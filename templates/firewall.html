@@ -1,0 +1,90 @@
+{{template "base" .}}
+{{define "firewall_content"}}
+<div x-data="firewallPage()" x-init="init()" class="p-6">
+    <h2 class="text-lg font-semibold text-purple-300 mb-6">安全防御</h2>
+
+    <!-- 白名单 -->
+    <div class="card mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <div class="text-sm font-medium text-gray-300">IP 白名单</div>
+            <button @click="showWhitelistModal=true" class="btn-primary text-sm">+ 添加 IP</button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead><tr><th class="table-header">IP 地址</th><th class="table-header">备注</th><th class="table-header">添加时间</th><th class="table-header">操作</th></tr></thead>
+                <tbody>
+                <template x-for="w in whitelist" :key="w.id">
+                    <tr class="border-t border-gray-700/50">
+                        <td class="table-cell text-white font-mono" x-text="w.ip_address"></td>
+                        <td class="table-cell text-gray-400" x-text="w.notes||'--'"></td>
+                        <td class="table-cell text-gray-500 text-xs" x-text="fmtTime(w.created_at)"></td>
+                        <td class="table-cell"><a href="#" @click.prevent="delWhitelist(w.id)" class="text-sm text-red-400">删除</a></td>
+                    </tr>
+                </template>
+                </tbody>
+            </table>
+            <div class="text-gray-500 text-sm py-4 text-center" x-show="whitelist.length==0">暂无白名单</div>
+        </div>
+    </div>
+
+    <!-- 封禁历史 -->
+    <div class="card">
+        <div class="text-sm font-medium text-gray-300 mb-3">封禁历史</div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead><tr><th class="table-header">IP</th><th class="table-header">原因</th><th class="table-header">来源</th><th class="table-header">到期时间</th><th class="table-header">封禁时间</th><th class="table-header">操作</th></tr></thead>
+                <tbody>
+                <template x-for="b in bans.items" :key="b.id">
+                    <tr class="border-t border-gray-700/50">
+                        <td class="table-cell text-white font-mono" x-text="b.ip_address"></td>
+                        <td class="table-cell text-gray-400 text-sm" x-text="b.reason"></td>
+                        <td class="table-cell text-gray-400 text-xs" x-text="b.source"></td>
+                        <td class="table-cell text-gray-400 text-xs" x-text="b.expires_at||'--'"></td>
+                        <td class="table-cell text-gray-500 text-xs" x-text="fmtTime(b.created_at)"></td>
+                        <td class="table-cell"><a href="#" @click.prevent="unban(b.id)" class="text-sm text-green-400">解封</a></td>
+                    </tr>
+                </template>
+                </tbody>
+            </table>
+            <div class="text-gray-500 text-sm py-4 text-center" x-show="!bans.items||bans.items.length==0">暂无封禁记录</div>
+        </div>
+    </div>
+
+    <!-- Add Whitelist Modal -->
+    <div class="modal-overlay" x-show="showWhitelistModal" @click.self="showWhitelistModal=false">
+        <div class="modal-content">
+            <h3 class="text-lg font-semibold text-purple-300 mb-4">添加白名单 IP</h3>
+            <div class="space-y-3">
+                <div><label class="label">IP 地址</label><input type="text" x-model="wlForm.ip_address" class="input-field" placeholder="192.168.1.1"></div>
+                <div><label class="label">备注</label><input type="text" x-model="wlForm.notes" class="input-field"></div>
+            </div>
+            <div class="flex gap-3 mt-5">
+                <button @click="addWhitelist()" class="btn-primary">添加</button>
+                <button @click="showWhitelistModal=false" class="btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function firewallPage() {
+    return {
+        bans: { items: [] }, whitelist: [], showWhitelistModal: false,
+        wlForm: { ip_address: '', notes: '' },
+        async init() { await this.fetchBans(); await this.fetchWhitelist(); },
+        async fetchBans() { try { const d = await api('/api/firewall/bans'); this.bans = d.data; } catch(e) {} },
+        async fetchWhitelist() { try { const d = await api('/api/firewall/whitelist'); this.whitelist = d.data || []; } catch(e) {} },
+        async unban(id) {
+            if (!await confirmModal('确认解封？')) return;
+            try { await api('/api/firewall/unban/'+id, {method:'POST'}); await this.fetchBans(); showToast('已解封','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async addWhitelist() {
+            try { await api('/api/firewall/whitelist', {method:'POST', body: this.wlForm}); this.showWhitelistModal = false; await this.fetchWhitelist(); showToast('添加成功','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async delWhitelist(id) {
+            if (!await confirmModal('确认删除？')) return;
+            try { await api('/api/firewall/whitelist/'+id, {method:'DELETE'}); await this.fetchWhitelist(); } catch(e) { showToast(e.message,'error'); }
+        }
+    }
+}
+</script>
+{{end}}

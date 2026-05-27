@@ -24,7 +24,6 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		cfg.Security.AttemptWindowMinutes,
 		cfg.Security.BanDurationHours,
 	)
-
 	basicAuthChecker := &middleware.BasicAuthChecker{
 		RecordAttempt: loginTracker.RecordAttempt,
 		IsBanned:      loginTracker.IsBanned,
@@ -36,6 +35,17 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 	suffix := cfg.Panel.RandomSuffix
 	prefix := "/" + suffix
 
+	// Public status page (no auth)
+	statusH := &handlers.StatusPageHandler{DB: db}
+	r.GET("/status/:token", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "status_public.html", nil)
+	})
+	r.GET("/api/status/:token/info", statusH.GetInfo)
+	r.GET("/api/status/:token/metrics", statusH.GetMetrics)
+	r.GET("/api/status/:token/websites", statusH.GetWebsites)
+	r.POST("/api/status/:token/verify", statusH.VerifyPassword)
+
+	// Agent routes
 	ag := r.Group("")
 	ag.Use(middleware.AgentAuth(db))
 	{
@@ -44,6 +54,7 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		ag.POST("/agent/metrics", ah.ReceiveMetrics)
 	}
 
+	// Panel group
 	pg := r.Group(prefix)
 	pg.Use(middleware.BasicAuth(basicAuthChecker))
 	{
@@ -127,6 +138,13 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.GET("/api/alerts/log", alertH.GetLog)
 			protected.POST("/api/alerts/test-smtp", alertH.TestSMTP)
 
+			fwH := &handlers.FirewallHandler{DB: db}
+			protected.GET("/api/firewall/bans", fwH.ListBans)
+			protected.POST("/api/firewall/unban/:id", fwH.Unban)
+			protected.GET("/api/firewall/whitelist", fwH.ListWhitelist)
+			protected.POST("/api/firewall/whitelist", fwH.AddWhitelist)
+			protected.DELETE("/api/firewall/whitelist/:id", fwH.DeleteWhitelist)
+
 			metricsH := &handlers.MetricsHandler{DB: db}
 			protected.GET("/api/monitor/overview", metricsH.GetOverview)
 			protected.GET("/api/monitor/:id/latest", metricsH.GetLatest)
@@ -188,6 +206,9 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			})
 			protected.GET("/settings", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "settings.html", pageData(cfg, "settings", "settings_content", c))
+			})
+			protected.GET("/firewall", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "firewall.html", pageData(cfg, "firewall", "firewall_content", c))
 			})
 		}
 	}
