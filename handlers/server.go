@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"net/http"
 	"strconv"
@@ -85,13 +86,17 @@ func (h *ServerHandler) List(c *gin.Context) {
 		var s models.Server
 		var probeHealthy sql.NullInt64
 		var lastSeen, probeLast sql.NullString
-		rows.Scan(&s.ID, &s.Name, &s.IPAddress, &s.ServerType, &s.OS, &s.UserID, &s.UserName,
+		err := rows.Scan(&s.ID, &s.Name, &s.IPAddress, &s.ServerType, &s.OS, &s.UserID, &s.UserName,
 			&s.CPU, &s.RAM, &s.Disk, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
 			&s.Location, &s.SSHPort, &s.SSHUsername, &s.PanelType, &s.PanelURL, &s.PanelUsername,
 			&s.PurchaseDate, &s.ExpiryDate, &s.RenewalCycle, &s.AutoRenewal, &s.PurchasePrice, &s.Currency,
 			&s.Status, &s.AgentVersion, &lastSeen, &s.IsOnline,
 			&s.HTTPProbeEnabled, &probeHealthy, &probeLast, &s.HTTPProbeLastError,
 			&s.StatusPageEnabled, &s.Notes, &s.CreatedAt, &s.UpdatedAt)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取服务器列表失败"))
+			return
+		}
 		if probeHealthy.Valid {
 			v := int(probeHealthy.Int64)
 			s.HTTPProbeHealthy = &v
@@ -149,6 +154,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 	if probeLast.Valid {
 		s.HTTPProbeLastAt = probeLast.String
 	}
+	decryptServerPasswords(c, &s)
 
 	c.JSON(http.StatusOK, models.SuccessResponse(s))
 }
@@ -164,37 +170,19 @@ func (h *ServerHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// 生成 Agent API Key
-	agentKey := make([]byte, 32)
-	rand.Read(agentKey)
-	agentKeyStr := hex.EncodeToString(agentKey)
-	agentKeyHash := sha256.Sum256([]byte(agentKeyStr))
-	agentKeyHashStr := hex.EncodeToString(agentKeyHash[:])
-
-	// 加密 SSH 密码
-	var sshPasswordEnc string
-	if s.SSHPasswordEnc != "" {
-		token, _ := c.Get("session_token")
-		key := GetDerivedKey(token.(string))
-		if key != nil {
-			enc, err := EncryptPassword(s.SSHPasswordEnc, key)
-			if err == nil {
-				sshPasswordEnc = enc
-			}
-		}
+	agentKeyStr, agentKeyHashStr, err := generateAgentKey()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("生成 Agent Key 失败"))
+		return
 	}
 
-	// 加密面板密码
-	var panelPasswordEnc string
-	if s.PanelPasswordEnc != "" {
-		token, _ := c.Get("session_token")
-		key := GetDerivedKey(token.(string))
-		if key != nil {
-			enc, err := EncryptPassword(s.PanelPasswordEnc, key)
-			if err == nil {
-				panelPasswordEnc = enc
-			}
-		}
+	sshPasswordEnc, ok := encryptOptionalPassword(c, s.SSHPassword)
+	if !ok {
+		return
+	}
+	panelPasswordEnc, ok := encryptOptionalPassword(c, s.PanelPassword)
+	if !ok {
+		return
 	}
 
 	result, err := h.DB.Exec(
@@ -215,8 +203,8 @@ func (h *ServerHandler) Create(c *gin.Context) {
 
 	id, _ := result.LastInsertId()
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
-		"id":         id,
-		"agent_key":  agentKeyStr,
+		"id":             id,
+		"agent_key":      agentKeyStr,
 		"agent_key_note": "请立即保存此密钥，之后无法再次查看",
 	}))
 }
@@ -229,31 +217,18 @@ func (h *ServerHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
 		return
 	}
-
-	// 处理 SSH 密码加密（如果提供了新密码）
-	sshPasswordEnc := ""
-	if s.SSHPasswordEnc != "" {
-		token, _ := c.Get("session_token")
-		key := GetDerivedKey(token.(string))
-		if key != nil {
-			enc, err := EncryptPassword(s.SSHPasswordEnc, key)
-			if err == nil {
-				sshPasswordEnc = enc
-			}
-		}
+	if s.Name == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("服务器名称不能为空"))
+		return
 	}
 
-	// 处理面板密码加密
-	panelPasswordEnc := ""
-	if s.PanelPasswordEnc != "" {
-		token, _ := c.Get("session_token")
-		key := GetDerivedKey(token.(string))
-		if key != nil {
-			enc, err := EncryptPassword(s.PanelPasswordEnc, key)
-			if err == nil {
-				panelPasswordEnc = enc
-			}
-		}
+	sshPasswordEnc, ok := encryptOptionalPassword(c, s.SSHPassword)
+	if !ok {
+		return
+	}
+	panelPasswordEnc, ok := encryptOptionalPassword(c, s.PanelPassword)
+	if !ok {
+		return
 	}
 
 	query := `UPDATE servers SET name=?, ip_address=?, server_type=?, os=?, user_id=?,
@@ -279,9 +254,13 @@ func (h *ServerHandler) Update(c *gin.Context) {
 	query += " WHERE id=?"
 	args = append(args, id)
 
-	_, err := h.DB.Exec(query, args...)
+	result, err := h.DB.Exec(query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败"))
+		return
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("服务器不存在"))
 		return
 	}
 
@@ -291,7 +270,6 @@ func (h *ServerHandler) Update(c *gin.Context) {
 func (h *ServerHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 
-	// 检查是否有关联网站
 	var count int
 	h.DB.QueryRow("SELECT COUNT(*) FROM websites WHERE server_id = ?", id).Scan(&count)
 	if count > 0 {
@@ -299,9 +277,13 @@ func (h *ServerHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	_, err := h.DB.Exec("DELETE FROM servers WHERE id = ?", id)
+	result, err := h.DB.Exec("DELETE FROM servers WHERE id = ?", id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("删除失败"))
+		return
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("服务器不存在"))
 		return
 	}
 
@@ -321,4 +303,62 @@ func (h *ServerHandler) GetStats(c *gin.Context) {
 		"offline":  offline,
 		"expiring": expiring,
 	}))
+}
+
+func generateAgentKey() (string, string, error) {
+	agentKey := make([]byte, 32)
+	if _, err := rand.Read(agentKey); err != nil {
+		return "", "", err
+	}
+	agentKeyStr := base64.RawURLEncoding.EncodeToString(agentKey)
+	agentKeyHash := sha256.Sum256([]byte(agentKeyStr))
+	return agentKeyStr, hex.EncodeToString(agentKeyHash[:]), nil
+}
+
+func encryptOptionalPassword(c *gin.Context, plaintext string) (string, bool) {
+	if plaintext == "" {
+		return "", true
+	}
+
+	key := derivedKeyFromContext(c)
+	if key == nil {
+		c.JSON(http.StatusForbidden, models.ErrorResponse("请先输入查看密码"))
+		return "", false
+	}
+
+	enc, err := EncryptPassword(plaintext, key)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("密码加密失败"))
+		return "", false
+	}
+	return enc, true
+}
+
+func derivedKeyFromContext(c *gin.Context) []byte {
+	token, exists := c.Get("session_token")
+	if !exists {
+		return nil
+	}
+	tokenStr, ok := token.(string)
+	if !ok || tokenStr == "" {
+		return nil
+	}
+	return GetDerivedKey(tokenStr)
+}
+
+func decryptServerPasswords(c *gin.Context, s *models.Server) {
+	key := derivedKeyFromContext(c)
+	if key == nil {
+		return
+	}
+	if s.SSHPasswordEnc != "" {
+		if password, err := DecryptPassword(s.SSHPasswordEnc, key); err == nil {
+			s.SSHPassword = password
+		}
+	}
+	if s.PanelPasswordEnc != "" {
+		if password, err := DecryptPassword(s.PanelPasswordEnc, key); err == nil {
+			s.PanelPassword = password
+		}
+	}
 }

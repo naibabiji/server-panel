@@ -1,6 +1,7 @@
 function api(path, options = {}) {
     const prefix = document.body.dataset.panelPrefix || '';
-    const url = prefix + '/api' + path;
+    const apiPath = path.startsWith('/api/') ? path : '/api' + path;
+    const url = prefix + apiPath;
 
     const headers = {
         'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',

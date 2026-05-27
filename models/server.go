@@ -16,10 +16,10 @@ var PanelTypes = []string{PanelTypeNone, PanelTypeBaota, PanelTypeWPPanel, Panel
 
 // ServerType 常量
 const (
-	ServerTypeVPS     = "vps"
+	ServerTypeVPS       = "vps"
 	ServerTypeDedicated = "dedicated"
-	ServerTypeShared  = "shared"
-	ServerTypeOtherS  = "other"
+	ServerTypeShared    = "shared"
+	ServerTypeOtherS    = "other"
 )
 
 var ServerTypes = []string{ServerTypeVPS, ServerTypeDedicated, ServerTypeShared, ServerTypeOtherS}
@@ -50,49 +50,51 @@ var Currencies = []string{"USD", "CNY", "EUR", "JPY"}
 var AutoRenewalOptions = []string{"是", "否"}
 
 type Server struct {
-	ID                  int64   `json:"id"`
-	Name                string  `json:"name"`
-	IPAddress           string  `json:"ip_address"`
-	ServerType          string  `json:"server_type"`
-	OS                  string  `json:"os"`
-	UserID              *int64  `json:"user_id"`
-	UserName            string  `json:"user_name,omitempty"`
-	CPU                 string  `json:"cpu"`
-	RAM                 string  `json:"ram"`
-	Disk                string  `json:"disk"`
-	Bandwidth           string  `json:"bandwidth"`
-	ProviderID          *int64  `json:"provider_id"`
-	ProviderName        string  `json:"provider_name,omitempty"`
-	Location            string  `json:"location"`
-	SSHPort             int     `json:"ssh_port"`
-	SSHUsername         string  `json:"ssh_username"`
-	SSHPasswordEnc      string  `json:"-"`
-	PanelType           string  `json:"panel_type"`
-	PanelURL            string  `json:"panel_url"`
-	PanelUsername       string  `json:"panel_username"`
-	PanelPasswordEnc    string  `json:"-"`
-	PurchaseDate        string  `json:"purchase_date"`
-	ExpiryDate          string  `json:"expiry_date"`
-	RenewalCycle        string  `json:"renewal_cycle"`
-	AutoRenewal         int     `json:"auto_renewal"`
-	PurchasePrice       float64 `json:"purchase_price"`
-	Currency            string  `json:"currency"`
-	Status              string  `json:"status"`
-	AgentAPIKeyHash     string  `json:"-"`
-	AgentAPIKey         string  `json:"agent_api_key,omitempty"`
-	AgentVersion        string  `json:"agent_version"`
-	LastSeenAt          string  `json:"last_seen_at"`
-	IsOnline            bool    `json:"is_online"`
-	HTTPProbeEnabled    int     `json:"http_probe_enabled"`
-	HTTPProbeHealthy    *int    `json:"http_probe_healthy"`
-	HTTPProbeLastAt     string  `json:"http_probe_last_at"`
-	HTTPProbeLastError  string  `json:"http_probe_last_error"`
-	StatusPageEnabled   int     `json:"status_page_enabled"`
-	StatusPageToken     string  `json:"status_page_token"`
-	StatusPagePassword  string  `json:"-"`
-	Notes               string  `json:"notes"`
-	CreatedAt           string  `json:"created_at"`
-	UpdatedAt           string  `json:"updated_at"`
+	ID                 int64   `json:"id"`
+	Name               string  `json:"name"`
+	IPAddress          string  `json:"ip_address"`
+	ServerType         string  `json:"server_type"`
+	OS                 string  `json:"os"`
+	UserID             *int64  `json:"user_id"`
+	UserName           string  `json:"user_name,omitempty"`
+	CPU                string  `json:"cpu"`
+	RAM                string  `json:"ram"`
+	Disk               string  `json:"disk"`
+	Bandwidth          string  `json:"bandwidth"`
+	ProviderID         *int64  `json:"provider_id"`
+	ProviderName       string  `json:"provider_name,omitempty"`
+	Location           string  `json:"location"`
+	SSHPort            int     `json:"ssh_port"`
+	SSHUsername        string  `json:"ssh_username"`
+	SSHPasswordEnc     string  `json:"-"`
+	SSHPassword        string  `json:"ssh_password,omitempty"`
+	PanelType          string  `json:"panel_type"`
+	PanelURL           string  `json:"panel_url"`
+	PanelUsername      string  `json:"panel_username"`
+	PanelPasswordEnc   string  `json:"-"`
+	PanelPassword      string  `json:"panel_password,omitempty"`
+	PurchaseDate       string  `json:"purchase_date"`
+	ExpiryDate         string  `json:"expiry_date"`
+	RenewalCycle       string  `json:"renewal_cycle"`
+	AutoRenewal        int     `json:"auto_renewal"`
+	PurchasePrice      float64 `json:"purchase_price"`
+	Currency           string  `json:"currency"`
+	Status             string  `json:"status"`
+	AgentAPIKeyHash    string  `json:"-"`
+	AgentAPIKey        string  `json:"agent_api_key,omitempty"`
+	AgentVersion       string  `json:"agent_version"`
+	LastSeenAt         string  `json:"last_seen_at"`
+	IsOnline           bool    `json:"is_online"`
+	HTTPProbeEnabled   int     `json:"http_probe_enabled"`
+	HTTPProbeHealthy   *int    `json:"http_probe_healthy"`
+	HTTPProbeLastAt    string  `json:"http_probe_last_at"`
+	HTTPProbeLastError string  `json:"http_probe_last_error"`
+	StatusPageEnabled  int     `json:"status_page_enabled"`
+	StatusPageToken    string  `json:"status_page_token"`
+	StatusPagePassword string  `json:"-"`
+	Notes              string  `json:"notes"`
+	CreatedAt          string  `json:"created_at"`
+	UpdatedAt          string  `json:"updated_at"`
 }
 
 // ServerPublic 公开状态页视图（仅暴露非敏感字段）

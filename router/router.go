@@ -41,8 +41,8 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 	ag.Use(middleware.AgentAuth(db))
 	{
 		ah := &handlers.AgentDataHandler{DB: db}
-		ag.POST(prefix+"/agent/ping", ah.Ping)
-		ag.POST(prefix+"/agent/metrics", ah.ReceiveMetrics)
+		ag.POST("/agent/ping", ah.Ping)
+		ag.POST("/agent/metrics", ah.ReceiveMetrics)
 	}
 
 	// Panel group
