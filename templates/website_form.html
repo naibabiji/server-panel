@@ -1,0 +1,77 @@
+{{template "base" .}}
+{{define "website_form_content"}}
+<div x-data="websiteForm()" x-init="init()" class="p-6 max-w-2xl">
+    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑网站' : '添加网站'"></h2>
+    <div class="card space-y-4">
+        <div><label class="label">网站名称</label><input type="text" x-model="form.name" class="input-field" placeholder="例如：公司官网"></div>
+        <div><label class="label">域名 <span class="text-red-400">*</span></label><input type="text" x-model="form.domain" class="input-field" placeholder="example.com"></div>
+        <div>
+            <label class="label">网站类型</label>
+            <select x-model="form.site_type" class="input-field">
+                <option value="">-- 请选择 --</option>
+                <template x-for="t in siteTypes" :key="t"><option :value="t" x-text="t"></option></template>
+            </select>
+        </div>
+        <div><label class="label">所属服务器 <span class="text-red-400">*</span></label>
+            <select x-model.number="form.server_id" class="input-field">
+                <option :value="0">-- 请选择 --</option>
+                <template x-for="s in servers" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
+            </select>
+        </div>
+        <div>
+            <label class="label">所属用户</label>
+            <select x-model="form.user_id" class="input-field">
+                <option value="">-- 请选择 --</option>
+                <template x-for="u in users" :key="u.id"><option :value="u.id" x-text="u.name"></option></template>
+            </select>
+        </div>
+        <div><label class="label">到期日期</label><input type="date" x-model="form.expiry_date" class="input-field"></div>
+        <div>
+            <label class="label">状态</label>
+            <select x-model="form.status" class="input-field w-48">
+                <option value="active">运行中</option><option value="expired">已到期</option>
+            </select>
+        </div>
+        <div><label class="label">备注</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
+        <div class="flex gap-3 pt-2">
+            <button @click="save()" class="btn-primary" :disabled="saving"><span x-show="!saving">保存</span><span x-show="saving">保存中...</span></button>
+            <a href="/{{.RandomSuffix}}/websites" class="btn-secondary">取消</a>
+        </div>
+    </div>
+</div>
+<script>
+function websiteForm() {
+    return {
+        isEdit: false, id: null, saving: false,
+        form: { name:'', domain:'', site_type:'', server_id:0, user_id:'', expiry_date:'', status:'active', notes:'' },
+        servers: [], users: [], siteTypes: [],
+        async init() {
+            const parts = window.location.pathname.split('/').filter(Boolean);
+            const last = parts[parts.length-1];
+            if (last === 'edit') this.id = parts[parts.length-2];
+            else if (last !== 'new') this.id = last;
+            if (this.id) { this.isEdit = true; await this.load(); }
+            try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {}
+            try { const d = await api('/api/users?page_size=100'); this.users = d.data.items || []; } catch(e) {}
+            try { const d = await api('/api/settings/site-type-list'); this.siteTypes = JSON.parse(d.data.svalue || '[]'); } catch(e) {}
+        },
+        async load() {
+            try { const d = await api('/api/websites/'+this.id); const w = d.data; Object.keys(this.form).forEach(k => { if (w[k] !== undefined && w[k] !== null) this.form[k] = w[k]; }); } catch(e) {}
+        },
+        async save() {
+            this.saving = true;
+            try {
+                if (!this.form.domain) { showToast('域名不能为空','error'); this.saving=false; return; }
+                if (!this.form.server_id) { showToast('请选择服务器','error'); this.saving=false; return; }
+                const method = this.isEdit ? 'PUT' : 'POST';
+                const url = this.isEdit ? '/api/websites/'+this.id : '/api/websites';
+                await api(url, {method, body: this.form});
+                showToast('保存成功','success');
+                setTimeout(() => location.href = document.body.dataset.panelPrefix+'/websites', 500);
+            } catch(e) { showToast(e.message,'error'); }
+            this.saving = false;
+        }
+    }
+}
+</script>
+{{end}}

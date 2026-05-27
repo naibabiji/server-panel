@@ -100,6 +100,22 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.PUT("/api/users/:id", userH.Update)
 			protected.DELETE("/api/users/:id", userH.Delete)
 
+			// Websites
+			webH := &handlers.WebsiteHandler{DB: db}
+			protected.GET("/api/websites", webH.List)
+			protected.POST("/api/websites", webH.Create)
+			protected.GET("/api/websites/:id", webH.Get)
+			protected.PUT("/api/websites/:id", webH.Update)
+			protected.DELETE("/api/websites/:id", webH.Delete)
+
+			// Providers
+			provH := &handlers.ProviderHandler{DB: db}
+			protected.GET("/api/providers", provH.List)
+			protected.POST("/api/providers", provH.Create)
+			protected.GET("/api/providers/:id", provH.Get)
+			protected.PUT("/api/providers/:id", provH.Update)
+			protected.DELETE("/api/providers/:id", provH.Delete)
+
 			// Metrics
 			metricsH := &handlers.MetricsHandler{DB: db}
 			protected.GET("/api/monitor/overview", metricsH.GetOverview)
@@ -136,6 +152,24 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			})
 			protected.GET("/monitor/:id", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "monitor_detail.html", pageData(cfg, "monitor", "monitor_detail_content", c))
+			})
+			protected.GET("/websites", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "website_list.html", pageData(cfg, "website_list", "website_list_content", c))
+			})
+			protected.GET("/websites/new", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "website_form.html", pageData(cfg, "website_form", "website_form_content", c))
+			})
+			protected.GET("/websites/:id/edit", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "website_form.html", pageData(cfg, "website_form", "website_form_content", c))
+			})
+			protected.GET("/providers", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "provider_list.html", pageData(cfg, "provider_list", "provider_list_content", c))
+			})
+			protected.GET("/providers/new", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "provider_form.html", pageData(cfg, "provider_form", "provider_form_content", c))
+			})
+			protected.GET("/providers/:id/edit", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "provider_form.html", pageData(cfg, "provider_form", "provider_form_content", c))
 			})
 		}
 	}

@@ -79,8 +79,11 @@
                 {{if eq .ContentTemplate "user_list_content"}}{{template "user_list_content" .}}{{end}}
                 {{if eq .ContentTemplate "user_form_content"}}{{template "user_form_content" .}}{{end}}
                 {{if eq .ContentTemplate "website_list_content"}}{{template "website_list_content" .}}{{end}}
+                {{if eq .ContentTemplate "website_form_content"}}{{template "website_form_content" .}}{{end}}
                 {{if eq .ContentTemplate "provider_list_content"}}{{template "provider_list_content" .}}{{end}}
+                {{if eq .ContentTemplate "provider_form_content"}}{{template "provider_form_content" .}}{{end}}
                 {{if eq .ContentTemplate "monitor_content"}}{{template "monitor_content" .}}{{end}}
+                {{if eq .ContentTemplate "monitor_detail_content"}}{{template "monitor_detail_content" .}}{{end}}
                 {{if eq .ContentTemplate "firewall_content"}}{{template "firewall_content" .}}{{end}}
                 {{if eq .ContentTemplate "alert_rules_content"}}{{template "alert_rules_content" .}}{{end}}
                 {{if eq .ContentTemplate "alert_log_content"}}{{template "alert_log_content" .}}{{end}}

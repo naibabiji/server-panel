@@ -1,0 +1,64 @@
+{{template "base" .}}
+{{define "website_list_content"}}
+<div x-data="websiteList()" x-init="fetch()" class="p-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div class="flex gap-2">
+            <input type="text" x-model="search" @input="fetch()" placeholder="搜索名称/域名..." class="input-field w-48">
+            <select x-model="filterServer" @change="fetch()" class="input-field w-40">
+                <option value="">全部服务器</option>
+                <template x-for="s in servers" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
+            </select>
+        </div>
+        <a href="websites/new" class="btn-primary text-sm">+ 添加网站</a>
+    </div>
+    <div class="card overflow-x-auto">
+        <table class="w-full">
+            <thead><tr>
+                <th class="table-header">名称</th><th class="table-header">域名</th><th class="table-header">服务器</th>
+                <th class="table-header">类型</th><th class="table-header">状态</th><th class="table-header">到期日</th><th class="table-header">操作</th>
+            </tr></thead>
+            <tbody>
+            <template x-for="w in items" :key="w.id">
+                <tr class="border-t border-gray-700/50 hover:bg-white/5">
+                    <td class="table-cell text-white" x-text="w.name || w.domain"></td>
+                    <td class="table-cell text-gray-400" x-text="w.domain"></td>
+                    <td class="table-cell text-gray-400" x-text="w.server_name || '--'"></td>
+                    <td class="table-cell"><span class="badge-info text-xs" x-text="w.site_type || '--'"></span></td>
+                    <td class="table-cell"><span :class="w.status=='active'?'badge-success':'badge-danger'" x-text="w.status=='active'?'运行中':'已到期'"></span></td>
+                    <td class="table-cell text-gray-400" x-text="w.expiry_date || '--'"></td>
+                    <td class="table-cell">
+                        <a :href="'websites/'+w.id+'/edit'" class="text-sm text-blue-400 hover:text-blue-300 mr-2">编辑</a>
+                        <a href="#" @click.prevent="del(w.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
+                    </td>
+                </tr>
+            </template>
+            </tbody>
+        </table>
+        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无网站</div>
+    </div>
+</div>
+<script>
+function websiteList() {
+    return {
+        items: [], servers: [], loading: true, search: '', filterServer: '',
+        async fetch() {
+            this.loading = true;
+            try {
+                const d = await api('/api/websites?search='+encodeURIComponent(this.search)+'&server_id='+this.filterServer+'&page_size=100');
+                this.items = d.data.items || [];
+            } catch(e) {}
+            this.loading = false;
+        },
+        async init() {
+            await this.fetch();
+            try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {}
+        },
+        async del(id) {
+            if (!await confirmModal('确认删除此网站？')) return;
+            try { await api('/api/websites/'+id, {method:'DELETE'}); await this.fetch(); }
+            catch(e) { showToast(e.message, 'error'); }
+        }
+    }
+}
+</script>
+{{end}}

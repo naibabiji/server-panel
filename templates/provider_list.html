@@ -1,0 +1,47 @@
+{{template "base" .}}
+{{define "provider_list_content"}}
+<div x-data="providerList()" x-init="fetch()" class="p-6">
+    <div class="flex items-center justify-between mb-4">
+        <input type="text" x-model="search" @input="fetch()" placeholder="搜索服务商..." class="input-field w-48">
+        <a href="providers/new" class="btn-primary text-sm">+ 添加服务商</a>
+    </div>
+    <div class="card overflow-x-auto">
+        <table class="w-full">
+            <thead><tr>
+                <th class="table-header">名称</th><th class="table-header">官网</th><th class="table-header">联系方式</th><th class="table-header">备注</th><th class="table-header">操作</th>
+            </tr></thead>
+            <tbody>
+            <template x-for="p in items" :key="p.id">
+                <tr class="border-t border-gray-700/50 hover:bg-white/5">
+                    <td class="table-cell text-white" x-text="p.name"></td>
+                    <td class="table-cell"><a :href="p.website" target="_blank" class="text-purple-400 hover:text-purple-300 text-sm" x-text="p.website||'--'"></a></td>
+                    <td class="table-cell text-gray-400" x-text="p.contact||'--'"></td>
+                    <td class="table-cell text-gray-400 text-sm" x-text="p.notes||'--'"></td>
+                    <td class="table-cell">
+                        <a :href="'providers/'+p.id+'/edit'" class="text-sm text-blue-400 hover:text-blue-300 mr-2">编辑</a>
+                        <a href="#" @click.prevent="del(p.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
+                    </td>
+                </tr>
+            </template>
+            </tbody>
+        </table>
+        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无服务商</div>
+    </div>
+</div>
+<script>
+function providerList() {
+    return {
+        items: [], loading: true, search: '',
+        async fetch() {
+            this.loading = true;
+            try { const d = await api('/api/providers?search='+encodeURIComponent(this.search)); this.items = d.data.items || []; } catch(e) {}
+            this.loading = false;
+        },
+        async del(id) {
+            if (!await confirmModal('确认删除？')) return;
+            try { await api('/api/providers/'+id, {method:'DELETE'}); await this.fetch(); } catch(e) { showToast(e.message,'error'); }
+        }
+    }
+}
+</script>
+{{end}}
