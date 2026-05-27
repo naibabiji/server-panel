@@ -1,0 +1,83 @@
+{{template "base" .}}
+{{define "settings_content"}}
+<div x-data="settingsPage()" x-init="init()" class="p-6 max-w-2xl">
+    <h2 class="text-lg font-semibold text-purple-300 mb-6">系统设置</h2>
+
+    <!-- 面板设置 -->
+    <div class="card mb-4">
+        <div class="text-sm font-medium text-gray-300 mb-3">面板设置</div>
+        <div class="grid grid-cols-2 gap-3">
+            <div><label class="label">面板标题</label><input type="text" x-model="panelTitle" class="input-field"></div>
+            <div class="flex items-end"><button @click="saveTitle()" class="btn-primary text-sm">保存</button></div>
+        </div>
+    </div>
+
+    <!-- SMTP 配置 -->
+    <div class="card mb-4">
+        <div class="text-sm font-medium text-gray-300 mb-3">SMTP 邮件配置</div>
+        <div class="grid grid-cols-2 gap-3">
+            <div><label class="label">SMTP 主机</label><input type="text" x-model="smtp.smtp_host" class="input-field"></div>
+            <div><label class="label">端口</label><input type="number" x-model="smtp.smtp_port" class="input-field"></div>
+            <div><label class="label">加密方式</label>
+                <select x-model="smtp.smtp_encryption" class="input-field">
+                    <option value="starttls">STARTTLS</option><option value="ssl">SSL</option><option value="none">无</option>
+                </select>
+            </div>
+            <div><label class="label">发件账号</label><input type="text" x-model="smtp.smtp_user" class="input-field"></div>
+            <div><label class="label">密码/授权码</label><input type="password" x-model="smtp.smtp_pass" class="input-field"></div>
+            <div><label class="label">管理员邮箱</label><input type="email" x-model="smtp.admin_email" class="input-field"></div>
+        </div>
+        <div class="flex gap-3 mt-3">
+            <button @click="saveSMTP()" class="btn-primary text-sm">保存</button>
+            <button @click="testSMTP()" class="btn-secondary text-sm">发送测试邮件</button>
+        </div>
+    </div>
+
+    <!-- 修改密码 -->
+    <div class="card mb-4">
+        <div class="text-sm font-medium text-gray-300 mb-3">修改登录密码</div>
+        <div class="grid grid-cols-2 gap-3">
+            <div><label class="label">旧密码</label><input type="password" x-model="pwd.old_password" class="input-field"></div>
+            <div><label class="label">新密码</label><input type="password" x-model="pwd.new_password" class="input-field"></div>
+        </div>
+        <button @click="changePwd()" class="btn-primary text-sm mt-3">修改密码</button>
+    </div>
+
+    <!-- 查看密码 -->
+    <div class="card">
+        <div class="text-sm font-medium text-gray-300 mb-3">查看密码</div>
+        <div class="text-sm text-gray-400 mb-2" x-show="!isVPUnlocked">查看密码未解锁，无法查看已保存的 SSH/面板密码</div>
+        <div class="text-sm text-green-400 mb-2" x-show="isVPUnlocked">查看密码已解锁</div>
+        <div class="flex gap-2">
+            <button @click="unlockVP()" class="btn-primary text-sm" x-show="!isVPUnlocked">解锁</button>
+            <button @click="lockVP()" class="btn-secondary text-sm" x-show="isVPUnlocked">锁定</button>
+        </div>
+    </div>
+</div>
+<script>
+function settingsPage() {
+    return {
+        panelTitle: '', smtp: {}, pwd: { old_password:'', new_password:'' }, isVPUnlocked: false,
+        async init() {
+            try { const d = await api('/api/settings'); this.panelTitle = d.data.panel_title || ''; } catch(e) {}
+            try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {}
+            try { const d = await api('/api/view-password/status'); this.isVPUnlocked = d.data.is_unlocked; } catch(e) {}
+        },
+        async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
+        async saveSMTP() { try { await api('/api/settings/smtp', {method:'PUT', body:this.smtp}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
+        async testSMTP() {
+            const email = prompt('请输入测试接收邮箱:', this.smtp.admin_email || '');
+            if (!email) return;
+            try { await api('/api/alerts/test-smtp', {method:'POST', body:{email}}); showToast('测试邮件已发送','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async changePwd() { try { await api('/api/settings/change-password', {method:'POST', body:this.pwd}); showToast('密码修改成功','success'); this.pwd = {old_password:'',new_password:''}; } catch(e) { showToast(e.message,'error'); } },
+        async unlockVP() {
+            const pw = prompt('请输入查看密码:');
+            if (!pw) return;
+            try { await api('/api/view-password/unlock', {method:'POST', body:{password:pw}}); this.isVPUnlocked = true; showToast('已解锁','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async lockVP() { try { await api('/api/view-password/lock', {method:'POST'}); this.isVPUnlocked = false; showToast('已锁定','success'); } catch(e) { showToast(e.message,'error'); } }
+    }
+}
+</script>
+{{end}}

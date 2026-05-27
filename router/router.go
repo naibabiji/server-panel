@@ -36,7 +36,6 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 	suffix := cfg.Panel.RandomSuffix
 	prefix := "/" + suffix
 
-	// Agent routes
 	ag := r.Group("")
 	ag.Use(middleware.AgentAuth(db))
 	{
@@ -45,7 +44,6 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		ag.POST("/agent/metrics", ah.ReceiveMetrics)
 	}
 
-	// Panel group
 	pg := r.Group(prefix)
 	pg.Use(middleware.BasicAuth(basicAuthChecker))
 	{
@@ -66,24 +64,20 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		protected.Use(middleware.SetCSRFToken)
 		protected.Use(middleware.CSRF())
 		{
-			// Auth
 			protected.POST("/api/auth/logout", authH.Logout)
 			protected.GET("/api/auth/check", authH.Check)
 			protected.GET("/api/auth/csrf-token", authH.CSRFToken)
 
-			// View Password
 			protected.GET("/api/view-password/status", vpH.GetStatus)
 			protected.POST("/api/view-password/setup", vpH.Setup)
 			protected.POST("/api/view-password/unlock", vpH.Unlock)
 			protected.POST("/api/view-password/lock", vpH.Lock)
 
-			// Dashboard
 			dashH := &handlers.DashboardHandler{}
 			protected.GET("/api/dashboard/stats", dashH.GetStats)
 			protected.GET("/api/dashboard/expiring", dashH.GetExpiring)
 			protected.GET("/api/dashboard/recent-alerts", dashH.GetRecentAlerts)
 
-			// Servers
 			srvH := &handlers.ServerHandler{DB: db}
 			protected.GET("/api/servers", srvH.List)
 			protected.POST("/api/servers", srvH.Create)
@@ -92,7 +86,6 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.PUT("/api/servers/:id", srvH.Update)
 			protected.DELETE("/api/servers/:id", srvH.Delete)
 
-			// Users
 			userH := &handlers.UserHandler{DB: db}
 			protected.GET("/api/users", userH.List)
 			protected.POST("/api/users", userH.Create)
@@ -100,7 +93,6 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.PUT("/api/users/:id", userH.Update)
 			protected.DELETE("/api/users/:id", userH.Delete)
 
-			// Websites
 			webH := &handlers.WebsiteHandler{DB: db}
 			protected.GET("/api/websites", webH.List)
 			protected.POST("/api/websites", webH.Create)
@@ -108,7 +100,6 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.PUT("/api/websites/:id", webH.Update)
 			protected.DELETE("/api/websites/:id", webH.Delete)
 
-			// Providers
 			provH := &handlers.ProviderHandler{DB: db}
 			protected.GET("/api/providers", provH.List)
 			protected.POST("/api/providers", provH.Create)
@@ -116,18 +107,31 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.PUT("/api/providers/:id", provH.Update)
 			protected.DELETE("/api/providers/:id", provH.Delete)
 
-			// Settings list data used by forms
 			settingsH := &handlers.SettingsHandler{DB: db}
 			protected.GET("/api/settings/os-list", settingsH.GetOSList)
 			protected.GET("/api/settings/site-type-list", settingsH.GetSiteTypeList)
+			protected.GET("/api/settings", settingsH.GetPanelTitle)
+			protected.PUT("/api/settings", settingsH.UpdatePanelTitle)
+			protected.GET("/api/settings/smtp", settingsH.GetSMTPConfig)
+			protected.PUT("/api/settings/smtp", settingsH.UpdateSMTPConfig)
+			protected.POST("/api/settings/change-password", settingsH.ChangePassword)
+			protected.PUT("/api/settings/os-list", settingsH.UpdateOSList)
+			protected.PUT("/api/settings/site-type-list", settingsH.UpdateSiteTypeList)
+			protected.GET("/api/settings/cron-status", settingsH.GetCronStatus)
 
-			// Metrics
+			alertH := &handlers.AlertHandler{DB: db}
+			protected.GET("/api/alerts/rules", alertH.ListRules)
+			protected.POST("/api/alerts/rules", alertH.CreateRule)
+			protected.PUT("/api/alerts/rules/:id", alertH.UpdateRule)
+			protected.DELETE("/api/alerts/rules/:id", alertH.DeleteRule)
+			protected.GET("/api/alerts/log", alertH.GetLog)
+			protected.POST("/api/alerts/test-smtp", alertH.TestSMTP)
+
 			metricsH := &handlers.MetricsHandler{DB: db}
 			protected.GET("/api/monitor/overview", metricsH.GetOverview)
 			protected.GET("/api/monitor/:id/latest", metricsH.GetLatest)
 			protected.GET("/api/monitor/:id", metricsH.GetServerMetrics)
 
-			// Page routes
 			protected.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "dashboard.html", pageData(cfg, "dashboard", "dashboard_content", c))
 			})
@@ -176,14 +180,21 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.GET("/providers/:id/edit", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "provider_form.html", pageData(cfg, "provider_form", "provider_form_content", c))
 			})
+			protected.GET("/alerts", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "alert_rules.html", pageData(cfg, "alert_rules", "alert_rules_content", c))
+			})
+			protected.GET("/alerts/log", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "alert_log.html", pageData(cfg, "alert_log", "alert_log_content", c))
+			})
+			protected.GET("/settings", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "settings.html", pageData(cfg, "settings", "settings_content", c))
+			})
 		}
 	}
 
-	// Static files
 	staticSubFS, _ := fs.Sub(staticFS, "static")
 	r.StaticFS(prefix+"/assets", http.FS(staticSubFS))
 
-	// Templates
 	tmpl := template.Must(template.New("").ParseFS(templatesFS, "templates/*.html"))
 	r.SetHTMLTemplate(tmpl)
 
@@ -200,7 +211,9 @@ func pageData(cfg *config.Config, active string, contentTpl string, c *gin.Conte
 		"user_list":     "用户管理",
 		"user_form":     "编辑用户",
 		"website_list":  "网站管理",
+		"website_form":  "编辑网站",
 		"provider_list": "服务商管理",
+		"provider_form": "编辑服务商",
 		"monitor":       "性能监控",
 		"firewall":      "安全防御",
 		"alert_rules":   "告警规则",
