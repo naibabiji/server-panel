@@ -1,0 +1,124 @@
+{{template "base" .}}
+{{define "monitor_detail_content"}}
+<div x-data="monitorDetail()" x-init="init()" class="p-6">
+    <div class="flex items-center justify-between mb-4">
+        <div>
+            <h2 class="text-lg font-semibold text-purple-300" x-text="server.name || '加载中...'"></h2>
+            <div class="text-xs text-gray-500 mt-1" x-text="server.ip_address"></div>
+        </div>
+        <div class="flex gap-2">
+            <select @change="changeRange($event.target.value)" class="input-field w-28 text-sm">
+                <option value="24h">24小时</option>
+                <option value="7d">7天</option>
+                <option value="15d">15天</option>
+                <option value="30d">30天</option>
+            </select>
+            <a href="../monitor" class="btn-secondary text-sm">返回</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card">
+            <div class="text-xs text-gray-400">CPU</div>
+            <div class="text-xl font-bold mt-1 text-purple-400" x-text="(latest.cpu_percent||0).toFixed(1)+'%'"></div>
+        </div>
+        <div class="card">
+            <div class="text-xs text-gray-400">内存</div>
+            <div class="text-xl font-bold mt-1 text-green-400" x-text="(latest.memory_percent||0).toFixed(1)+'%'"></div>
+        </div>
+        <div class="card">
+            <div class="text-xs text-gray-400">磁盘</div>
+            <div class="text-xl font-bold mt-1 text-yellow-400" x-text="(latest.disk_percent||0).toFixed(1)+'%'"></div>
+        </div>
+        <div class="card">
+            <div class="text-xs text-gray-400">负载 (1m)</div>
+            <div class="text-xl font-bold mt-1 text-gray-200" x-text="(latest.load_avg_1||0).toFixed(2)"></div>
+        </div>
+    </div>
+
+    <div class="card mb-4"><canvas id="cpuChart" height="80"></canvas></div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="card"><canvas id="memChart" height="80"></canvas></div>
+        <div class="card"><canvas id="loadChart" height="80"></canvas></div>
+    </div>
+</div>
+<script>
+let charts = {};
+
+function destroyCharts() {
+    Object.values(charts).forEach(c => c.destroy());
+    charts = {};
+}
+
+function makeChart(canvasId, label, color, dataKey) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return null;
+    return new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{ label, data: [], borderColor: color, borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#a1a1aa', font: { size: 11 } } } },
+            scales: {
+                x: { ticks: { color: '#52525b', maxTicksLimit: 10 }, grid: { color: '#27272a' } },
+                y: { ticks: { color: '#52525b' }, grid: { color: '#27272a' }, beginAtZero: true }
+            }
+        }
+    });
+}
+
+function updateCharts(points) {
+    destroyCharts();
+    if (!points || !points.length) return;
+
+    const labels = points.map(p => {
+        const d = new Date(p.t.replace(' ', 'T'));
+        return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    });
+
+    charts.cpu = makeChart('cpuChart', 'CPU %', '#a78bfa', 'cpu');
+    if (charts.cpu) {
+        charts.cpu.data.labels = labels;
+        charts.cpu.data.datasets[0].data = points.map(p => p.cpu);
+        charts.cpu.update();
+    }
+
+    charts.mem = makeChart('memChart', 'Memory %', '#4ade80', 'mem');
+    if (charts.mem) {
+        charts.mem.data.labels = labels;
+        charts.mem.data.datasets[0].data = points.map(p => p.mem);
+        charts.mem.update();
+    }
+
+    charts.load = makeChart('loadChart', 'Load 1m', '#fbbf24', 'load1');
+    if (charts.load) {
+        charts.load.data.labels = labels;
+        charts.load.data.datasets[0].data = points.map(p => p.load1);
+        charts.load.update();
+    }
+}
+
+function monitorDetail() {
+    return {
+        server: {}, latest: {}, currentRange: '24h',
+        async init() {
+            const id = window.location.pathname.split('/').filter(Boolean).pop();
+            try { const d = await api('/api/servers/'+id); this.server = d.data; } catch(e) {}
+            try { const d = await api('/api/monitor/'+id+'/latest'); this.latest = d.data; } catch(e) {}
+            await this.loadCharts();
+        },
+        async loadCharts(range) {
+            const r = range || this.currentRange;
+            this.currentRange = r;
+            const id = window.location.pathname.split('/').filter(Boolean).pop();
+            try {
+                const d = await api('/api/monitor/'+id+'?range='+r);
+                updateCharts(d.data || []);
+            } catch(e) { console.error(e); }
+        },
+        changeRange(range) { this.loadCharts(range); }
+    }
+}
+</script>
+{{end}}

@@ -8,9 +8,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/executor"
 	"github.com/naibabiji/server-panel/router"
 )
 
@@ -57,6 +59,10 @@ func main() {
 
 	// 设置路由
 	r := router.SetupRouter(cfg, database.GetDB(), StaticFS, TemplatesFS)
+
+	// 启动后台任务
+	go executor.StartMetricCleanup(1 * time.Hour)
+	go executor.StartHTTPProber(5 * time.Minute) // 间隔由 http_probe_interval_minutes 设置决定
 
 	// 启动服务器
 	go func() {

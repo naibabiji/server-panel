@@ -100,6 +100,12 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.PUT("/api/users/:id", userH.Update)
 			protected.DELETE("/api/users/:id", userH.Delete)
 
+			// Metrics
+			metricsH := &handlers.MetricsHandler{DB: db}
+			protected.GET("/api/monitor/overview", metricsH.GetOverview)
+			protected.GET("/api/monitor/:id/latest", metricsH.GetLatest)
+			protected.GET("/api/monitor/:id", metricsH.GetServerMetrics)
+
 			// Page routes
 			protected.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "dashboard.html", pageData(cfg, "dashboard", "dashboard_content", c))
@@ -124,6 +130,12 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			})
 			protected.GET("/users/:id/edit", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "user_form.html", pageData(cfg, "user_form", "user_form_content", c))
+			})
+			protected.GET("/monitor", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "monitor.html", pageData(cfg, "monitor", "monitor_content", c))
+			})
+			protected.GET("/monitor/:id", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "monitor_detail.html", pageData(cfg, "monitor", "monitor_detail_content", c))
 			})
 		}
 	}

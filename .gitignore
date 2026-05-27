@@ -1,6 +1,8 @@
 nul
 server-panel.exe
 server-panel
+vpsd-agent
+vpsd-agent.exe
 static/css/main.css
 static/js/alpine.min.js
 static/js/chart.min.js
