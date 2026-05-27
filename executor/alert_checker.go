@@ -3,7 +3,6 @@ package executor
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -46,12 +45,11 @@ func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 	defer rows.Close()
 
 	for rows.Next() {
-		var id int64
 		var daysBefore float64
 		var notifyUser int
 		var notifyEmail string
 		var serverID *int64
-		rows.Scan(&id, &daysBefore, &notifyUser, &notifyEmail, &serverID)
+		rows.Scan(new(int64), &daysBefore, &notifyUser, &notifyEmail, &serverID)
 		if daysBefore <= 0 {
 			daysBefore = 7
 		}
@@ -69,7 +67,6 @@ func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 		if err != nil {
 			continue
 		}
-		defer itemRows.Close()
 		for itemRows.Next() {
 			var itemID int64
 			var itemName string
@@ -81,7 +78,7 @@ func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 			createAlert(db, alertType, &itemID, nil, "warning",
 				fmt.Sprintf("%s %s 将在 %d 天后到期", label, itemName, int(daysBefore)))
 		}
-		_ = id
+		itemRows.Close()
 	}
 }
 
@@ -137,7 +134,6 @@ func checkResourceAlerts(db *sql.DB, alertType, metricCol string) {
 		count = 3
 	}
 
-	// 查询最近 N 条指标连续超标的服务器
 	checkCount := int(count)
 	sRows, err := db.Query(
 		fmt.Sprintf(`SELECT s.id, s.name FROM servers s WHERE (
@@ -267,8 +263,4 @@ func createAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64
 	go func() {
 		_ = SendMail("", "Server Panel 告警", message)
 	}()
-}
-
-func init() {
-	log.Println()
 }
