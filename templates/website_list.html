@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "website_list_content"}}
-<div x-data="websiteList()" x-init="fetch()" class="p-6">
+<div x-data="websiteList()" x-init="init()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div class="flex gap-2">
             <input type="text" x-model="search" @input="fetch()" placeholder="搜索名称/域名..." class="input-field w-48">

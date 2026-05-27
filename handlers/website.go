@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
@@ -29,8 +30,12 @@ func (h *WebsiteHandler) List(c *gin.Context) {
 	userID := c.Query("user_id")
 	status := c.Query("status")
 
-	if page < 1 { page = 1 }
-	if pageSize < 1 || pageSize > 100 { pageSize = 20 }
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
 
 	where := "WHERE 1=1"
 	args := []interface{}{}
@@ -73,8 +78,12 @@ func (h *WebsiteHandler) List(c *gin.Context) {
 	websites := []models.Website{}
 	for rows.Next() {
 		var w models.Website
-		rows.Scan(&w.ID, &w.Name, &w.Domain, &w.SiteType, &w.ServerID, &w.ServerName,
+		err := rows.Scan(&w.ID, &w.Name, &w.Domain, &w.SiteType, &w.ServerID, &w.ServerName,
 			&w.UserID, &w.UserName, &w.ExpiryDate, &w.Status, &w.Notes, &w.CreatedAt, &w.UpdatedAt)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取网站列表失败"))
+			return
+		}
 		websites = append(websites, w)
 	}
 
@@ -108,12 +117,7 @@ func (h *WebsiteHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
 		return
 	}
-	if w.Domain == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("域名不能为空"))
-		return
-	}
-	if w.ServerID == 0 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请选择所属服务器"))
+	if !validateWebsiteInput(c, &w) {
 		return
 	}
 
@@ -137,8 +141,7 @@ func (h *WebsiteHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
 		return
 	}
-	if w.Domain == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("域名不能为空"))
+	if !validateWebsiteInput(c, &w) {
 		return
 	}
 
@@ -169,4 +172,20 @@ func (h *WebsiteHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
+}
+
+func validateWebsiteInput(c *gin.Context, w *models.Website) bool {
+	w.Domain = strings.TrimSpace(w.Domain)
+	if w.Domain == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("域名不能为空"))
+		return false
+	}
+	if w.ServerID == 0 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("请选择所属服务器"))
+		return false
+	}
+	if w.Status == "" {
+		w.Status = models.WebsiteStatusActive
+	}
+	return true
 }

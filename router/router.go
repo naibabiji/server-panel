@@ -116,6 +116,11 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.PUT("/api/providers/:id", provH.Update)
 			protected.DELETE("/api/providers/:id", provH.Delete)
 
+			// Settings list data used by forms
+			settingsH := &handlers.SettingsHandler{DB: db}
+			protected.GET("/api/settings/os-list", settingsH.GetOSList)
+			protected.GET("/api/settings/site-type-list", settingsH.GetSiteTypeList)
+
 			// Metrics
 			metricsH := &handlers.MetricsHandler{DB: db}
 			protected.GET("/api/monitor/overview", metricsH.GetOverview)

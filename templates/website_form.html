@@ -63,9 +63,12 @@ function websiteForm() {
             try {
                 if (!this.form.domain) { showToast('域名不能为空','error'); this.saving=false; return; }
                 if (!this.form.server_id) { showToast('请选择服务器','error'); this.saving=false; return; }
+                const payload = { ...this.form };
+                payload.server_id = parseInt(payload.server_id) || 0;
+                payload.user_id = payload.user_id ? parseInt(payload.user_id) : null;
                 const method = this.isEdit ? 'PUT' : 'POST';
                 const url = this.isEdit ? '/api/websites/'+this.id : '/api/websites';
-                await api(url, {method, body: this.form});
+                await api(url, {method, body: payload});
                 showToast('保存成功','success');
                 setTimeout(() => location.href = document.body.dataset.panelPrefix+'/websites', 500);
             } catch(e) { showToast(e.message,'error'); }

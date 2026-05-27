@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
@@ -26,8 +27,12 @@ func (h *ProviderHandler) List(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
 	search := c.Query("search")
 
-	if page < 1 { page = 1 }
-	if pageSize < 1 || pageSize > 100 { pageSize = 50 }
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 50
+	}
 
 	where := "WHERE 1=1"
 	args := []interface{}{}
@@ -52,7 +57,10 @@ func (h *ProviderHandler) List(c *gin.Context) {
 	providers := []models.Provider{}
 	for rows.Next() {
 		var p models.Provider
-		rows.Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &p.Notes, &p.CreatedAt, &p.UpdatedAt)
+		if err := rows.Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &p.Notes, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取服务商列表失败"))
+			return
+		}
 		providers = append(providers, p)
 	}
 
@@ -80,8 +88,7 @@ func (h *ProviderHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
 		return
 	}
-	if p.Name == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("服务商名称不能为空"))
+	if !validateProviderInput(c, &p) {
 		return
 	}
 
@@ -104,13 +111,16 @@ func (h *ProviderHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
 		return
 	}
+	if !validateProviderInput(c, &p) {
+		return
+	}
 
 	result, err := h.db().Exec(
 		"UPDATE providers SET name=?, website=?, contact=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
 		p.Name, p.Website, p.Contact, p.Notes, id,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败，名称可能已存在"))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
@@ -132,4 +142,13 @@ func (h *ProviderHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
+}
+
+func validateProviderInput(c *gin.Context, p *models.Provider) bool {
+	p.Name = strings.TrimSpace(p.Name)
+	if p.Name == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("服务商名称不能为空"))
+		return false
+	}
+	return true
 }

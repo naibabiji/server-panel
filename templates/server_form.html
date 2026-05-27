@@ -138,6 +138,7 @@ function serverForm() {
             else if (last && !['servers'].includes(last)) this.id = last;
             if (this.id) { this.isEdit = true; await this.load(); }
             try { const d = await api('/api/users?page_size=100'); this.users = d.data.items || []; } catch(e) {}
+            try { const d = await api('/api/providers?page_size=100'); this.providers = d.data.items || []; } catch(e) {}
             try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]'); } catch(e) {}
         },
         async load() {
