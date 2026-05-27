@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -138,7 +139,7 @@ func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 		}
 		remaining := maxUnlockAttempts - unlockAttempts[ip]
 		unlockAttemptsMu.Unlock()
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("密码错误，还剩 "+string(rune('0'+remaining))+" 次尝试"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("密码错误，还剩 "+strconv.Itoa(remaining)+" 次尝试"))
 		return
 	}
 

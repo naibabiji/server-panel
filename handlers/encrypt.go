@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sync"
+	"time"
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
@@ -48,6 +49,25 @@ func IsViewPasswordUnlocked(sessionToken string) bool {
 	defer derivedKeysMu.RUnlock()
 	_, ok := derivedKeys[sessionToken]
 	return ok
+}
+
+func init() {
+	// 每小时清理过期的锁定状态和尝试记录，防止内存无限增长
+	go func() {
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now().Unix()
+			unlockAttemptsMu.Lock()
+			for ip, until := range unlockLockUntil {
+				if now >= until {
+					delete(unlockLockUntil, ip)
+					delete(unlockAttempts, ip)
+				}
+			}
+			unlockAttemptsMu.Unlock()
+		}
+	}()
 }
 
 // DeriveEncryptionKey 从查看密码 + salt + pepper 派生 AES-256 密钥

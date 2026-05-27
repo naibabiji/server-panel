@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/naibabiji/server-panel/database"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -322,6 +323,10 @@ func encryptOptionalPassword(c *gin.Context, plaintext string) (string, bool) {
 
 	key := derivedKeyFromContext(c)
 	if key == nil {
+		// 查看密码尚未设置时，直接存明文（用户应尽快设置查看密码）
+		if !isViewPasswordSetup() {
+			return plaintext, true
+		}
 		c.JSON(http.StatusForbidden, models.ErrorResponse("请先输入查看密码"))
 		return "", false
 	}
@@ -332,6 +337,16 @@ func encryptOptionalPassword(c *gin.Context, plaintext string) (string, bool) {
 		return "", false
 	}
 	return enc, true
+}
+
+func isViewPasswordSetup() bool {
+	db := database.GetDB()
+	if db == nil {
+		return false
+	}
+	var hash string
+	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
+	return hash != ""
 }
 
 func derivedKeyFromContext(c *gin.Context) []byte {
