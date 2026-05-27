@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -49,7 +50,7 @@ func (s *MetricSnapshot) collectCPU() {
 	scanner := bufio.NewScanner(f)
 	if scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
-		if len(fields) < 5 || fields[0] != "cpu" {
+		if len(fields) < 8 || fields[0] != "cpu" {
 			return
 		}
 		user, _ := strconv.ParseInt(fields[1], 10, 64)
@@ -107,32 +108,29 @@ func (s *MetricSnapshot) collectMemory() {
 }
 
 func (s *MetricSnapshot) collectDisk() {
-	f, err := os.Open("/proc/mounts")
+	out, err := exec.Command("df", "-B1", "-P", "/").Output()
 	if err != nil {
 		return
 	}
-	defer f.Close()
 
-	var totalUsed, totalSize int64
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// 只统计主分区
-		if !strings.HasPrefix(line, "/dev/") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-		mountPoint := fields[1]
-		if mountPoint == "/" || mountPoint == "/home" || strings.HasPrefix(mountPoint, "/www") {
-			// 使用 syscall.Statfs 更准确，这里简化用 df 命令
-		}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) < 2 {
+		return
 	}
-	// 简化实现：读取根分区统计
-	_ = totalUsed
-	_ = totalSize
+	fields := strings.Fields(lines[1])
+	if len(fields) < 6 {
+		return
+	}
+
+	total, _ := strconv.ParseInt(fields[1], 10, 64)
+	used, _ := strconv.ParseInt(fields[2], 10, 64)
+	if total <= 0 {
+		return
+	}
+
+	s.DiskTotal = total
+	s.DiskUsed = used
+	s.DiskPercent = float64(used) / float64(total) * 100
 }
 
 func (s *MetricSnapshot) collectNetwork() {
