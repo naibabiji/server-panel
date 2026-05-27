@@ -1,0 +1,39 @@
+{{template "base" .}}
+{{define "dashboard_content"}}
+<div x-data="dashboardPage()" x-init="init()" class="p-6">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="card"><div class="text-sm text-gray-400">总服务器</div><div class="text-2xl font-bold mt-1" x-text="stats.total_servers">0</div></div>
+        <div class="card"><div class="text-sm text-gray-400">在线</div><div class="text-2xl font-bold mt-1 text-green-400" x-text="stats.online_count">0</div></div>
+        <div class="card"><div class="text-sm text-gray-400">离线</div><div class="text-2xl font-bold mt-1 text-red-400" x-text="stats.offline_count">0</div></div>
+        <div class="card"><div class="text-sm text-gray-400">即将到期</div><div class="text-2xl font-bold mt-1 text-yellow-400" x-text="stats.expiring_count">0</div></div>
+    </div>
+    <div class="card">
+        <div class="text-sm font-medium text-gray-300 mb-3">最近告警</div>
+        <div class="text-sm text-gray-500" x-show="!alerts.length">暂无告警</div>
+        <template x-for="a in alerts" :key="a.id">
+            <div class="flex items-center justify-between py-2 border-b border-gray-700 last:border-0">
+                <div><span :class="'badge-' + (a.level === 'critical' ? 'danger' : a.level === 'warning' ? 'warning' : 'info')" x-text="a.message" class="text-xs"></span></div>
+                <div class="text-xs text-gray-500" x-text="fmtTime(a.created_at)"></div>
+            </div>
+        </template>
+    </div>
+</div>
+<script>
+function dashboardPage() {
+    return {
+        stats: { total_servers: 0, online_count: 0, offline_count: 0, expiring_count: 0 },
+        alerts: [],
+        async init() {
+            try {
+                const d = await api('/api/dashboard/stats');
+                this.stats = d.data;
+            } catch(e) {}
+            try {
+                const d = await api('/api/dashboard/recent-alerts?limit=10');
+                this.alerts = d.data || [];
+            } catch(e) {}
+        }
+    }
+}
+</script>
+{{end}}

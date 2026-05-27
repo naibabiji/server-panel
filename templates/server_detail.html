@@ -1,0 +1,53 @@
+{{template "base" .}}
+{{define "server_detail_content"}}
+<div x-data="serverDetail()" x-init="init()" class="p-6 max-w-4xl">
+    <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-semibold text-purple-300" x-text="s.name || '加载中...'"></h2>
+        <div class="flex gap-2">
+            <a :href="s.id+'/edit'" class="btn-secondary text-sm">编辑</a>
+            <a href=".." class="text-sm text-gray-400 hover:text-white">返回列表</a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div class="card">
+            <div class="text-sm font-medium text-gray-300 mb-3">基本信息</div>
+            <dl class="space-y-2 text-sm">
+                <div class="flex"><dt class="w-24 text-gray-400">名称</dt><dd class="text-gray-200" x-text="s.name"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">IP</dt><dd class="text-gray-200" x-text="s.ip_address||'--'"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">类型</dt><dd x-text="s.server_type" class="text-gray-200"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">系统</dt><dd x-text="s.os||'--'" class="text-gray-200"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">状态</dt><dd><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">在线</dt><dd x-text="s.is_online ? '● 在线' : '○ 离线'" :class="s.is_online ? 'text-green-400' : 'text-red-400'"></dd></div>
+            </dl>
+        </div>
+        <div class="card">
+            <div class="text-sm font-medium text-gray-300 mb-3">费用信息</div>
+            <dl class="space-y-2 text-sm">
+                <div class="flex"><dt class="w-24 text-gray-400">购买日</dt><dd x-text="s.purchase_date||'--'" class="text-gray-200"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">到期日</dt><dd x-text="s.expiry_date||'--'" class="text-gray-200"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">周期</dt><dd x-text="s.renewal_cycle||'--'" class="text-gray-200"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">价格</dt><dd x-text="(s.purchase_price||0)+' '+s.currency" class="text-gray-200"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">服务商</dt><dd x-text="s.provider_name||'--'" class="text-gray-200"></dd></div>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="text-sm font-medium text-gray-300 mb-3">备注</div>
+        <p class="text-sm text-gray-400" x-text="s.notes||'无'"></p>
+    </div>
+</div>
+<script>
+function serverDetail() {
+    return {
+        s: {},
+        async init() {
+            const id = window.location.pathname.split('/').filter(Boolean).pop();
+            try { const d = await api('/api/servers/'+id); this.s = d.data; }
+            catch(e) { showToast(e.message,'error'); }
+        }
+    }
+}
+</script>
+{{end}}

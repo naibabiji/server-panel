@@ -1,0 +1,86 @@
+{{define "login.html"}}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="">
+    <title>{{.PanelTitle}} - 登录</title>
+    <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css">
+    <script defer src="{{.AssetPrefix}}/js/alpine.min.js"></script>
+    <script src="{{.AssetPrefix}}/js/app.js"></script>
+    <style>
+        :root { --primary: #7c3aed; --primary-hover: #6d28d9; --bg: #0f0f11; --card: #1a1a1f; --text: #e4e4e7; --sub: #a1a1aa; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .login-card { background: var(--card); border: 1px solid #27272a; border-radius: 16px; padding: 40px; width: 100%; max-width: 400px; margin: 0 16px; }
+        .login-title, .login-sub { text-align: center; }
+        .login-title { font-size: 24px; font-weight: 700; color: #c4b5fd; margin-bottom: 4px; }
+        .login-sub { font-size: 14px; color: var(--sub); margin-bottom: 32px; font-style: italic; transition: opacity 0.4s; }
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; font-size: 13px; color: var(--sub); margin-bottom: 6px; }
+        .input-group input { width: 100%; padding: 10px 14px; background: #27272a; border: 1px solid #3f3f46; border-radius: 8px; color: var(--text); font-size: 15px; outline: none; box-sizing: border-box; transition: border-color 0.2s; }
+        .input-group input:focus { border-color: var(--primary); }
+        .btn-login { width: 100%; padding: 11px; background: var(--primary); border: none; border-radius: 8px; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+        .btn-login:hover { background: var(--primary-hover); }
+        .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+        .error-msg { color: #fca5a5; font-size: 13px; text-align: center; margin-top: 12px; }
+    </style>
+</head>
+<body>
+<div x-data="loginForm()" class="login-card">
+    <div class="login-title">{{.PanelTitle}}</div>
+    <div class="login-sub" id="motto"></div>
+    <form @submit.prevent="login">
+        <div class="input-group">
+            <label>用户名</label>
+            <input type="text" x-model="username" placeholder="请输入用户名" autocomplete="username">
+        </div>
+        <div class="input-group">
+            <label>密码</label>
+            <input type="password" x-model="password" placeholder="请输入密码" autocomplete="current-password">
+        </div>
+        <button class="btn-login" type="submit" :disabled="loading">
+            <span x-show="!loading">登录</span>
+            <span x-show="loading">登录中...</span>
+        </button>
+        <div class="error-msg" x-show="error" x-text="error"></div>
+    </form>
+</div>
+
+<script>
+const mottos = [
+    "代码是写给人看的，顺便给机器运行。",
+    "简单是可靠的前提。",
+    "一个好的系统应该像一把瑞士军刀。",
+    "问题不在于你能做什么，而在于你选择做什么。",
+    "优秀的软件设计源于对细节的关注。",
+    "最好的代码是没有代码。",
+    "简洁是智慧的灵魂。",
+    "完美不在于无以复加，而在于无从删减。",
+];
+let mottoIdx = 0;
+function cycleMotto() {
+    const el = document.getElementById('motto');
+    if (!el) return;
+    el.style.opacity = '0';
+    setTimeout(() => { el.textContent = mottos[mottoIdx % mottos.length]; mottoIdx++; el.style.opacity = '1'; }, 400);
+}
+cycleMotto();
+setInterval(cycleMotto, 8000);
+
+function loginForm() {
+    return {
+        username: '', password: '', loading: false, error: '',
+        async login() {
+            this.loading = true; this.error = '';
+            try {
+                const data = await api('/api/auth/login', { method: 'POST', body: { username: this.username, password: this.password } });
+                window.location.href = document.body.dataset.panelPrefix || '/';
+            } catch(e) { this.error = e.message || '登录失败'; }
+            finally { this.loading = false; }
+        }
+    }
+}
+document.body.dataset.panelPrefix = '/{{.RandomSuffix}}';
+</script>
+</body>
+</html>{{end}}

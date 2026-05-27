@@ -1,0 +1,58 @@
+{{template "base" .}}
+{{define "user_form_content"}}
+<div x-data="userForm()" x-init="init()" class="p-6 max-w-2xl">
+    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑用户' : '添加用户'"></h2>
+    <div class="card space-y-4">
+        <div><label class="label">用户名称 <span class="text-red-400">*</span></label>
+            <input type="text" x-model="form.name" class="input-field" placeholder="例如：客户A"></div>
+        <div class="grid grid-cols-2 gap-4">
+            <div><label class="label">联系人</label><input type="text" x-model="form.contact_person" class="input-field"></div>
+            <div><label class="label">联系电话</label><input type="text" x-model="form.phone" class="input-field"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div><label class="label">联系邮箱</label><input type="email" x-model="form.email" class="input-field"></div>
+            <div><label class="label">公司名称</label><input type="text" x-model="form.company" class="input-field"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div><label class="label">合作开始日期</label><input type="date" x-model="form.start_date" class="input-field"></div>
+            <div><label class="label">公司地址</label><input type="text" x-model="form.address" class="input-field"></div>
+        </div>
+        <div><label class="label">备注</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
+        <div class="flex gap-3 pt-2">
+            <button @click="save()" class="btn-primary" :disabled="saving">
+                <span x-show="!saving">保存</span><span x-show="saving">保存中...</span></button>
+            <a href="/{{.RandomSuffix}}/users" class="btn-secondary">取消</a>
+        </div>
+    </div>
+</div>
+<script>
+function userForm() {
+    return {
+        isEdit: false, id: null, saving: false,
+        form: { name:'', contact_person:'', phone:'', email:'', company:'', start_date:'', address:'', notes:'' },
+        async init() {
+            const parts = window.location.pathname.split('/').filter(Boolean);
+            const last = parts[parts.length-1];
+            if (last === 'edit') this.id = parts[parts.length-2];
+            else if (last !== 'new') this.id = last;
+            if (this.id) { this.isEdit = true; await this.load(); }
+        },
+        async load() {
+            try { const d = await api('/api/users/'+this.id); Object.assign(this.form, d.data); } catch(e) {}
+        },
+        async save() {
+            this.saving = true;
+            try {
+                if (!this.form.name) { showToast('用户名称不能为空','error'); this.saving=false; return; }
+                const method = this.isEdit ? 'PUT' : 'POST';
+                const url = this.isEdit ? '/api/users/'+this.id : '/api/users';
+                await api(url, {method, body: this.form});
+                showToast('保存成功','success');
+                setTimeout(() => location.href = document.body.dataset.panelPrefix+'/users', 500);
+            } catch(e) { showToast(e.message,'error'); }
+            this.saving = false;
+        }
+    }
+}
+</script>
+{{end}}

@@ -1,0 +1,48 @@
+{{template "base" .}}
+{{define "user_list_content"}}
+<div x-data="userList()" x-init="fetch()" class="p-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <input type="text" x-model="search" @input="fetch()" placeholder="搜索..." class="input-field w-48">
+        <a href="users/new" class="btn-primary text-sm">+ 添加用户</a>
+    </div>
+    <div class="card overflow-x-auto">
+        <table class="w-full">
+            <thead><tr>
+                <th class="table-header">名称</th><th class="table-header">联系人</th><th class="table-header">邮箱</th>
+                <th class="table-header">公司</th><th class="table-header">操作</th>
+            </tr></thead>
+            <tbody>
+            <template x-for="u in items" :key="u.id">
+                <tr class="border-t border-gray-700/50 hover:bg-white/5">
+                    <td class="table-cell text-white" x-text="u.name"></td>
+                    <td class="table-cell text-gray-400" x-text="u.contact_person||'--'"></td>
+                    <td class="table-cell text-gray-400" x-text="u.email||'--'"></td>
+                    <td class="table-cell text-gray-400" x-text="u.company||'--'"></td>
+                    <td class="table-cell">
+                        <a :href="'users/'+u.id+'/edit'" class="text-sm text-blue-400 hover:text-blue-300 mr-2">编辑</a>
+                        <a href="#" @click.prevent="del(u.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
+                    </td>
+                </tr>
+            </template>
+            </tbody>
+        </table>
+        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无用户</div>
+    </div>
+</div>
+<script>
+function userList() {
+    return {
+        items: [], loading: true, search: '',
+        async fetch() {
+            this.loading=true;
+            try { const d=await api('/api/users?search='+encodeURIComponent(this.search)+'&page_size=100'); this.items=d.data.items||[]; } catch(e) {}
+            this.loading=false;
+        },
+        async del(id) {
+            if(!await confirmModal('确认删除？')) return;
+            try { await api('/api/users/'+id,{method:'DELETE'}); await this.fetch(); } catch(e) { showToast(e.message,'error'); }
+        }
+    }
+}
+</script>
+{{end}}

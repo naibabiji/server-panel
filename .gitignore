@@ -1,0 +1,8 @@
+nul
+server-panel.exe
+server-panel
+static/css/main.css
+static/js/alpine.min.js
+static/js/chart.min.js
+bin/
+*.db
