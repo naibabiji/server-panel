@@ -35,7 +35,14 @@ func runAlertCheck() {
 	checkOfflineAlerts(db)
 }
 
+var allowedTables = map[string]bool{"servers": true, "websites": true}
+var allowedColumns = map[string]bool{"expiry_date": true, "cpu_percent": true, "memory_percent": true, "disk_percent": true}
+
 func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
+	if !allowedTables[table] || !allowedColumns[dateCol] {
+		return
+	}
+
 	rows, err := db.Query(
 		"SELECT id, threshold_value, notify_user, notify_email, server_id FROM alert_rules WHERE alert_type = ? AND enabled = 1",
 		alertType)
@@ -110,6 +117,10 @@ func checkHTTPProbeAlerts(db *sql.DB) {
 }
 
 func checkResourceAlerts(db *sql.DB, alertType, metricCol string) {
+	if !allowedColumns[metricCol] {
+		return
+	}
+
 	rows, err := db.Query(
 		"SELECT threshold_value, threshold_count FROM alert_rules WHERE alert_type = ? AND enabled = 1",
 		alertType)
@@ -118,40 +129,31 @@ func checkResourceAlerts(db *sql.DB, alertType, metricCol string) {
 	}
 	defer rows.Close()
 
-	var threshold, count float64
-	hasRule := false
 	for rows.Next() {
+		var threshold, count float64
 		rows.Scan(&threshold, &count)
-		hasRule = true
-	}
-	if !hasRule {
-		return
-	}
-	if threshold <= 0 {
-		threshold = 90
-	}
-	if count <= 0 {
-		count = 3
-	}
+		if threshold <= 0 { threshold = 90 }
+		if count <= 0 { count = 3 }
 
-	checkCount := int(count)
-	sRows, err := db.Query(
-		fmt.Sprintf(`SELECT s.id, s.name FROM servers s WHERE (
-		     SELECT COUNT(*) FROM (
-		         SELECT %s FROM metrics WHERE server_id = s.id ORDER BY recorded_at DESC LIMIT %d
-		     ) WHERE %s > ?
-		 ) = %d AND s.is_online = 1`, metricCol, checkCount, metricCol, checkCount),
-		threshold)
-	if err != nil {
-		return
-	}
-	defer sRows.Close()
-	for sRows.Next() {
-		var id int64
-		var name string
-		sRows.Scan(&id, &name)
-		createAlert(db, alertType, &id, nil, "warning",
-			fmt.Sprintf("服务器 %s %s 连续 %d 次超标 (阈值: %.0f%%)", name, alertTypeToLabel(alertType), checkCount, threshold))
+		checkCount := int(count)
+		sRows, err := db.Query(
+			fmt.Sprintf(`SELECT s.id, s.name FROM servers s WHERE (
+			     SELECT COUNT(*) FROM (
+			         SELECT %s FROM metrics WHERE server_id = s.id ORDER BY recorded_at DESC LIMIT %d
+			     ) WHERE %s > ?
+			 ) = %d AND s.is_online = 1`, metricCol, checkCount, metricCol, checkCount),
+			threshold)
+		if err != nil {
+			continue
+		}
+		for sRows.Next() {
+			var id int64
+			var name string
+			sRows.Scan(&id, &name)
+			createAlert(db, alertType, &id, nil, "warning",
+				fmt.Sprintf("服务器 %s %s 连续 %d 次超标 (阈值: %.0f%%)", name, alertTypeToLabel(alertType), checkCount, threshold))
+		}
+		sRows.Close()
 	}
 }
 
@@ -162,31 +164,27 @@ func checkDiskAlerts(db *sql.DB) {
 	}
 	defer rows.Close()
 
-	var threshold float64
-	hasRule := false
 	for rows.Next() {
+		var threshold float64
 		rows.Scan(&threshold)
-		hasRule = true
-	}
-	if !hasRule || threshold <= 0 {
-		return
-	}
+		if threshold <= 0 { continue }
 
-	sRows, err := db.Query(
-		`SELECT s.id, s.name, m.disk_percent FROM servers s
-		 JOIN (SELECT server_id, disk_percent FROM metrics WHERE (server_id, recorded_at) IN (SELECT server_id, MAX(recorded_at) FROM metrics GROUP BY server_id)) m ON s.id = m.server_id
-		 WHERE m.disk_percent > ? AND s.is_online = 1`, threshold)
-	if err != nil {
-		return
-	}
-	defer sRows.Close()
-	for sRows.Next() {
-		var id int64
-		var name string
-		var disk float64
-		sRows.Scan(&id, &name, &disk)
-		createAlert(db, "disk_high", &id, nil, "warning",
-			fmt.Sprintf("服务器 %s 磁盘使用率 %.1f%% 超过阈值 %.0f%%", name, disk, threshold))
+		sRows, err := db.Query(
+			`SELECT s.id, s.name, m.disk_percent FROM servers s
+			 JOIN (SELECT server_id, disk_percent FROM metrics WHERE (server_id, recorded_at) IN (SELECT server_id, MAX(recorded_at) FROM metrics GROUP BY server_id)) m ON s.id = m.server_id
+			 WHERE m.disk_percent > ? AND s.is_online = 1`, threshold)
+		if err != nil {
+			continue
+		}
+		for sRows.Next() {
+			var id int64
+			var name string
+			var disk float64
+			sRows.Scan(&id, &name, &disk)
+			createAlert(db, "disk_high", &id, nil, "warning",
+				fmt.Sprintf("服务器 %s 磁盘使用率 %.1f%% 超过阈值 %.0f%%", name, disk, threshold))
+		}
+		sRows.Close()
 	}
 }
 
@@ -197,47 +195,36 @@ func checkOfflineAlerts(db *sql.DB) {
 	}
 	defer rows.Close()
 
-	var threshold float64
-	hasRule := false
 	for rows.Next() {
+		var threshold float64
 		rows.Scan(&threshold)
-		hasRule = true
-	}
-	if !hasRule {
-		return
-	}
-	if threshold <= 0 {
-		threshold = 5
-	}
+		if threshold <= 0 { threshold = 5 }
 
-	minutes := int(threshold)
-	sRows, err := db.Query(
-		`SELECT id, name FROM servers WHERE is_online = 0 AND status = 'active'
-		 AND last_seen_at IS NOT NULL AND last_seen_at < datetime('now', ? || ' minutes')`,
-		strconv.Itoa(-minutes))
-	if err != nil {
-		return
-	}
-	defer sRows.Close()
-	for sRows.Next() {
-		var id int64
-		var name string
-		sRows.Scan(&id, &name)
-		createAlert(db, "server_offline", &id, nil, "critical",
-			fmt.Sprintf("服务器 %s 已离线超过 %d 分钟", name, minutes))
+		minutes := int(threshold)
+		sRows, err := db.Query(
+			`SELECT id, name FROM servers WHERE is_online = 0 AND status = 'active'
+			 AND last_seen_at IS NOT NULL AND last_seen_at < datetime('now', ? || ' minutes')`,
+			strconv.Itoa(-minutes))
+		if err != nil {
+			continue
+		}
+		for sRows.Next() {
+			var id int64
+			var name string
+			sRows.Scan(&id, &name)
+			createAlert(db, "server_offline", &id, nil, "critical",
+				fmt.Sprintf("服务器 %s 已离线超过 %d 分钟", name, minutes))
+		}
+		sRows.Close()
 	}
 }
 
 func alertTypeToLabel(t string) string {
 	switch t {
-	case "cpu_high":
-		return "CPU"
-	case "memory_high":
-		return "内存"
-	case "disk_high":
-		return "磁盘"
-	default:
-		return t
+	case "cpu_high": return "CPU"
+	case "memory_high": return "内存"
+	case "disk_high": return "磁盘"
+	default: return t
 	}
 }
 
@@ -252,9 +239,7 @@ func createAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64
 			`SELECT COUNT(*) FROM alert_log WHERE alert_type = ? AND resolved = 0 AND created_at > datetime('now','-4 hours')`,
 			alertType).Scan(&count)
 	}
-	if count > 0 {
-		return
-	}
+	if count > 0 { return }
 
 	_, _ = db.Exec(
 		`INSERT INTO alert_log (alert_type, server_id, website_id, level, message) VALUES (?,?,?,?,?)`,

@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -74,13 +75,8 @@ func versionLE(a, b string) bool {
 	partsA := strings.Split(a, ".")
 	partsB := strings.Split(b, ".")
 	for i := 0; i < 3; i++ {
-		var va, vb string
-		if i < len(partsA) {
-			va = partsA[i]
-		}
-		if i < len(partsB) {
-			vb = partsB[i]
-		}
+		va := atoiSafe(partsA, i)
+		vb := atoiSafe(partsB, i)
 		if va < vb {
 			return true
 		}
@@ -89,4 +85,12 @@ func versionLE(a, b string) bool {
 		}
 	}
 	return true
+}
+
+func atoiSafe(parts []string, i int) int {
+	if i >= len(parts) {
+		return 0
+	}
+	v, _ := strconv.Atoi(parts[i])
+	return v
 }

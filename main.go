@@ -59,7 +59,9 @@ func main() {
 	go func() {
 		addrHTTP := fmt.Sprintf(":%d", cfg.Panel.Port)
 		log.Printf("HTTP server listening on %s", addrHTTP)
-		_ = http.ListenAndServe(addrHTTP, r)
+		if err := http.ListenAndServe(addrHTTP, r); err != nil {
+			log.Printf("HTTP server error: %v", err)
+		}
 	}()
 
 	go func() {
@@ -67,7 +69,7 @@ func main() {
 			addrTLS := fmt.Sprintf(":%d", cfg.Panel.TLSPort)
 			log.Printf("HTTPS server listening on %s (mode: %s)", addrTLS, cfg.Panel.TLSMode)
 			if err := r.RunTLS(addrTLS, cfg.Panel.TLSCertPath, cfg.Panel.TLSKeyPath); err != nil {
-				log.Fatalf("Failed to start TLS server: %v", err)
+				log.Printf("TLS server error: %v", err)
 			}
 		}
 	}()

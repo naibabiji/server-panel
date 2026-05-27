@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -42,6 +43,15 @@ func RemoveDerivedKey(sessionToken string) {
 	derivedKeysMu.Lock()
 	defer derivedKeysMu.Unlock()
 	delete(derivedKeys, sessionToken)
+}
+
+func GetSessionToken(c *gin.Context) (string, bool) {
+	token, exists := c.Get("session_token")
+	if !exists {
+		return "", false
+	}
+	s, ok := token.(string)
+	return s, ok && s != ""
 }
 
 func IsViewPasswordUnlocked(sessionToken string) bool {

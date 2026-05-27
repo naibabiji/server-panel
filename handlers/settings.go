@@ -72,6 +72,11 @@ func (h *SettingsHandler) GetSMTPConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(cfg))
 }
 
+var allowedSMTPKeys = map[string]bool{
+	"smtp_host": true, "smtp_port": true, "smtp_encryption": true,
+	"smtp_user": true, "smtp_pass": true, "admin_email": true,
+}
+
 func (h *SettingsHandler) UpdateSMTPConfig(c *gin.Context) {
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -79,6 +84,10 @@ func (h *SettingsHandler) UpdateSMTPConfig(c *gin.Context) {
 		return
 	}
 	for k, v := range req {
+		if !allowedSMTPKeys[k] {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("不允许的配置项: "+k))
+			return
+		}
 		h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES (?, ?)", k, v)
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
@@ -135,7 +144,6 @@ func (h *SettingsHandler) updateListSetting(c *gin.Context, key string) {
 }
 
 func (h *SettingsHandler) GetCronStatus(c *gin.Context) {
-	// 查询最近告警日志作为计划任务运行状态的参考
 	var lastCheck string
 	h.db().QueryRow("SELECT MAX(created_at) FROM alert_log").Scan(&lastCheck)
 	var lastProbe string

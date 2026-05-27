@@ -3,6 +3,7 @@ package middleware
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,7 +11,10 @@ import (
 
 func generateCSRFToken() string {
 	b := make([]byte, 32)
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		log.Printf("CRITICAL: failed to generate CSRF token: %v", err)
+		return ""
+	}
 	return hex.EncodeToString(b)
 }
 

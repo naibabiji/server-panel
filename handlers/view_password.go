@@ -16,15 +16,13 @@ type ViewPasswordHandler struct{}
 
 func (h *ViewPasswordHandler) GetStatus(c *gin.Context) {
 	db := database.GetDB()
-	var hash, salt, pepper string
+	var hash string
 	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
-	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_salt'").Scan(&salt)
-	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'pepper'").Scan(&pepper)
 
 	isSetup := hash != ""
 	isUnlocked := false
-	if token, exists := c.Get("session_token"); exists {
-		isUnlocked = IsViewPasswordUnlocked(token.(string))
+	if token, ok := GetSessionToken(c); ok {
+		isUnlocked = IsViewPasswordUnlocked(token)
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]bool{
@@ -36,7 +34,6 @@ func (h *ViewPasswordHandler) GetStatus(c *gin.Context) {
 func (h *ViewPasswordHandler) Setup(c *gin.Context) {
 	db := database.GetDB()
 
-	// 检查是否已设置
 	var existingHash string
 	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&existingHash)
 	if existingHash != "" {
@@ -56,7 +53,6 @@ func (h *ViewPasswordHandler) Setup(c *gin.Context) {
 		return
 	}
 
-	// 生成 salt 和 pepper
 	salt := make([]byte, 32)
 	pepper := make([]byte, 32)
 	rand.Read(salt)
@@ -64,27 +60,24 @@ func (h *ViewPasswordHandler) Setup(c *gin.Context) {
 	saltHex := hex.EncodeToString(salt)
 	pepperHex := hex.EncodeToString(pepper)
 
-	// bcrypt hash
 	hash, err := HashPassword(req.Password)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("密码处理失败"))
 		return
 	}
 
-	// 存入 settings
 	db.Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('view_password_hash', ?)", hash)
 	db.Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('view_password_salt', ?)", saltHex)
 	db.Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('pepper', ?)", pepperHex)
 
-	// 派生密钥并存入内存
 	key, err := DeriveEncryptionKey(req.Password, saltHex, pepperHex)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("密钥派生失败"))
 		return
 	}
 
-	if token, exists := c.Get("session_token"); exists {
-		StoreDerivedKey(token.(string), key)
+	if token, ok := GetSessionToken(c); ok {
+		StoreDerivedKey(token, key)
 		c.Set("view_password_unlocked", true)
 	}
 
@@ -96,7 +89,6 @@ func (h *ViewPasswordHandler) Setup(c *gin.Context) {
 func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 	db := database.GetDB()
 
-	// 检查是否锁定
 	unlockAttemptsMu.Lock()
 	ip := c.ClientIP()
 	now := time.Now().Unix()
@@ -115,7 +107,6 @@ func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 		return
 	}
 
-	// 获取存储的 hash/salt/pepper
 	var hash, saltHex, pepperHex string
 	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
 	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_salt'").Scan(&saltHex)
@@ -126,12 +117,11 @@ func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 		return
 	}
 
-	// 验证密码
 	if !VerifyPassword(req.Password, hash) {
 		unlockAttemptsMu.Lock()
 		unlockAttempts[ip]++
 		if unlockAttempts[ip] >= maxUnlockAttempts {
-			unlockLockUntil[ip] = now + 300 // 锁定 5 分钟
+			unlockLockUntil[ip] = now + 300
 			delete(unlockAttempts, ip)
 			unlockAttemptsMu.Unlock()
 			c.JSON(http.StatusTooManyRequests, models.ErrorResponse("尝试次数过多，请 5 分钟后重试"))
@@ -143,20 +133,18 @@ func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 		return
 	}
 
-	// 清除尝试记录
 	unlockAttemptsMu.Lock()
 	delete(unlockAttempts, ip)
 	unlockAttemptsMu.Unlock()
 
-	// 派生密钥
 	key, err := DeriveEncryptionKey(req.Password, saltHex, pepperHex)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("密钥派生失败"))
 		return
 	}
 
-	if token, exists := c.Get("session_token"); exists {
-		StoreDerivedKey(token.(string), key)
+	if token, ok := GetSessionToken(c); ok {
+		StoreDerivedKey(token, key)
 		c.Set("view_password_unlocked", true)
 	}
 
@@ -166,8 +154,8 @@ func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 }
 
 func (h *ViewPasswordHandler) Lock(c *gin.Context) {
-	if token, exists := c.Get("session_token"); exists {
-		RemoveDerivedKey(token.(string))
+	if token, ok := GetSessionToken(c); ok {
+		RemoveDerivedKey(token)
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 		"message": "查看密码已锁定",
