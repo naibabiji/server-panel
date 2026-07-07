@@ -32,6 +32,27 @@ log()  { echo -e "${GREEN}[+]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 err()  { echo -e "${RED}[x]${NC} $1"; exit 1; }
 
+prompt() {
+    local __var="$1"
+    local message="$2"
+    local default="${3:-}"
+    local value=""
+
+    if [ -r /dev/tty ]; then
+        read -r -p "$message" value </dev/tty || value="$default"
+    elif [ -t 0 ]; then
+        read -r -p "$message" value || value="$default"
+    else
+        value="$default"
+        echo "${message}${value}"
+    fi
+
+    if [ -z "$value" ] && [ -n "$default" ]; then
+        value="$default"
+    fi
+    printf -v "$__var" '%s' "$value"
+}
+
 require_root() {
     if [ "$(id -u)" != "0" ]; then
         err "请使用 root 用户运行此脚本"
@@ -199,7 +220,7 @@ handle_existing_install() {
     echo "  1) 升级/覆盖二进制（保留配置、数据库、证书）"
     echo "  2) 重新生成配置（保留数据库文件，重置登录信息）"
     echo "  3) 退出"
-    read -r -p "请选择 [1-3]: " reinstall_choice
+    prompt reinstall_choice "请选择 [1-3]: " "3"
     case "$reinstall_choice" in
         1) upgrade_existing; exit 0 ;;
         2) remove_service_only ;;
@@ -331,13 +352,13 @@ main() {
     echo "============================================"
     echo "  Server Panel TLS 配置"
     echo "============================================"
-    read -r -p "是否绑定面板域名? [y/N]: " bind_domain
+    prompt bind_domain "是否绑定面板域名? [y/N]: " "n"
     DOMAIN=""
     PUBLIC_URL=""
     if [[ "$bind_domain" =~ ^[Yy] ]]; then
-        read -r -p "面板域名（如 panel.example.com）: " DOMAIN
+        prompt DOMAIN "面板域名（如 panel.example.com）: "
         if [ -n "$DOMAIN" ]; then
-            read -r -p "HTTPS 端口 (默认 ${TLS_PORT}): " tls_port_input
+            prompt tls_port_input "HTTPS 端口 (默认 ${TLS_PORT}): "
             TLS_PORT="${tls_port_input:-$TLS_PORT}"
             PUBLIC_URL="https://${DOMAIN}:${TLS_PORT}"
         fi
