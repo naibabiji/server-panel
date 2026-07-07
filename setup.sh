@@ -3,7 +3,7 @@ set -e
 
 # ============================================================
 # Server Panel — 开发环境初始化
-# 下载 TailwindCSS CLI + Alpine.js CSP build + Chart.js，编译 CSS
+# 下载 TailwindCSS CLI + Alpine.js + Chart.js，编译 CSS
 # ============================================================
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -40,9 +40,9 @@ fi
 curl -sL "$TAILWIND_URL" -o "$BIN_DIR/tailwindcss"
 chmod +x "$BIN_DIR/tailwindcss"
 
-# Download Alpine.js CSP build
-echo "Downloading Alpine.js CSP build ${ALPINE_VERSION}..."
-curl -sL "https://cdn.jsdelivr.net/npm/@alpinejs/csp@${ALPINE_VERSION}/dist/cdn.min.js" -o "$STATIC_JS/alpine.min.js"
+# Download Alpine.js
+echo "Downloading Alpine.js ${ALPINE_VERSION}..."
+curl -sL "https://cdn.jsdelivr.net/npm/alpinejs@${ALPINE_VERSION}/dist/cdn.min.js" -o "$STATIC_JS/alpine.min.js"
 
 # Download Chart.js
 echo "Downloading Chart.js ${CHART_VERSION}..."
