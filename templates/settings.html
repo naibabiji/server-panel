@@ -424,9 +424,20 @@ function settingsPage() {
         },
         _pollUpdateStatus() {
             if (this._updateTimer) clearInterval(this._updateTimer);
+            const prefix = document.body.dataset.panelPrefix || '';
             this._updateTimer = setInterval(async () => {
                 try {
-                    const d = await api('/api/update/status');
+                    // 直接用 fetch，不走 api()：面板重启的几秒窗口内，任何反代/CDN
+                    // （比如 Cloudflare 连不上源站时的 521）都可能先返回一个非 JSON
+                    // 的网关错误页，api() 会为此弹一条"服务器返回异常"提示——这个窗口
+                    // 期本来就是预期内的，不需要拿一条会自愈的错误去吓用户。
+                    const resp = await fetch(prefix + '/api/update/status', {cache:'no-store'});
+                    const contentType = resp.headers.get('content-type') || '';
+                    if (!resp.ok || !contentType.includes('application/json')) {
+                        throw new Error('non-json or non-ok response during restart window');
+                    }
+                    const d = await resp.json();
+                    if (!d.success) throw new Error(d.message || 'update status failed');
                     this.updateRun = {
                         running: d.data.running, message: d.data.message, percent: d.data.percent,
                         downloadedBytes: d.data.downloaded_bytes, totalBytes: d.data.total_bytes,
@@ -437,7 +448,7 @@ function settingsPage() {
                         if (d.data.completed) this._waitForRestart();
                     }
                 } catch(e) {
-                    // 面板进程正在被替换/重启，请求会短暂失败，转为等待服务恢复后自动刷新
+                    // 面板进程正在被替换/重启，请求会短暂失败，静默转为等待服务恢复后自动刷新
                     clearInterval(this._updateTimer);
                     this._waitForRestart();
                 }
