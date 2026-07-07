@@ -23,7 +23,7 @@
                     <div class="flex items-center justify-between gap-4">
                         <div class="min-w-0">
                             <div class="text-sm text-gray-100" x-text="item.name"></div>
-                            <div class="text-xs text-red-400 break-all" x-text="item.last_error || '探测失败'"></div>
+                            <div class="text-xs text-red-400 break-all" :title="item.last_error" x-text="probeErrorSummary(item.last_error)"></div>
                         </div>
                         <div class="text-xs text-gray-500 shrink-0" x-text="fmtTime(item.last_at)"></div>
                     </div>
@@ -130,6 +130,15 @@ function dashboardPage() {
             let text = '到期日：' + item.expiry_date;
             if (item.server_name) text += ' · ' + item.server_name;
             return text;
+        },
+        probeErrorSummary(msg) {
+            if (!msg) return '探测失败';
+            if (/context deadline exceeded|timeout|timed out/i.test(msg)) return '连接超时';
+            if (/connection refused/i.test(msg)) return '连接被拒绝';
+            if (/no such host|dns/i.test(msg)) return '域名解析失败';
+            if (/certificate|tls|x509/i.test(msg)) return 'TLS/证书错误';
+            if (/^HTTP \d+/.test(msg)) return msg;
+            return msg.length > 40 ? msg.slice(0, 40) + '…' : msg;
         }
     }
 }
