@@ -431,9 +431,35 @@ function settingsPage() {
                     };
                     if (!d.data.running) {
                         clearInterval(this._updateTimer);
-                        if (d.data.completed) showToast('面板正在重启，请稍候刷新页面','success');
+                        if (d.data.completed) this._waitForRestart();
                     }
-                } catch(e) { clearInterval(this._updateTimer); }
+                } catch(e) {
+                    // 面板进程正在被替换/重启，请求会短暂失败，转为等待服务恢复后自动刷新
+                    clearInterval(this._updateTimer);
+                    this._waitForRestart();
+                }
+            }, 1000);
+        },
+        _waitForRestart() {
+            if (this._restartTimer) clearInterval(this._restartTimer);
+            this.updateRun.running = true;
+            this.updateRun.message = '面板正在重启，等待服务恢复后将自动刷新...';
+            let attempts = 0;
+            this._restartTimer = setInterval(async () => {
+                attempts++;
+                try {
+                    const resp = await fetch('/healthz', {cache:'no-store'});
+                    if (resp.ok) {
+                        clearInterval(this._restartTimer);
+                        location.reload();
+                        return;
+                    }
+                } catch(e) {}
+                if (attempts >= 120) {
+                    clearInterval(this._restartTimer);
+                    this.updateRun.running = false;
+                    this.updateRun.message = '面板重启超时，请手动刷新页面确认状态';
+                }
             }, 1000);
         },
         formatBytes(n) {
