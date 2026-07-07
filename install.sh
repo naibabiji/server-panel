@@ -127,14 +127,17 @@ download_binary() {
     arch="$(detect_arch)"
     asset="server-panel-linux-${arch}"
     url="$(release_url "$arch")"
-    script_dir="$(cd "$(dirname "$0")" && pwd)"
+    script_dir=""
+    if [ -f "$0" ] && [ "$(basename "$0")" != "bash" ] && [ "$(basename "$0")" != "sh" ]; then
+        script_dir="$(cd "$(dirname "$0")" && pwd)"
+    fi
 
-    if [ -s "${script_dir}/server-panel" ]; then
+    if [ -n "$script_dir" ] && [ -s "${script_dir}/server-panel" ]; then
         log "使用脚本同目录的 server-panel 二进制"
         install -m 0755 "${script_dir}/server-panel" "$BIN_PATH"
         return
     fi
-    if [ -s "${script_dir}/${asset}" ]; then
+    if [ -n "$script_dir" ] && [ -s "${script_dir}/${asset}" ]; then
         log "使用脚本同目录的 ${asset} 二进制"
         install -m 0755 "${script_dir}/${asset}" "$BIN_PATH"
         return
