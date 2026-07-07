@@ -25,6 +25,17 @@ func AgentAuth(db *sql.DB) gin.HandlerFunc {
 		hash := sha256.Sum256([]byte(apiKey))
 		hashStr := hex.EncodeToString(hash[:])
 
+		// Rate-limit on the key hash before touching the DB at all, so a
+		// flood of requests using the same valid key can't force a
+		// SELECT+UPDATE per request just to get rejected afterward.
+		if !globalAgentRateLimiter.allow(hashStr) {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+				"success": false,
+				"message": "请求过于频繁",
+			})
+			return
+		}
+
 		var serverID int64
 		err := db.QueryRow(
 			"SELECT id FROM servers WHERE agent_api_key_hash = ? AND agent_api_key_hash <> ''",
