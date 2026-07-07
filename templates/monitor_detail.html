@@ -50,16 +50,48 @@ function destroyCharts() {
     charts = {};
 }
 
-function makeChart(canvasId, label, color, dataKey) {
+function hexToRGBA(hex, alpha) {
+    const n = parseInt(hex.replace('#', ''), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+// 计算比较"贴合数据"的 y 轴上限：留 25% 余量后取整到规整刻度，
+// 避免固定量程把平稳数据压扁在图表底部一小条里。
+function niceAxisMax(values, opts) {
+    opts = opts || {};
+    const nums = (values || []).filter(v => typeof v === 'number' && isFinite(v));
+    const max = nums.length ? Math.max(...nums) : 0;
+    const floor = opts.percent ? 10 : 1;
+    let target = Math.max(max * 1.25, floor);
+    if (opts.percent) target = Math.min(target, 100);
+    const step = opts.percent ? 5 : (target > 10 ? 1 : 0.5);
+    return Math.ceil(target / step) * step;
+}
+
+function makeChart(canvasId, label, color) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return null;
     return new Chart(ctx, {
         type: 'line',
-        data: { labels: [], datasets: [{ label, data: [], borderColor: color, borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: false }] },
+        data: { labels: [], datasets: [{
+            label, data: [],
+            borderColor: color, borderWidth: 2, tension: 0.3,
+            fill: true, backgroundColor: hexToRGBA(color, 0.12),
+            pointRadius: (c) => c.dataIndex === c.dataset.data.length - 1 ? 4 : 0,
+            pointHoverRadius: 5, pointHitRadius: 12,
+            pointBackgroundColor: color, pointBorderColor: '#171b21', pointBorderWidth: 2
+        }] },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { labels: { color: '#a1a1aa', font: { size: 11 } } } },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#a1a1aa', font: { size: 11 } } },
+                tooltip: {
+                    backgroundColor: '#11151a', borderColor: '#2a3038', borderWidth: 1,
+                    titleColor: '#e5e7eb', bodyColor: '#e5e7eb', padding: 10, displayColors: false
+                }
+            },
             scales: {
                 x: { ticks: { color: '#52525b', maxTicksLimit: 10 }, grid: { color: '#27272a' } },
                 y: { ticks: { color: '#52525b' }, grid: { color: '#27272a' }, beginAtZero: true }
@@ -77,24 +109,30 @@ function updateCharts(points) {
         return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
     });
 
-    charts.cpu = makeChart('cpuChart', 'CPU %', '#a78bfa', 'cpu');
+    charts.cpu = makeChart('cpuChart', 'CPU %', '#a78bfa');
     if (charts.cpu) {
+        const data = points.map(p => p.cpu);
         charts.cpu.data.labels = labels;
-        charts.cpu.data.datasets[0].data = points.map(p => p.cpu);
+        charts.cpu.data.datasets[0].data = data;
+        charts.cpu.options.scales.y.suggestedMax = niceAxisMax(data, { percent: true });
         charts.cpu.update();
     }
 
-    charts.mem = makeChart('memChart', 'Memory %', '#4ade80', 'mem');
+    charts.mem = makeChart('memChart', 'Memory %', '#4ade80');
     if (charts.mem) {
+        const data = points.map(p => p.mem);
         charts.mem.data.labels = labels;
-        charts.mem.data.datasets[0].data = points.map(p => p.mem);
+        charts.mem.data.datasets[0].data = data;
+        charts.mem.options.scales.y.suggestedMax = niceAxisMax(data, { percent: true });
         charts.mem.update();
     }
 
-    charts.load = makeChart('loadChart', 'Load 1m', '#fbbf24', 'load1');
+    charts.load = makeChart('loadChart', 'Load 1m', '#fbbf24');
     if (charts.load) {
+        const data = points.map(p => p.load1);
         charts.load.data.labels = labels;
-        charts.load.data.datasets[0].data = points.map(p => p.load1);
+        charts.load.data.datasets[0].data = data;
+        charts.load.options.scales.y.suggestedMax = niceAxisMax(data);
         charts.load.update();
     }
 }
