@@ -38,9 +38,7 @@ prompt() {
     local default="${3:-}"
     local value=""
 
-    if [ -r /dev/tty ]; then
-        read -r -p "$message" value </dev/tty || value="$default"
-    elif [ -t 0 ]; then
+    if [ -t 0 ]; then
         read -r -p "$message" value || value="$default"
     else
         value="$default"
@@ -352,10 +350,15 @@ main() {
     echo "============================================"
     echo "  Server Panel TLS 配置"
     echo "============================================"
-    prompt bind_domain "是否绑定面板域名? [y/N]: " "n"
-    DOMAIN=""
-    PUBLIC_URL=""
-    if [[ "$bind_domain" =~ ^[Yy] ]]; then
+    DOMAIN="${DOMAIN:-}"
+    PUBLIC_URL="${PUBLIC_URL:-}"
+    if [ -n "$DOMAIN" ]; then
+        PUBLIC_URL="${PUBLIC_URL:-https://${DOMAIN}:${TLS_PORT}}"
+        log "使用环境变量中的面板域名: $DOMAIN"
+    else
+        prompt bind_domain "是否绑定面板域名? [y/N]: " "n"
+    fi
+    if [ -z "$DOMAIN" ] && [[ "${bind_domain:-}" =~ ^[Yy] ]]; then
         prompt DOMAIN "面板域名（如 panel.example.com）: "
         if [ -n "$DOMAIN" ]; then
             prompt tls_port_input "HTTPS 端口 (默认 ${TLS_PORT}): "
