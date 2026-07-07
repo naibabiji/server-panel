@@ -62,3 +62,7 @@ systemctl restart server-panel
 journalctl -u server-panel -f
 server-panel --reset-password
 ```
+
+## 授权协议
+
+本项目基于 [GPL-3.0](LICENSE) 协议开源。
