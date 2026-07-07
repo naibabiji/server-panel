@@ -282,13 +282,35 @@ case "$ARCH" in
   *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 AGENT_URL="https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/server-panel-agent-linux-\${ARCH}"
+CHECKSUM_URL="https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/checksums-\${ARCH}.txt"
+
+id -u server-panel-agent >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin server-panel-agent
 
 install -d /etc/server-panel
-curl -fsSL "$AGENT_URL" -o /usr/local/bin/server-panel-agent
-chmod +x /usr/local/bin/server-panel-agent
+TMP_BIN="$(mktemp)"
+TMP_SUM="$(mktemp)"
+curl -fsSL "$AGENT_URL" -o "$TMP_BIN"
+curl -fsSL "$CHECKSUM_URL" -o "$TMP_SUM"
+EXPECTED_SUM="$(grep "server-panel-agent-linux-\${ARCH}\$" "$TMP_SUM" | awk '{print $1}')"
+if [ -z "$EXPECTED_SUM" ]; then
+  echo "未能在 checksums-\${ARCH}.txt 中找到 server-panel-agent-linux-\${ARCH} 的校验和" >&2
+  rm -f "$TMP_BIN" "$TMP_SUM"
+  exit 1
+fi
+ACTUAL_SUM="$(sha256sum "$TMP_BIN" | awk '{print $1}')"
+if [ "$EXPECTED_SUM" != "$ACTUAL_SUM" ]; then
+  echo "Agent 二进制校验和不匹配，可能下载不完整或被篡改，已中止安装" >&2
+  rm -f "$TMP_BIN" "$TMP_SUM"
+  exit 1
+fi
+rm -f "$TMP_SUM"
+mv "$TMP_BIN" /usr/local/bin/server-panel-agent
+chmod 755 /usr/local/bin/server-panel-agent
 cat >/etc/server-panel/agent.json <<EOF
 {"center_url":"${centerURL}","api_key":"${agentKey}","interval_seconds":60,"tls_skip_verify":${tlsSkipVerify}}
 EOF
+chown server-panel-agent:server-panel-agent /etc/server-panel/agent.json
+chmod 600 /etc/server-panel/agent.json
 cat >/etc/systemd/system/server-panel-agent.service <<'EOF'
 [Unit]
 Description=Server Panel Agent
@@ -297,9 +319,20 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=server-panel-agent
+Group=server-panel-agent
 ExecStart=/usr/local/bin/server-panel-agent -config /etc/server-panel/agent.json
 Restart=always
 RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
 
 [Install]
 WantedBy=multi-user.target
@@ -324,6 +357,7 @@ fi
 systemctl disable --now server-panel-agent || true
 rm -f /usr/local/bin/server-panel-agent /etc/systemd/system/server-panel-agent.service /etc/server-panel/agent.json
 systemctl daemon-reload || true
+userdel server-panel-agent 2>/dev/null || true
 echo "Server Panel Agent 已卸载"`;
         },
         async revealServerSecret(field) {
