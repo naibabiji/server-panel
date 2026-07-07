@@ -39,7 +39,10 @@ prompt() {
     local default="${3:-}"
     local value=""
 
-    if [ -t 0 ]; then
+    if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+        printf "%s" "$message" >/dev/tty
+        IFS= read -r value </dev/tty || value="$default"
+    elif [ -t 0 ]; then
         read -r -p "$message" value || value="$default"
     else
         value="$default"
