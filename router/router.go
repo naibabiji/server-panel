@@ -15,6 +15,12 @@ import (
 
 func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.FS) *gin.Engine {
 	r := gin.New()
+	// Verified against gin v1.10.0 source: an empty/nil list here makes
+	// isTrustedProxy() always false, so ClientIP() never reads
+	// X-Forwarded-For/X-Real-IP and falls back to the raw TCP peer address -
+	// it does NOT mean "trust everyone". Only entries actually listed here
+	// (config.Panel.TrustedProxies, default loopback - see config.go) get
+	// their forwarded-for headers honored.
 	if err := r.SetTrustedProxies(cfg.Panel.TrustedProxies); err != nil {
 		panic(err)
 	}

@@ -341,6 +341,14 @@ systemctl daemon-reload
 systemctl enable --now server-panel-agent
 systemctl status server-panel-agent --no-pager`;
         },
+        // buildInstallCommand/buildUninstallCommand return shell scripts via JS
+        // template literals. Any literal shell ${...} (parameter expansion,
+        // e.g. ${AGENT_URL%/}) MUST be written as \${...} here, or JS parses it
+        // as its own interpolation and throws (this broke the whole page once:
+        // an unescaped ${AGENT_URL%/} was read as `AGENT_URL % /}`, a regex-flag
+        // SyntaxError, which fails at script-parse time so nothing on this page
+        // runs at all - not just this function). Only genuine JS interpolation
+        // (this.shellQuote(...), etc.) should use unescaped ${...}.
         buildUninstallCommand() {
             return `#!/bin/sh
 set -e
