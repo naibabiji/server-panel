@@ -347,6 +347,7 @@ print_summary() {
     echo -e "  ${CYAN}配置文件:${NC} $CONFIG_FILE"
     echo ""
     echo -e "  ${YELLOW}请立即保存以上地址和密码。自签证书会有浏览器安全提示，公网使用建议放在 Nginx/Caddy 反向代理后。${NC}"
+    echo -e "  ${YELLOW}同机反向代理默认已受信任。若反向代理跑在另一台机器上，请在 $CONFIG_FILE 的 panel 段把它的 IP 加入 \"trusted_proxies\" 并重启服务，否则封禁 IP 功能会误判为访客的真实来源。${NC}"
     echo ""
     echo "  管理命令:"
     echo "    systemctl status server-panel"

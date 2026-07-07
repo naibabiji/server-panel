@@ -58,6 +58,11 @@ type PanelConfig struct {
 	DataDir           string `json:"data_dir"`
 	LogDir            string `json:"log_dir"`
 	PanelTitle        string `json:"panel_title"`
+	// TrustedProxies lists the IPs/CIDRs of reverse proxies allowed to set
+	// X-Forwarded-For/X-Real-IP. Defaults to loopback (see LoadConfig) to
+	// cover a same-host Nginx/Caddy out of the box; set to [] explicitly to
+	// trust nothing, or add a specific address for a remote reverse proxy.
+	TrustedProxies []string `json:"trusted_proxies"`
 }
 
 type SQLiteConfig struct {
@@ -116,6 +121,14 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.Panel.PanelTitle == "" {
 		cfg.Panel.PanelTitle = "Server Panel"
+	}
+	if cfg.Panel.TrustedProxies == nil {
+		// Trust a same-host reverse proxy by default: the kernel drops
+		// inbound packets that claim a loopback source address on a
+		// non-loopback interface, so honoring X-Forwarded-For from
+		// 127.0.0.1/::1 doesn't let a remote attacker spoof ClientIP().
+		// Set "trusted_proxies": [] explicitly to opt out.
+		cfg.Panel.TrustedProxies = []string{"127.0.0.1", "::1"}
 	}
 	if cfg.Security.MaxLoginAttempts == 0 {
 		cfg.Security.MaxLoginAttempts = 5

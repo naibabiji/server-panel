@@ -15,7 +15,7 @@ import (
 
 func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.FS) *gin.Engine {
 	r := gin.New()
-	if err := r.SetTrustedProxies(nil); err != nil {
+	if err := r.SetTrustedProxies(cfg.Panel.TrustedProxies); err != nil {
 		panic(err)
 	}
 

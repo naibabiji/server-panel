@@ -72,6 +72,13 @@ func BanIP(ip, reason, source string, durationHours int) {
 	if IsWhitelisted(ip) {
 		return
 	}
+	// Never firewall off loopback: if the panel sits behind a same-host
+	// reverse proxy and TrustedProxies isn't configured, every request looks
+	// like it comes from 127.0.0.1/::1. Banning it would lock out everyone,
+	// including the proxy itself, until the ban expires.
+	if parsed := net.ParseIP(ip); parsed != nil && parsed.IsLoopback() {
+		return
+	}
 	ensureBanRecord(ip, reason, source, durationHours)
 	if !nftInitialized {
 		return
