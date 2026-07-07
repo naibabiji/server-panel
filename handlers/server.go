@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -278,7 +279,7 @@ func (h *ServerHandler) GetSecret(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse("会话已过期，请重新登录"))
 		return
 	}
-	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, c.ClientIP()) {
+	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
 		c.JSON(http.StatusForbidden, models.ErrorResponse("请重新输入查看密码"))
 		return
 	}

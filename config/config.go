@@ -63,6 +63,11 @@ type PanelConfig struct {
 	// cover a same-host Nginx/Caddy out of the box; set to [] explicitly to
 	// trust nothing, or add a specific address for a remote reverse proxy.
 	TrustedProxies []string `json:"trusted_proxies"`
+	// TrustCloudflare enables recognizing Cloudflare's published edge IP
+	// ranges (auto-refreshed periodically) and reading the real visitor IP
+	// from CF-Connecting-IP for requests coming from them. Only enable this
+	// if the panel is actually fronted by Cloudflare.
+	TrustCloudflare bool `json:"trust_cloudflare"`
 }
 
 type SQLiteConfig struct {

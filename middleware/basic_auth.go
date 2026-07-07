@@ -15,7 +15,7 @@ type BasicAuthChecker struct {
 
 func BasicAuth(checker *BasicAuthChecker) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		ip := ClientIP(c)
 
 		if checker.IsBanned != nil && checker.IsBanned(ip) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{

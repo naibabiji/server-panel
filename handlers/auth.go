@@ -42,14 +42,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err != nil {
 		bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(req.Password))
 		if h.AttemptTracker != nil {
-			h.AttemptTracker.RecordAttempt(c.ClientIP(), "web_login")
+			h.AttemptTracker.RecordAttempt(middleware.ClientIP(c), "web_login")
 		}
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse("用户名或密码错误"))
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)) != nil {
 		if h.AttemptTracker != nil {
-			h.AttemptTracker.RecordAttempt(c.ClientIP(), "web_login")
+			h.AttemptTracker.RecordAttempt(middleware.ClientIP(c), "web_login")
 		}
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse("用户名或密码错误"))
 		return

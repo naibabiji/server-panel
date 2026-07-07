@@ -120,6 +120,9 @@ func main() {
 	executor.StartAutoRenewalChecker(24 * time.Hour)
 	executor.InitNFTables(cfg.Panel.TLSPort)
 	executor.StartBanCleanup(1 * time.Minute)
+	if cfg.Panel.TrustCloudflare {
+		executor.StartCloudflareIPRefresh(24 * time.Hour)
+	}
 	executor.FinalizePendingPanelUpdate(cfg, Version)
 	executor.StartPanelAutoUpdateScheduler(Version, *configPath, cfg)
 

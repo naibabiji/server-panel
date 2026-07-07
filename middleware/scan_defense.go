@@ -21,7 +21,7 @@ func ScanDefense(suffix string, banHours int) gin.HandlerFunc {
 			return
 		}
 
-		ip := c.ClientIP()
+		ip := ClientIP(c)
 		if executor.IsWhitelisted(ip) {
 			c.Next()
 			return

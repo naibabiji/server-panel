@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -133,7 +134,7 @@ func (h *ViewPasswordHandler) Change(c *gin.Context) {
 func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 	db := database.GetDB()
 
-	ip := c.ClientIP()
+	ip := middleware.ClientIP(c)
 
 	var req struct {
 		Password string `json:"password"`

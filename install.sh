@@ -348,6 +348,7 @@ print_summary() {
     echo ""
     echo -e "  ${YELLOW}请立即保存以上地址和密码。自签证书会有浏览器安全提示，公网使用建议放在 Nginx/Caddy 反向代理后。${NC}"
     echo -e "  ${YELLOW}同机反向代理默认已受信任。若反向代理跑在另一台机器上，请在 $CONFIG_FILE 的 panel 段把它的 IP 加入 \"trusted_proxies\" 并重启服务，否则封禁 IP 功能会误判为访客的真实来源。${NC}"
+    echo -e "  ${YELLOW}接入 Cloudflare 时，请在 $CONFIG_FILE 的 panel 段加入 \"trust_cloudflare\": true 并重启服务，面板会自动拉取并每日刷新 Cloudflare 的 IP 段，从 CF-Connecting-IP 还原访客真实 IP。${NC}"
     echo ""
     echo "  管理命令:"
     echo "    systemctl status server-panel"
