@@ -15,6 +15,22 @@
         <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">离线</div><div class="text-2xl font-semibold mt-1 text-red-400" x-text="stats.offline_count">0</div></div>
         <div class="p-5"><div class="text-sm text-gray-400">即将到期</div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count">0</div></div>
     </div>
+    <div class="border border-[#2a3038] bg-[#171b21] mb-6" x-show="httpProbeIssues.length">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-red-300">HTTP 探测异常</div>
+        <div class="p-5">
+            <template x-for="item in httpProbeIssues" :key="'probe-'+item.id">
+                <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="min-w-0">
+                            <div class="text-sm text-gray-100" x-text="item.name"></div>
+                            <div class="text-xs text-red-400 break-all" x-text="item.last_error || '探测失败'"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 shrink-0" x-text="fmtTime(item.last_at)"></div>
+                    </div>
+                </a>
+            </template>
+        </div>
+    </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <section class="border border-[#2a3038] bg-[#171b21]">
             <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">即将到期的服务器</div>
@@ -69,32 +85,39 @@ function dashboardPage() {
     return {
         stats: { total_servers: 0, online_count: 0, offline_count: 0, expiring_count: 0 },
         expiring: { servers: [], websites: [] },
+        httpProbeIssues: [],
         alerts: [],
         panelUpdate: { hasUpdate: false, latestVersion: '' },
         sysUpdateCount: 0,
         async init() {
-            try {
-                const d = await api('/api/dashboard/stats');
-                this.stats = d.data;
-            } catch(e) {}
-            try {
-                const d = await api('/api/dashboard/expiring');
-                this.expiring = d.data || { servers: [], websites: [] };
-                this.expiring.servers = this.expiring.servers || [];
-                this.expiring.websites = this.expiring.websites || [];
-            } catch(e) {}
-            try {
-                const d = await api('/api/dashboard/recent-alerts?limit=10');
-                this.alerts = d.data || [];
-            } catch(e) {}
-            try {
-                const d = await api('/api/update/check');
-                this.panelUpdate = { hasUpdate: d.data.has_update, latestVersion: d.data.latest_version };
-            } catch(e) {}
-            try {
-                const d = await api('/api/system/updates');
-                this.sysUpdateCount = d.data.count || 0;
-            } catch(e) {}
+            await Promise.all([
+                (async () => { try {
+                    const d = await api('/api/dashboard/stats');
+                    this.stats = d.data;
+                } catch(e) {} })(),
+                (async () => { try {
+                    const d = await api('/api/dashboard/expiring');
+                    this.expiring = d.data || { servers: [], websites: [] };
+                    this.expiring.servers = this.expiring.servers || [];
+                    this.expiring.websites = this.expiring.websites || [];
+                } catch(e) {} })(),
+                (async () => { try {
+                    const d = await api('/api/dashboard/http-probe-issues');
+                    this.httpProbeIssues = d.data || [];
+                } catch(e) {} })(),
+                (async () => { try {
+                    const d = await api('/api/dashboard/recent-alerts?limit=10');
+                    this.alerts = d.data || [];
+                } catch(e) {} })(),
+                (async () => { try {
+                    const d = await api('/api/update/check');
+                    this.panelUpdate = { hasUpdate: d.data.has_update, latestVersion: d.data.latest_version };
+                } catch(e) {} })(),
+                (async () => { try {
+                    const d = await api('/api/system/updates');
+                    this.sysUpdateCount = d.data.count || 0;
+                } catch(e) {} })(),
+            ]);
         },
         panelURL(path) {
             return (document.body.dataset.panelPrefix || '') + path;

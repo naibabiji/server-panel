@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"strconv"
 
@@ -109,6 +110,49 @@ func (h *DashboardHandler) GetExpiring(c *gin.Context) {
 		"servers":  servers,
 		"websites": websites,
 	}))
+}
+
+func (h *DashboardHandler) GetHTTPProbeIssues(c *gin.Context) {
+	db := database.GetDB()
+
+	rows, err := db.Query(
+		`SELECT id, name, http_probe_last_at, http_probe_last_error
+		 FROM servers
+		 WHERE http_probe_enabled = 1 AND http_probe_healthy = 0
+		 ORDER BY http_probe_last_at DESC LIMIT 20`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取 HTTP 探测异常失败"))
+		return
+	}
+	defer rows.Close()
+
+	type probeIssue struct {
+		ID         int64  `json:"id"`
+		Name       string `json:"name"`
+		LastAt     string `json:"last_at"`
+		LastError  string `json:"last_error"`
+		DetailPath string `json:"detail_path"`
+	}
+	issues := []probeIssue{}
+	for rows.Next() {
+		var item probeIssue
+		var lastAt sql.NullString
+		if err := rows.Scan(&item.ID, &item.Name, &lastAt, &item.LastError); err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("解析 HTTP 探测异常失败"))
+			return
+		}
+		if lastAt.Valid {
+			item.LastAt = lastAt.String
+		}
+		item.DetailPath = "/servers/" + strconv.FormatInt(item.ID, 10)
+		issues = append(issues, item)
+	}
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取 HTTP 探测异常失败"))
+		return
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(issues))
 }
 
 func (h *DashboardHandler) GetRecentAlerts(c *gin.Context) {

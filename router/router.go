@@ -95,6 +95,7 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			dashH := &handlers.DashboardHandler{}
 			protected.GET("/api/dashboard/stats", dashH.GetStats)
 			protected.GET("/api/dashboard/expiring", dashH.GetExpiring)
+			protected.GET("/api/dashboard/http-probe-issues", dashH.GetHTTPProbeIssues)
 			protected.GET("/api/dashboard/recent-alerts", dashH.GetRecentAlerts)
 
 			srvH := &handlers.ServerHandler{DB: db}
