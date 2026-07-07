@@ -104,9 +104,11 @@ function monitorDetail() {
         server: {}, latest: {}, currentRange: '24h',
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
-            try { const d = await api('/api/servers/'+id); this.server = d.data; } catch(e) {}
-            try { const d = await api('/api/monitor/'+id+'/latest'); this.latest = d.data; } catch(e) {}
-            await this.loadCharts();
+            await Promise.all([
+                (async () => { try { const d = await api('/api/servers/'+id); this.server = d.data; } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/monitor/'+id+'/latest'); this.latest = d.data; } catch(e) {} })(),
+                this.loadCharts(),
+            ]);
         },
         async loadCharts(range) {
             const r = range || this.currentRange;

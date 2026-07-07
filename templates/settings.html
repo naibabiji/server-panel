@@ -311,32 +311,35 @@ function settingsPage() {
         sysUpdate: { packages:[], count:0, checking:false, updating:false, output:'' },
         opLogs: { items:[], total:0, page:1, page_size:20 },
         async init() {
-            try { const d = await api('/api/settings'); this.panelTitle = d.data.panel_title || ''; } catch(e) {}
-            try { const d = await api('/api/settings/panel-access'); this.access = d.data; this._loadedAccess = {tls_port: d.data.tls_port, random_suffix: d.data.random_suffix}; } catch(e) {}
-            try { const d = await api('/api/settings/tls'); this.tls = Object.assign(this.tls, d.data || {}); } catch(e) {}
-            try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {}
-            try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; } catch(e) {}
-            try { const d = await api('/api/view-password/status'); this.vpSetup = d.data.is_setup; this.vpUnlocked = d.data.is_unlocked; } catch(e) {}
-            try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {}
-            try { const d = await api('/api/settings/site-type-list'); this.siteTypeList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {}
-            try { await this.checkUpdate(); } catch(e) {}
-            try {
-                const d = await api('/api/update/auto-settings');
-                this.autoUpdate = {
-                    enabled: d.data.panel_auto_update_enabled === 'true',
-                    mode: d.data.panel_auto_update_mode || 'patch_only',
-                    window: d.data.panel_auto_update_window || '03:00-05:00',
-                    release_delay_minutes: d.data.panel_auto_update_release_delay_minutes || '15',
-                    signature_timeout_minutes: d.data.panel_auto_update_signature_timeout_minutes || '120',
-                    last_check_at: d.data.panel_auto_update_last_check_at || '',
-                    last_status: d.data.panel_auto_update_last_status || '',
-                    last_error: d.data.panel_auto_update_last_error || '',
-                    last_success_at: d.data.panel_auto_update_last_success_at || '',
-                    last_success_version: d.data.panel_auto_update_last_success_version || ''
-                };
-            } catch(e) {}
-            try { await this.checkSysUpdate(); } catch(e) {}
-            try { await this.loadOpLogs(); } catch(e) {}
+            // 各区块数据源互不依赖，并行加载，避免逐个排队等待
+            await Promise.all([
+                (async () => { try { const d = await api('/api/settings'); this.panelTitle = d.data.panel_title || ''; } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/panel-access'); this.access = d.data; this._loadedAccess = {tls_port: d.data.tls_port, random_suffix: d.data.random_suffix}; } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/tls'); this.tls = Object.assign(this.tls, d.data || {}); } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/view-password/status'); this.vpSetup = d.data.is_setup; this.vpUnlocked = d.data.is_unlocked; } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypeList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
+                (async () => { try {
+                    const d = await api('/api/update/auto-settings');
+                    this.autoUpdate = {
+                        enabled: d.data.panel_auto_update_enabled === 'true',
+                        mode: d.data.panel_auto_update_mode || 'patch_only',
+                        window: d.data.panel_auto_update_window || '03:00-05:00',
+                        release_delay_minutes: d.data.panel_auto_update_release_delay_minutes || '15',
+                        signature_timeout_minutes: d.data.panel_auto_update_signature_timeout_minutes || '120',
+                        last_check_at: d.data.panel_auto_update_last_check_at || '',
+                        last_status: d.data.panel_auto_update_last_status || '',
+                        last_error: d.data.panel_auto_update_last_error || '',
+                        last_success_at: d.data.panel_auto_update_last_success_at || '',
+                        last_success_version: d.data.panel_auto_update_last_success_version || ''
+                    };
+                } catch(e) {} })(),
+                this.checkUpdate().catch(() => {}),
+                this.checkSysUpdate().catch(() => {}),
+                this.loadOpLogs().catch(() => {}),
+            ]);
         },
         async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
         async saveAccess() {

@@ -55,8 +55,10 @@ function websiteList() {
             this.loading = false;
         },
         async init() {
-            await this.fetch();
-            try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {}
+            await Promise.all([
+                this.fetch(),
+                (async () => { try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {} })(),
+            ]);
         },
         externalURL(domain) {
             if (!domain) return '#';

@@ -70,7 +70,7 @@ function firewallPage() {
     return {
         bans: { items: [] }, whitelist: [], showWhitelistModal: false,
         wlForm: { ip_address: '', notes: '' },
-        async init() { await this.fetchBans(); await this.fetchWhitelist(); },
+        async init() { await Promise.all([this.fetchBans(), this.fetchWhitelist()]); },
         async fetchBans() { try { const d = await api('/api/firewall/bans'); this.bans = d.data; } catch(e) {} },
         async fetchWhitelist() { try { const d = await api('/api/firewall/whitelist'); this.whitelist = d.data || []; } catch(e) {} },
         async unban(id) {
