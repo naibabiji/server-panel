@@ -63,9 +63,12 @@ func (l *agentRateLimiter) allow(key string) bool {
 	return true
 }
 
-// globalAgentRateLimiter caps requests per presented API key hash, checked
-// in AgentAuth before any DB access. A legitimate agent reports once per its
-// configured interval (default 60s) with up to 3 retries on failure, so this
-// leaves generous headroom while still bounding what a leaked/replayed API
-// key can do.
+// globalAgentRateLimiter caps requests per resolved server ID, checked in
+// AgentAuth after the API key has been validated against the DB but before
+// the last_seen_at/is_online write. Keying by server ID (rather than the raw
+// header value) keeps the map bounded by the number of servers actually
+// registered, instead of growing once per distinct key an attacker sends. A
+// legitimate agent reports once per its configured interval (default 60s)
+// with up to 3 retries on failure, so this leaves generous headroom while
+// still bounding what a leaked/replayed API key can do.
 var globalAgentRateLimiter = newAgentRateLimiter(20, time.Minute)
