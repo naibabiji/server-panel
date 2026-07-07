@@ -11,6 +11,7 @@ set -euo pipefail
 #   VERSION=v1.0.0          # default: latest
 #   TLS_PORT=8444           # default: 8444
 #   INSTALL_DIR=/www/server/server-panel
+#   INSTALL_MODE=upgrade    # existing install only: upgrade, reinstall, exit
 # ============================================================
 
 RED='\033[0;31m'
@@ -209,12 +210,42 @@ remove_service_only() {
 }
 
 handle_existing_install() {
+    local mode reinstall_choice
+
     if [ ! -f "$CONFIG_FILE" ]; then
         return
     fi
 
     echo ""
     warn "检测到已有安装: $CONFIG_FILE"
+    mode="${INSTALL_MODE:-}"
+    case "$mode" in
+        upgrade)
+            upgrade_existing
+            exit 0
+            ;;
+        reinstall)
+            remove_service_only
+            return
+            ;;
+        exit)
+            exit 0
+            ;;
+        "")
+            ;;
+        *)
+            err "INSTALL_MODE 只能是 upgrade、reinstall 或 exit"
+            ;;
+    esac
+
+    if [ ! -t 0 ]; then
+        err "当前通过管道运行，无法交互选择已有安装处理方式。请显式指定：
+  保留配置和数据库，仅升级二进制：
+    curl -fsSL https://raw.githubusercontent.com/${REPO}/master/install.sh | INSTALL_MODE=upgrade bash
+  重新生成配置和登录信息（保留数据库文件）：
+    curl -fsSL https://raw.githubusercontent.com/${REPO}/master/install.sh | INSTALL_MODE=reinstall bash"
+    fi
+
     echo "  1) 升级/覆盖二进制（保留配置、数据库、证书）"
     echo "  2) 重新生成配置（保留数据库文件，重置登录信息）"
     echo "  3) 退出"

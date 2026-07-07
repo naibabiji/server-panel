@@ -40,6 +40,16 @@ curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/insta
 curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/install.sh | VERSION=v1.0.0 bash
 ```
 
+已有安装时，管道模式不能交互选择操作，需要显式指定：
+
+```bash
+# 保留配置、数据库、证书，仅覆盖升级二进制
+curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/install.sh | INSTALL_MODE=upgrade bash
+
+# 重新生成配置和登录信息，保留数据库文件
+curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/install.sh | INSTALL_MODE=reinstall bash
+```
+
 离线/手动兜底：把 `install.sh` 和 release 附件 `server-panel-linux-amd64` 或 `server-panel-linux-arm64` 放在同一目录，执行：
 
 ```bash
