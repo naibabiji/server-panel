@@ -52,7 +52,9 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 
 	// Agent routes
 	ag := r.Group("")
+	ag.Use(middleware.MaxBodyBytes(64 * 1024))
 	ag.Use(middleware.AgentAuth(db))
+	ag.Use(middleware.AgentRateLimit())
 	{
 		ah := &handlers.AgentDataHandler{DB: db}
 		ag.POST("/agent/ping", ah.Ping)
