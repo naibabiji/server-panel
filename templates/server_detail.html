@@ -143,6 +143,7 @@
                 <span x-show="!savingAgent" x-text="hasAgent() ? '卸载 Agent 探针' : '安装 Agent 探针'"></span>
                 <span x-show="savingAgent">生成中...</span>
             </button>
+            <button x-show="agentUninstallMode" @click="confirmUninstall()" class="btn-danger text-sm" :disabled="savingAgent">确认已卸载</button>
         </div>
         <div class="p-5">
         <div class="text-sm text-gray-400 mb-2">状态：<span x-text="hasAgent() ? '已安装或已上报' : '未安装'"></span></div>
@@ -164,7 +165,7 @@
 <script>
 function serverDetail() {
     return {
-        s: {}, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '',
+        s: {}, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false,
         secrets: {'ssh-password':'', 'panel-password':''},
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
@@ -266,6 +267,10 @@ function serverDetail() {
             const tlsSkipVerify = '{{.TLSMode}}' === 'self_signed';
             return `#!/bin/sh
 set -e
+# 清理可能残留的旧 Agent，避免重复安装冲突
+systemctl disable --now server-panel-agent 2>/dev/null || true
+rm -f /usr/local/bin/server-panel-agent /etc/systemd/system/server-panel-agent.service /etc/server-panel/agent.json 2>/dev/null || true
+systemctl daemon-reload 2>/dev/null || true
 AGENT_VERSION="latest"
 CENTER_URL=${this.shellQuote(centerURL)}
 AGENT_API_KEY=${this.shellQuote(agentKey)}
@@ -306,6 +311,14 @@ systemctl status server-panel-agent --no-pager`;
         buildUninstallCommand() {
             return `#!/bin/sh
 set -e
+# 通知面板已卸载：面板收到后会自动清除该服务器记录（面板不可达时忽略，可稍后手动确认）
+if [ -f /etc/server-panel/agent.json ]; then
+  AGENT_URL="$(grep -o '"center_url":"[^"]*"' /etc/server-panel/agent.json | sed 's/"center_url":"//;s/"//')"
+  AGENT_KEY="$(grep -o '"api_key":"[^"]*"' /etc/server-panel/agent.json | sed 's/"api_key":"//;s/"//')"
+  if [ -n "$AGENT_URL" ] && [ -n "$AGENT_KEY" ]; then
+    curl -fsS -X POST -H "X-Agent-API-Key: $AGENT_KEY" "${AGENT_URL%/}/agent/uninstall" || true
+  fi
+fi
 systemctl disable --now server-panel-agent || true
 rm -f /usr/local/bin/server-panel-agent /etc/systemd/system/server-panel-agent.service /etc/server-panel/agent.json
 systemctl daemon-reload || true
@@ -339,27 +352,34 @@ echo "Server Panel Agent 已卸载"`;
             }
         },
         async showInstallCommand() {
+            this.agentUninstallMode = false;
             this.savingAgent = true;
             try {
                 const d = await api('/api/servers/'+this.s.id+'/agent-key/regenerate', {method:'POST'});
                 this.agentCommandTitle = '复制到被安装服务器执行';
                 this.agentCommand = this.buildInstallCommand(d.data.agent_key);
-                this.agentCommandNote = '执行后 Agent 会开始上报指标，服务器会自动出现在性能监控页面。再次点击安装会生成新 Key，旧 Agent 需要重新安装。';
+                this.agentCommandNote = '执行后 Agent 会开始上报指标，服务器会自动出现在性能监控页面。安装命令会先清理可能残留的旧 Agent，可安全重复执行；但每次生成都会作废旧 Key。';
                 showToast('Agent 安装命令已生成','success');
             } catch(e) { showToast(e.message,'error'); }
             this.savingAgent = false;
         },
         async showUninstallCommand() {
+            this.agentCommand = this.buildUninstallCommand();
+            this.agentCommandTitle = '复制到已安装 Agent 的服务器执行';
+            this.agentCommandNote = '在目标服务器执行该命令会停止并删除 Agent 服务。执行完后，回到此处点“确认已卸载”以清除面板记录。';
+            this.agentUninstallMode = true;
+            showToast('Agent 卸载命令已生成','success');
+        },
+        async confirmUninstall() {
             this.savingAgent = true;
             try {
                 await api('/api/servers/'+this.s.id+'/agent/uninstall', {method:'POST'});
                 this.s.agent_version = '';
                 this.s.last_seen_at = '';
                 this.s.is_online = false;
-                this.agentCommandTitle = '复制到已安装 Agent 的服务器执行';
-                this.agentCommand = this.buildUninstallCommand();
-                this.agentCommandNote = '面板中的 Agent 监控状态已关闭。执行该命令后，目标机上的 Agent 服务会被停止并删除。';
-                showToast('Agent 卸载命令已生成','success');
+                this.agentUninstallMode = false;
+                this.agentCommand = '';
+                showToast('Agent 已卸载，面板记录已清除','success');
             } catch(e) { showToast(e.message,'error'); }
             this.savingAgent = false;
         },
