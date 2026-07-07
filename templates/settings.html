@@ -1,0 +1,558 @@
+{{template "base" .}}
+{{define "settings_content"}}
+<div x-data="settingsPage()" x-init="init()" class="p-6 max-w-6xl">
+    <div class="flex items-end justify-between gap-4 pb-5 mb-5 border-b border-[#202833]">
+        <div>
+            <h2 class="text-xl font-semibold text-purple-200">系统设置</h2>
+            <div class="text-sm text-gray-500 mt-1">管理面板访问、安全凭据、通知发送和表单字典。</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
+        <nav class="lg:sticky lg:top-20 self-start bg-[#10151c] border border-[#202833] p-2">
+            <a href="#basic" class="block px-3 py-2 text-sm text-white bg-[#211a31] border-l-2 border-purple-500">基础设置</a>
+            <a href="#update" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">更新</a>
+            <a href="#security" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">安全</a>
+            <a href="#notification" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">通知</a>
+            <a href="#dictionary" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">字典</a>
+            <a href="#danger" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">危险操作</a>
+        </nav>
+
+        <div class="min-w-0">
+            <section id="basic" class="border border-[#2a3038] bg-[#171b21] mb-5">
+                <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
+                    <div class="text-base font-semibold text-gray-100">基础设置</div>
+                    <div class="text-sm text-gray-500 mt-1">这些配置决定后台在浏览器中如何显示和访问。</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">面板标题</div>
+                        <div class="text-sm text-gray-500 leading-6">显示在侧边栏顶部和浏览器标题中。</div>
+                    </div>
+                    <div>
+                        <label class="label">标题</label>
+                        <input type="text" x-model="panelTitle" class="input-field">
+                        <div class="flex gap-2 mt-3"><button @click="saveTitle()" class="btn-primary text-sm">保存标题</button></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">面板访问</div>
+                        <div class="text-sm text-gray-500 leading-6">面板只监听 HTTPS。修改端口或随机路径后会自动重启服务生效，重启期间面板会短暂无法访问。</div>
+                    </div>
+                    <div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label class="label">HTTPS 端口</label><input type="number" x-model="access.tls_port" class="input-field"></div>
+                            <div><label class="label">随机路径</label><input type="text" x-model="access.random_suffix" class="input-field" placeholder="AbC123"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-3" x-show="access.random_suffix">登录路径：<span class="text-purple-300">/<span x-text="access.random_suffix"></span>/login</span></div>
+                        <div class="flex gap-2 mt-3"><button @click="saveAccess()" class="btn-primary text-sm">保存访问设置</button></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-t border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">域名与 SSL</div>
+                        <div class="text-sm text-gray-500 leading-6">绑定面板域名，按部署场景选择证书模式：</div>
+                        <div class="text-xs text-gray-500 leading-6 mt-2">
+                            自动申请（Let's Encrypt）→ 面板独占整机，无反代/CDN，需要 80 端口空闲<br>
+                            自签证书 / 上传证书 → 前面有 Caddy、Nginx 或 Cloudflare 时使用
+                        </div>
+                        <div class="text-xs text-gray-500 leading-6 mt-3 border-t border-[#202833] pt-3">
+                            <span class="text-gray-400">用 Cloudflare 时：</span>不需要选自动申请，访客看到的证书是 Cloudflare 边缘证书。SSL/TLS 模式选 <b>Full</b> 配自签证书，或 <b>Full (strict)</b> 配上传 Cloudflare Origin CA 证书。Cloudflare 代理默认按访客端口原样转发到源站；想不带端口访问，443 要么在源站空闲，要么用 Cloudflare 的 Origin Rules 把端口转发到面板实际端口。
+                        </div>
+                    </div>
+                    <div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label class="label">面板域名</label><input type="text" x-model="tls.domain" class="input-field" placeholder="panel.example.com"></div>
+                            <div><label class="label">证书模式</label><select x-model="tls.tls_mode" class="input-field"><option value="self_signed">自签证书</option><option value="uploaded">上传证书</option><option value="acme">自动申请（Let's Encrypt）</option></select></div>
+                            <div class="sm:col-span-2" x-show="tls.tls_mode === 'acme'"><label class="label">ACME 邮箱</label><input type="text" x-model="tls.acme_email" class="input-field" placeholder="用于接收证书到期提醒"></div>
+                            <div class="sm:col-span-2"><label class="label">公网访问地址</label><div class="input-field text-purple-300" x-text="accessPreview()"></div></div>
+                            <div class="sm:col-span-2"><label class="label">证书路径</label><input type="text" x-model="tls.tls_cert_path" class="input-field" disabled></div>
+                            <div class="sm:col-span-2"><label class="label">私钥路径</label><input type="text" x-model="tls.tls_key_path" class="input-field" disabled></div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button @click="saveTLS()" class="btn-primary text-sm">保存 TLS 配置</button>
+                            <button @click="issueSelfSigned()" class="btn-secondary text-sm">生成自签证书</button>
+                        </div>
+                        <div class="mt-4 border border-[#202833] bg-[#11151a] p-3">
+                            <div class="text-sm font-semibold text-gray-200 mb-3">上传证书</div>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                <div><label class="label">证书 PEM</label><textarea x-model="tlsUpload.cert_pem" rows="7" class="input-field" placeholder="-----BEGIN CERTIFICATE-----"></textarea></div>
+                                <div><label class="label">私钥 PEM</label><textarea x-model="tlsUpload.key_pem" rows="7" class="input-field" placeholder="-----BEGIN PRIVATE KEY-----"></textarea></div>
+                            </div>
+                            <div class="flex gap-2 mt-3"><button @click="uploadTLS()" class="btn-secondary text-sm">验证并上传证书</button></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="update" class="border border-[#2a3038] bg-[#171b21] mb-5">
+                <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
+                    <div class="text-base font-semibold text-gray-100">更新</div>
+                    <div class="text-sm text-gray-500 mt-1">面板版本检查/更新、自动更新策略，以及系统包更新。</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">面板版本</div>
+                        <div class="text-sm text-gray-500 leading-6">当前版本：<span class="text-purple-300" x-text="update.current_version || '未知'"></span></div>
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="checkUpdate()" class="btn-secondary text-sm" :disabled="update.checking">检查更新</button>
+                            <button @click="doUpdate()" class="btn-primary text-sm" x-show="update.hasUpdate" :disabled="updateRun.running">立即更新到 <span x-text="update.latestVersion"></span></button>
+                        </div>
+                        <div class="mt-3 border border-[#202833] bg-[#11151a] p-3" x-show="update.hasUpdate">
+                            <div class="text-sm text-gray-200 mb-2">发现新版本 <span class="text-purple-300" x-text="update.latestVersion"></span></div>
+                            <pre class="text-xs text-gray-400 whitespace-pre-wrap" x-text="update.releaseNotes"></pre>
+                        </div>
+                        <div class="mt-3 border border-[#202833] bg-[#11151a] p-3" x-show="updateRun.running || updateRun.completed || updateRun.error">
+                            <div class="text-sm text-gray-200" x-text="updateRun.message"></div>
+                            <div class="mt-2 h-2 bg-[#202833] rounded" x-show="updateRun.running">
+                                <div class="h-2 bg-purple-500 rounded" :style="'width:' + updateRun.percent + '%'"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1" x-show="updateRun.running && updateRun.totalBytes">
+                                <span x-text="formatBytes(updateRun.downloadedBytes)"></span> / <span x-text="formatBytes(updateRun.totalBytes)"></span>
+                            </div>
+                            <div class="text-xs text-yellow-400 mt-2" x-show="updateRun.running">更新进行中，请勿关闭本页面</div>
+                            <div class="text-xs text-red-400 mt-2" x-show="updateRun.error" x-text="updateRun.error"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">自动更新</div>
+                        <div class="text-sm text-gray-500 leading-6">默认关闭。开启后仅在设定时间窗口内、且仅升级到稳定版才会自动更新。</div>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 text-sm text-gray-300 mb-3">
+                            <input type="checkbox" x-model="autoUpdate.enabled" @change="saveAutoUpdate()">
+                            启用自动更新
+                        </label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label class="label">更新范围</label><select x-model="autoUpdate.mode" @change="saveAutoUpdate()" class="input-field"><option value="patch_only">仅 patch 版本</option><option value="all_stable">所有稳定版</option></select></div>
+                            <div><label class="label">时间窗口</label><input type="text" x-model="autoUpdate.window" @change="saveAutoUpdate()" class="input-field" placeholder="03:00-05:00"></div>
+                            <div><label class="label">发布成熟期（分钟）</label><input type="number" x-model="autoUpdate.release_delay_minutes" @change="saveAutoUpdate()" class="input-field"></div>
+                            <div><label class="label">签名等待超时（分钟）</label><input type="number" x-model="autoUpdate.signature_timeout_minutes" @change="saveAutoUpdate()" class="input-field"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-3 space-y-1">
+                            <div x-show="autoUpdate.last_check_at">上次检查：<span x-text="autoUpdate.last_check_at"></span></div>
+                            <div x-show="autoUpdate.last_status">上次状态：<span :class="autoUpdate.last_status === 'failed' ? 'text-red-400' : 'text-gray-400'" x-text="autoUpdate.last_status"></span></div>
+                            <div x-show="autoUpdate.last_error" class="text-red-400">上次错误：<span x-text="autoUpdate.last_error"></span></div>
+                            <div x-show="autoUpdate.last_success_version">上次成功版本：<span x-text="autoUpdate.last_success_version"></span>（<span x-text="autoUpdate.last_success_at"></span>）</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">系统更新</div>
+                        <div class="text-sm text-gray-500 leading-6">检查 apt 可升级的系统包。一键更新会直接在服务器上执行 apt update && apt upgrade -y。</div>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                            <span :class="sysUpdate.count > 0 ? 'badge-warning' : 'badge-success'" x-text="sysUpdate.count > 0 ? (sysUpdate.count + ' 个包可更新') : '系统已是最新'"></span>
+                        </div>
+                        <div class="max-h-64 overflow-y-auto border border-[#202833]" x-show="sysUpdate.count > 0">
+                            <table class="w-full text-xs">
+                                <tbody>
+                                    <template x-for="pkg in sysUpdate.packages" :key="pkg.name">
+                                        <tr class="border-b border-[#202833]">
+                                            <td class="px-2 py-1 text-gray-200" x-text="pkg.name"></td>
+                                            <td class="px-2 py-1" :class="pkg.repo.includes('security') ? 'text-red-400' : 'text-gray-500'" x-text="pkg.repo"></td>
+                                            <td class="px-2 py-1 text-gray-400" x-text="pkg.version"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button @click="checkSysUpdate()" class="btn-secondary text-sm" :disabled="sysUpdate.checking">刷新</button>
+                            <button @click="doSysUpdate()" class="btn-danger text-sm" x-show="sysUpdate.count > 0" :disabled="sysUpdate.updating">一键更新</button>
+                        </div>
+                        <pre class="text-xs text-gray-400 whitespace-pre-wrap mt-3 max-h-64 overflow-y-auto" x-show="sysUpdate.output" x-text="sysUpdate.output"></pre>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">操作日志</div>
+                        <div class="text-sm text-gray-500 leading-6">最近的更新/系统操作记录。</div>
+                    </div>
+                    <div>
+                        <div class="border border-[#202833] max-h-80 overflow-y-auto">
+                            <table class="w-full text-xs">
+                                <tbody>
+                                    <template x-for="log in opLogs.items" :key="log.id">
+                                        <tr class="border-b border-[#202833]">
+                                            <td class="px-2 py-1 text-gray-400 whitespace-nowrap" x-text="log.created_at"></td>
+                                            <td class="px-2 py-1 text-gray-300" x-text="log.operation"></td>
+                                            <td class="px-2 py-1" :class="log.status === 'failed' ? 'text-red-400' : (log.status === 'success' ? 'text-green-400' : 'text-gray-500')" x-text="log.status"></td>
+                                            <td class="px-2 py-1 text-gray-500" x-text="log.message"></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            <div class="text-xs text-gray-500 p-3" x-show="!opLogs.items || opLogs.items.length === 0">暂无记录</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="security" class="border border-[#2a3038] bg-[#171b21] mb-5">
+                <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
+                    <div class="text-base font-semibold text-gray-100">安全</div>
+                    <div class="text-sm text-gray-500 mt-1">BasicAuth、面板登录和查看密码都在这里管理。</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">查看密码</div>
+                        <div class="text-sm text-gray-500 leading-6">用于查看已保存的 SSH 密码、服务器面板密码和网站面板密码。每次查看都需要重新输入。</div>
+                    </div>
+                    <div>
+                        <div class="flex items-center justify-between gap-3 mb-3">
+                            <span :class="vpSetup ? 'badge-success' : 'badge-warning'" x-text="vpSetup ? '已设置' : '未设置'"></span>
+                            <span class="text-xs text-gray-500" x-show="vpSetup">错误 5 次后清空敏感凭据</span>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="setupVP()" class="btn-primary text-sm" x-show="!vpSetup">设置查看密码</button>
+                            <button @click="unlockVP()" class="btn-primary text-sm" x-show="vpSetup">验证查看密码</button>
+                            <button @click="changeVP()" class="btn-secondary text-sm" x-show="vpSetup">修改密码</button>
+                            <button @click="resetVP()" class="btn-danger text-sm" x-show="vpSetup">重置密码</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">账户安全</div>
+                        <div class="text-sm text-gray-500 leading-6">BasicAuth 强制启用。修改面板登录信息后，需要重新登录。</div>
+                    </div>
+                    <div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label class="label">BasicAuth 用户名</label><input type="text" x-model="acct.basic_username" class="input-field"></div>
+                            <div><label class="label">BasicAuth 新密码</label><input type="password" x-model="acct.basic_password" class="input-field" placeholder="留空不修改"></div>
+                            <div><label class="label">面板登录用户名</label><input type="text" x-model="acct.web_username" class="input-field"></div>
+                            <div><label class="label">当前面板密码</label><input type="password" x-model="acct.old_password" class="input-field"></div>
+                            <div><label class="label">面板新密码</label><input type="password" x-model="acct.web_password" class="input-field" placeholder="留空不修改"></div>
+                            <div><label class="label">确认新密码</label><input type="password" x-model="acct.web_password2" class="input-field"></div>
+                        </div>
+                        <div class="flex gap-2 mt-3"><button @click="saveAccount()" class="btn-primary text-sm">保存并重新登录</button></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="notification" class="border border-[#2a3038] bg-[#171b21] mb-5">
+                <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
+                    <div class="text-base font-semibold text-gray-100">通知</div>
+                    <div class="text-sm text-gray-500 mt-1">配置告警邮件发送方式。</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">SMTP 邮件</div>
+                        <div class="text-sm text-gray-500 leading-6">用于到期提醒、探测异常和监控告警。</div>
+                    </div>
+                    <div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label class="label">SMTP 主机</label><input type="text" x-model="smtp.smtp_host" class="input-field"></div>
+                            <div><label class="label">端口</label><input type="number" x-model="smtp.smtp_port" class="input-field"></div>
+                            <div><label class="label">加密方式</label><select x-model="smtp.smtp_encryption" class="input-field"><option value="starttls">STARTTLS</option><option value="ssl">SSL</option><option value="none">无</option></select></div>
+                            <div><label class="label">发件账号</label><input type="text" x-model="smtp.smtp_user" class="input-field"></div>
+                            <div><label class="label">密码/授权码</label><input type="password" x-model="smtp.smtp_pass" class="input-field"></div>
+                            <div><label class="label">管理员邮箱</label><input type="email" x-model="smtp.admin_email" class="input-field"></div>
+                        </div>
+                        <div class="flex gap-2 mt-3"><button @click="saveSMTP()" class="btn-primary text-sm">保存 SMTP</button><button @click="testSMTP()" class="btn-secondary text-sm">发送测试邮件</button></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="dictionary" class="border border-[#2a3038] bg-[#171b21] mb-5">
+                <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
+                    <div class="text-base font-semibold text-gray-100">字典</div>
+                    <div class="text-sm text-gray-500 mt-1">这些列表会出现在添加或编辑服务器、网站的表单中。</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">操作系统列表</div>
+                        <div class="text-sm text-gray-500 leading-6">每行一个系统名称。</div>
+                    </div>
+                    <div><textarea x-model="osList" rows="7" class="input-field w-full" placeholder="每行一个操作系统名称"></textarea><div class="flex gap-2 mt-3"><button @click="saveOSList()" class="btn-primary text-sm">保存操作系统列表</button></div></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">网站类型列表</div>
+                        <div class="text-sm text-gray-500 leading-6">每行一个网站类型。</div>
+                    </div>
+                    <div><textarea x-model="siteTypeList" rows="7" class="input-field w-full" placeholder="每行一个网站类型"></textarea><div class="flex gap-2 mt-3"><button @click="saveSiteTypeList()" class="btn-primary text-sm">保存网站类型列表</button></div></div>
+                </div>
+            </section>
+
+            <section id="danger" class="border border-red-900/60 bg-[#171b21] mb-5">
+                <div class="px-5 py-4 border-b border-red-900/40 bg-red-950/10">
+                    <div class="text-base font-semibold text-gray-100">危险操作</div>
+                    <div class="text-sm text-gray-500 mt-1">这些操作会影响已保存的敏感凭据或当前登录状态。</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 bg-red-950/5">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">重置查看密码</div>
+                        <div class="text-sm text-gray-500 leading-6">重置会清空已保存的服务器和网站敏感凭据，不能恢复。</div>
+                    </div>
+                    <div><button @click="resetVP()" class="btn-danger text-sm" x-show="vpSetup">重置查看密码</button></div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+<script>
+function settingsPage() {
+    return {
+        panelTitle: '', smtp: {}, access: { tls_port: 0, random_suffix: '' }, tls: { tls_mode:'self_signed', domain:'', tls_cert_path:'', tls_key_path:'', acme_email:'' }, tlsUpload: { cert_pem:'', key_pem:'' }, osList: '', siteTypeList: '',
+        acct: { web_username:'', web_password:'', web_password2:'', basic_username:'', basic_password:'', old_password:'' },
+        vpSetup: false, vpUnlocked: false,
+        update: { current_version:'', hasUpdate:false, latestVersion:'', releaseNotes:'', checking:false },
+        updateRun: { running:false, message:'', percent:0, downloadedBytes:0, totalBytes:0, completed:false, error:'' },
+        autoUpdate: { enabled:false, mode:'patch_only', window:'03:00-05:00', release_delay_minutes:'15', signature_timeout_minutes:'120', last_check_at:'', last_status:'', last_error:'', last_success_at:'', last_success_version:'' },
+        sysUpdate: { packages:[], count:0, checking:false, updating:false, output:'' },
+        opLogs: { items:[], total:0, page:1, page_size:20 },
+        async init() {
+            try { const d = await api('/api/settings'); this.panelTitle = d.data.panel_title || ''; } catch(e) {}
+            try { const d = await api('/api/settings/panel-access'); this.access = d.data; this._loadedAccess = {tls_port: d.data.tls_port, random_suffix: d.data.random_suffix}; } catch(e) {}
+            try { const d = await api('/api/settings/tls'); this.tls = Object.assign(this.tls, d.data || {}); } catch(e) {}
+            try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {}
+            try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; } catch(e) {}
+            try { const d = await api('/api/view-password/status'); this.vpSetup = d.data.is_setup; this.vpUnlocked = d.data.is_unlocked; } catch(e) {}
+            try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {}
+            try { const d = await api('/api/settings/site-type-list'); this.siteTypeList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {}
+            try { await this.checkUpdate(); } catch(e) {}
+            try {
+                const d = await api('/api/update/auto-settings');
+                this.autoUpdate = {
+                    enabled: d.data.panel_auto_update_enabled === 'true',
+                    mode: d.data.panel_auto_update_mode || 'patch_only',
+                    window: d.data.panel_auto_update_window || '03:00-05:00',
+                    release_delay_minutes: d.data.panel_auto_update_release_delay_minutes || '15',
+                    signature_timeout_minutes: d.data.panel_auto_update_signature_timeout_minutes || '120',
+                    last_check_at: d.data.panel_auto_update_last_check_at || '',
+                    last_status: d.data.panel_auto_update_last_status || '',
+                    last_error: d.data.panel_auto_update_last_error || '',
+                    last_success_at: d.data.panel_auto_update_last_success_at || '',
+                    last_success_version: d.data.panel_auto_update_last_success_version || ''
+                };
+            } catch(e) {}
+            try { await this.checkSysUpdate(); } catch(e) {}
+            try { await this.loadOpLogs(); } catch(e) {}
+        },
+        async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
+        async saveAccess() {
+            const body = {
+                tls_port: parseInt(this.access.tls_port) || 0,
+                random_suffix: (this.access.random_suffix || '').trim()
+            };
+            const before = this._loadedAccess || {};
+            const changed = before.tls_port !== body.tls_port || before.random_suffix !== body.random_suffix;
+            try {
+                const d = await api('/api/settings/panel-access', {method:'PUT', body});
+                showToast(d.data.message || '保存成功','success');
+                if (changed) {
+                    const port = body.tls_port && body.tls_port !== 443 ? (':' + body.tls_port) : '';
+                    const target = window.location.protocol + '//' + window.location.hostname + port + '/' + body.random_suffix + '/login';
+                    setTimeout(() => { window.location.href = target; }, 4000);
+                }
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        accessPreview() {
+            if (!this.tls.domain) return '（先填写面板域名）';
+            const port = parseInt(this.access.tls_port) || 0;
+            const portPart = (port && port !== 443) ? (':' + port) : '';
+            return 'https://' + this.tls.domain + portPart + '/' + (this.access.random_suffix || '') + '/login';
+        },
+        async saveTLS() {
+            const body = {
+                tls_mode: this.tls.tls_mode || 'self_signed',
+                domain: (this.tls.domain || '').trim(),
+                acme_email: (this.tls.acme_email || '').trim()
+            };
+            try { const d = await api('/api/settings/tls', {method:'PUT', body}); showToast(d.data.message || 'TLS 配置已保存','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async issueSelfSigned() {
+            const ok = await confirmModal('生成新的自签证书后服务会自动重启生效，期间面板会短暂无法访问。确认继续？');
+            if (!ok) return;
+            try {
+                const d = await api('/api/settings/tls/issue', {method:'POST'});
+                this.tls.tls_mode = 'self_signed';
+                this.tls.tls_cert_path = d.data.tls_cert_path || this.tls.tls_cert_path;
+                this.tls.tls_key_path = d.data.tls_key_path || this.tls.tls_key_path;
+                showToast(d.data.message || '自签证书已生成','success');
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        async uploadTLS() {
+            const body = {
+                domain: (this.tls.domain || '').trim(),
+                cert_pem: (this.tlsUpload.cert_pem || '').trim(),
+                key_pem: (this.tlsUpload.key_pem || '').trim()
+            };
+            if (!body.cert_pem || !body.key_pem) { showToast('证书和私钥不能为空','error'); return; }
+            try {
+                const d = await api('/api/settings/tls/upload', {method:'POST', body});
+                this.tls.tls_mode = 'uploaded';
+                this.tls.tls_cert_path = d.data.tls_cert_path || this.tls.tls_cert_path;
+                this.tls.tls_key_path = d.data.tls_key_path || this.tls.tls_key_path;
+                this.tlsUpload.cert_pem = '';
+                this.tlsUpload.key_pem = '';
+                showToast(d.data.message || '证书已上传','success');
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        async checkUpdate() {
+            this.update.checking = true;
+            try {
+                const d = await api('/api/update/check');
+                this.update.current_version = d.data.current_version;
+                this.update.hasUpdate = d.data.has_update;
+                this.update.latestVersion = d.data.latest_version;
+                this.update.releaseNotes = d.data.release_notes;
+            } catch(e) { showToast(e.message,'error'); }
+            this.update.checking = false;
+        },
+        async doUpdate() {
+            const ok = await confirmModal('确认更新到 ' + this.update.latestVersion + ' 吗？更新过程中面板会重启，请勿关闭本页面。');
+            if (!ok) return;
+            try {
+                const d = await api('/api/update/do', {method:'POST'});
+                showToast(d.data.message || '更新已开始','success');
+                this.updateRun.running = true;
+                this._pollUpdateStatus();
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        _pollUpdateStatus() {
+            if (this._updateTimer) clearInterval(this._updateTimer);
+            this._updateTimer = setInterval(async () => {
+                try {
+                    const d = await api('/api/update/status');
+                    this.updateRun = {
+                        running: d.data.running, message: d.data.message, percent: d.data.percent,
+                        downloadedBytes: d.data.downloaded_bytes, totalBytes: d.data.total_bytes,
+                        completed: d.data.completed, error: d.data.error
+                    };
+                    if (!d.data.running) {
+                        clearInterval(this._updateTimer);
+                        if (d.data.completed) showToast('面板正在重启，请稍候刷新页面','success');
+                    }
+                } catch(e) { clearInterval(this._updateTimer); }
+            }, 1000);
+        },
+        formatBytes(n) {
+            if (!n) return '0 B';
+            const units = ['B','KB','MB','GB'];
+            let i = 0, v = n;
+            while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+            return v.toFixed(1) + ' ' + units[i];
+        },
+        async saveAutoUpdate() {
+            const body = {
+                panel_auto_update_enabled: this.autoUpdate.enabled ? 'true' : 'false',
+                panel_auto_update_mode: this.autoUpdate.mode || 'patch_only',
+                panel_auto_update_window: this.autoUpdate.window || '03:00-05:00',
+                panel_auto_update_release_delay_minutes: String(parseInt(this.autoUpdate.release_delay_minutes) || 15),
+                panel_auto_update_signature_timeout_minutes: String(parseInt(this.autoUpdate.signature_timeout_minutes) || 120)
+            };
+            try { await api('/api/update/auto-settings', {method:'PUT', body}); showToast('自动更新设置已保存','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async checkSysUpdate() {
+            this.sysUpdate.checking = true;
+            try {
+                const d = await api('/api/system/updates');
+                this.sysUpdate.packages = d.data.packages || [];
+                this.sysUpdate.count = d.data.count || 0;
+            } catch(e) { showToast(e.message,'error'); }
+            this.sysUpdate.checking = false;
+        },
+        async doSysUpdate() {
+            const ok = await confirmModal('将在服务器上执行 apt update && apt upgrade -y，确认继续？');
+            if (!ok) return;
+            this.sysUpdate.updating = true;
+            try {
+                const d = await api('/api/system/updates/do', {method:'POST'});
+                this.sysUpdate.output = d.data.output || '';
+                showToast(d.data.message || '系统更新完成','success');
+                await this.checkSysUpdate();
+            } catch(e) { showToast(e.message,'error'); }
+            this.sysUpdate.updating = false;
+        },
+        async loadOpLogs() {
+            try { const d = await api('/api/update/logs?page=1&page_size=20'); this.opLogs = d.data; } catch(e) {}
+        },
+        async saveOSList() {
+            const items = this.osList.split('\n').map(s => s.trim()).filter(s => s);
+            try { await api('/api/settings/os-list', {method:'PUT', body:{svalue: JSON.stringify(items)}}); showToast('操作系统列表已保存','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async saveSiteTypeList() {
+            const items = this.siteTypeList.split('\n').map(s => s.trim()).filter(s => s);
+            try { await api('/api/settings/site-type-list', {method:'PUT', body:{svalue: JSON.stringify(items)}}); showToast('网站类型列表已保存','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async saveSMTP() { try { await api('/api/settings/smtp', {method:'PUT', body:this.smtp}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
+        async testSMTP() {
+            const email = prompt('请输入测试接收邮箱:', this.smtp.admin_email || '');
+            if (!email) return;
+            try { await api('/api/alerts/test-smtp', {method:'POST', body:{email}}); showToast('测试邮件已发送','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async saveAccount() {
+            if (this.acct.web_password && this.acct.web_password.length < 8) { showToast('面板密码至少需要 8 个字符','error'); return; }
+            if (this.acct.web_password && this.acct.web_password !== this.acct.web_password2) { showToast('两次输入的新密码不一致','error'); return; }
+            const body = {};
+            if (this.acct.web_username) body.web_username = this.acct.web_username;
+            if (this.acct.web_password) body.web_password = this.acct.web_password;
+            if (this.acct.basic_username) body.basic_username = this.acct.basic_username;
+            if (this.acct.basic_password) body.basic_password = this.acct.basic_password;
+            if (this.acct.old_password) body.old_password = this.acct.old_password;
+            if (!body.web_username && !body.web_password && !body.basic_username && !body.basic_password) {
+                showToast('没有需要修改的内容','warning'); return;
+            }
+            try {
+                await api('/api/settings/account', {method:'PUT', body});
+                showToast('账户已更新，即将重新登录...','success');
+                setTimeout(async () => {
+                    try { await api('/api/auth/logout', {method:'POST'}); } catch(e) {}
+                    window.location.href = (document.body.dataset.panelPrefix || '') + '/login';
+                }, 1500);
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        async setupVP() {
+            const pw = prompt('请设置查看密码（建议使用较长且不重复的密码）:');
+            if (!pw) return;
+            const pw2 = prompt('请再次输入查看密码:');
+            if (!pw2) return;
+            if (pw !== pw2) { showToast('两次输入的查看密码不一致','error'); return; }
+            try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2}}); this.vpSetup = true; this.vpUnlocked = false; showToast('查看密码已设置','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async changeVP() {
+            const oldPw = prompt('请输入当前查看密码:');
+            if (!oldPw) return;
+            const newPw = prompt('请输入新的查看密码（建议使用较长且不重复的密码）:');
+            if (!newPw) return;
+            const newPw2 = prompt('请再次输入新的查看密码:');
+            if (!newPw2) return;
+            if (newPw !== newPw2) { showToast('两次输入的新查看密码不一致','error'); return; }
+            try {
+                await api('/api/view-password/change', {method:'POST', body:{old_password:oldPw, new_password:newPw, new_password_confirm:newPw2}});
+                this.vpUnlocked = false;
+                showToast('查看密码已修改','success');
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        async resetVP() {
+            const ok = await confirmModal('重置查看密码会清空所有已保存的服务器/网站敏感凭据，且不可恢复。确认继续？');
+            if (!ok) return;
+            const confirm = prompt('请输入 DELETE_SAVED_PASSWORDS 确认删除所有已保存密码:') || '';
+            if (confirm !== 'DELETE_SAVED_PASSWORDS') { showToast('确认短语不匹配，已取消','error'); return; }
+            const pw = prompt('请设置新的查看密码（建议使用较长且不重复的密码）:');
+            if (!pw) return;
+            const pw2 = prompt('请再次输入新的查看密码:');
+            if (!pw2) return;
+            if (pw !== pw2) { showToast('两次输入的新查看密码不一致','error'); return; }
+            try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2, force:true, confirm}}); this.vpSetup = true; this.vpUnlocked = false; showToast('查看密码已重置，已保存密码已清空','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async unlockVP() {
+            const pw = prompt('请输入查看密码:');
+            if (!pw) return;
+            try { await api('/api/view-password/unlock', {method:'POST', body:{password:pw}}); this.vpUnlocked = false; showToast('查看密码验证通过','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async lockVP() { this.vpUnlocked = false; }
+    }
+}
+</script>
+{{end}}

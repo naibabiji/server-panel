@@ -1,0 +1,95 @@
+{{template "base" .}}
+{{define "alert_rules_content"}}
+<div x-data="alertRules()" x-init="fetch()" class="p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-purple-300">告警规则</h2>
+        <button @click="openAdd()" class="btn-primary text-sm">+ 添加规则</button>
+    </div>
+    <div class="card overflow-x-auto">
+        <table class="w-full">
+            <thead><tr>
+                <th class="table-header">类型</th><th class="table-header">名称</th><th class="table-header">阈值</th>
+                <th class="table-header">状态</th><th class="table-header">通知客户</th><th class="table-header">操作</th>
+            </tr></thead>
+            <tbody>
+            <template x-for="r in rules" :key="r.id">
+                <tr class="border-t border-gray-700/50 hover:bg-white/5">
+                    <td class="table-cell"><span class="badge-info text-xs" x-text="typeLabel(r.alert_type)"></span></td>
+                    <td class="table-cell text-white" x-text="r.name"></td>
+                    <td class="table-cell text-gray-400" x-text="formatThreshold(r)"></td>
+                    <td class="table-cell"><span :class="r.enabled ? 'badge-success' : 'badge-danger'" x-text="r.enabled ? '启用' : '禁用'"></span></td>
+                    <td class="table-cell"><span x-text="r.notify_user ? '是' : '否'" class="text-gray-400 text-sm"></span></td>
+                    <td class="table-cell">
+                        <a href="#" @click.prevent="toggle(r)" class="text-sm mr-2" :class="r.enabled ? 'text-yellow-400' : 'text-green-400'" x-text="r.enabled ? '禁用' : '启用'"></a>
+                        <a href="#" @click.prevent="del(r.id)" class="text-sm text-red-400">删除</a>
+                    </td>
+                </tr>
+            </template>
+            </tbody>
+        </table>
+        <div class="text-center text-gray-500 py-8 text-sm" x-show="rules.length==0">暂无规则，点击右上角添加</div>
+    </div>
+
+    <!-- Add Rule Modal -->
+    <div class="modal-overlay" x-show="showModal" @click.self="showModal=false">
+        <div class="modal-content">
+            <h3 class="text-lg font-semibold text-purple-300 mb-4">添加告警规则</h3>
+            <div class="space-y-3">
+                <div><label class="label">告警类型</label>
+                    <select x-model="form.alert_type" class="input-field">
+                        <option value="server_expiry">服务器到期</option><option value="website_expiry">网站到期</option>
+                        <option value="http_probe_down">HTTP探测异常</option><option value="cpu_high">CPU过高</option>
+                        <option value="memory_high">内存过高</option><option value="disk_high">磁盘过高</option>
+                        <option value="server_offline">服务器离线</option>
+                    </select>
+                </div>
+                <div><label class="label">规则名称</label><input type="text" x-model="form.name" class="input-field" placeholder="例如：到期提醒"></div>
+                <div><label class="label">阈值</label><input type="number" x-model="form.threshold_value" class="input-field" placeholder="天数/百分比/分钟"></div>
+                <div><label class="label">连续次数（CPU/内存用）</label><input type="number" x-model="form.threshold_count" class="input-field" placeholder="默认 3"></div>
+                <div class="flex items-center gap-2"><input type="checkbox" x-model="form.notify_user" :true-value="1" :false-value="0"><span class="text-sm text-gray-400">通知客户</span></div>
+                <div><label class="label">通知邮箱</label><input type="text" x-model="form.notify_email" class="input-field" placeholder="留空使用管理员邮箱"></div>
+            </div>
+            <div class="flex gap-3 mt-5">
+                <button @click="save()" class="btn-primary" :disabled="saving">保存</button>
+                <button @click="showModal=false" class="btn-secondary">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function alertRules() {
+    return {
+        rules: [], showModal: false, saving: false,
+        form: { alert_type:'server_expiry', name:'', threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' },
+        typeLabel(t) {
+            const m = { server_expiry:'服务器到期', website_expiry:'网站到期', http_probe_down:'HTTP探测异常', cpu_high:'CPU过高', memory_high:'内存过高', disk_high:'磁盘过高', server_offline:'服务器离线' };
+            return m[t] || t;
+        },
+        formatThreshold(r) {
+            if (['server_expiry','website_expiry'].includes(r.alert_type)) return '提前 ' + r.threshold_value + ' 天';
+            if (['cpu_high','memory_high','disk_high'].includes(r.alert_type)) return r.threshold_value + '%';
+            if (r.alert_type === 'server_offline') return r.threshold_value + ' 分钟';
+            return r.threshold_value;
+        },
+        async fetch() { try { const d = await api('/api/alerts/rules'); this.rules = d.data || []; } catch(e) {} },
+        openAdd() { this.form = { alert_type:'server_expiry', name:'', threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' }; this.showModal = true; },
+        async save() {
+            this.saving = true;
+            try { await api('/api/alerts/rules', {method:'POST', body: this.form}); this.showModal = false; await this.fetch(); showToast('添加成功','success'); }
+            catch(e) { showToast(e.message,'error'); }
+            this.saving = false;
+        },
+        async toggle(r) {
+            r.enabled = r.enabled ? 0 : 1;
+            try { await api('/api/alerts/rules/'+r.id, {method:'PUT', body: r}); await this.fetch(); }
+            catch(e) { showToast(e.message,'error'); }
+        },
+        async del(id) {
+            if (!await confirmModal('确认删除？')) return;
+            try { await api('/api/alerts/rules/'+id, {method:'DELETE'}); await this.fetch(); }
+            catch(e) { showToast(e.message,'error'); }
+        }
+    }
+}
+</script>
+{{end}}

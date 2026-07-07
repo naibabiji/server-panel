@@ -1,0 +1,46 @@
+{{template "base" .}}
+{{define "provider_form_content"}}
+<div x-data="providerForm()" x-init="init()" class="p-6 max-w-2xl">
+    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑服务商' : '添加服务商'"></h2>
+    <div class="card space-y-4">
+        <div><label class="label">服务商名称 <span class="text-red-400">*</span></label><input type="text" x-model="form.name" class="input-field" placeholder="例如：阿里云"></div>
+        <div><label class="label">官网地址</label><input type="text" x-model="form.website" class="input-field" placeholder="https://..."></div>
+        <div><label class="label">客服联系方式</label><input type="text" x-model="form.contact" class="input-field" placeholder="电话/工单系统/账号"></div>
+        <div><label class="label">备注</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
+        <div class="flex gap-3 pt-2">
+            <button @click="save()" class="btn-primary" :disabled="saving"><span x-show="!saving">保存</span><span x-show="saving">保存中...</span></button>
+            <a href="/{{.RandomSuffix}}/providers" class="btn-secondary">取消</a>
+        </div>
+    </div>
+</div>
+<script>
+function providerForm() {
+    return {
+        isEdit: false, id: null, saving: false,
+        form: { name:'', website:'', contact:'', notes:'' },
+        async init() {
+            const parts = window.location.pathname.split('/').filter(Boolean);
+            const last = parts[parts.length-1];
+            if (last === 'edit') this.id = parts[parts.length-2];
+            else if (last !== 'new') this.id = last;
+            if (this.id) { this.isEdit = true; await this.load(); }
+        },
+        async load() {
+            try { const d = await api('/api/providers/'+this.id); Object.assign(this.form, d.data); } catch(e) {}
+        },
+        async save() {
+            this.saving = true;
+            try {
+                if (!this.form.name) { showToast('名称不能为空','error'); this.saving=false; return; }
+                const method = this.isEdit ? 'PUT' : 'POST';
+                const url = this.isEdit ? '/api/providers/'+this.id : '/api/providers';
+                await api(url, {method, body: this.form});
+                showToast('保存成功','success');
+                setTimeout(() => location.href = document.body.dataset.panelPrefix+'/providers', 500);
+            } catch(e) { showToast(e.message,'error'); }
+            this.saving = false;
+        }
+    }
+}
+</script>
+{{end}}

@@ -1,0 +1,52 @@
+{{template "base" .}}
+{{define "customer_list_content"}}
+<div x-data="customerList()" x-init="fetch()" class="p-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h2 class="text-lg font-semibold text-purple-200">客户</h2>
+        <a href="customers/new" class="btn-primary text-sm">添加客户</a>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <input type="text" x-model="search" @input="fetch()" placeholder="搜索..." class="input-field w-48">
+    </div>
+    <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
+        <table class="w-full">
+            <thead><tr>
+                <th class="table-header">名称</th><th class="table-header">联系人</th><th class="table-header">邮箱</th>
+                <th class="table-header">公司</th><th class="table-header">操作</th>
+            </tr></thead>
+            <tbody>
+            <template x-for="u in items" :key="u.id">
+                <tr class="border-t border-[#202833] hover:bg-[#1d232b]">
+                    <td class="table-cell text-white"><a :href="'customers/'+u.id" class="hover:text-purple-200" x-text="u.name"></a></td>
+                    <td class="table-cell text-gray-400" x-text="u.contact_person||'--'"></td>
+                    <td class="table-cell text-gray-400" x-text="u.email||'--'"></td>
+                    <td class="table-cell text-gray-400" x-text="u.company||'--'"></td>
+                    <td class="table-cell">
+                        <a :href="'customers/'+u.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">详情</a>
+                        <a :href="'customers/'+u.id+'/edit'" class="text-sm text-purple-300 hover:text-purple-200 mr-2">编辑</a>
+                        <a href="#" @click.prevent="del(u.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
+                    </td>
+                </tr>
+            </template>
+            </tbody>
+        </table>
+        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无客户</div>
+    </div>
+</div>
+<script>
+function customerList() {
+    return {
+        items: [], loading: true, search: '',
+        async fetch() {
+            this.loading=true;
+            try { const d=await api('/api/customers?search='+encodeURIComponent(this.search)+'&page_size=100'); this.items=d.data.items||[]; } catch(e) {}
+            this.loading=false;
+        },
+        async del(id) {
+            if(!await confirmModal('确认删除此客户？')) return;
+            try { await api('/api/customers/'+id,{method:'DELETE'}); await this.fetch(); } catch(e) { showToast(e.message,'error'); }
+        }
+    }
+}
+</script>
+{{end}}

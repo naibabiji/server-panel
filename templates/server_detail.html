@@ -1,0 +1,377 @@
+{{template "base" .}}
+{{define "server_detail_content"}}
+<style>
+.server-archive-grid { display: grid; grid-template-columns: 1fr; }
+.server-archive-col { padding: 20px; border-bottom: 1px solid #202833; }
+.server-archive-col:last-child { border-bottom: 0; }
+.server-archive-title { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
+.server-field-list { display: grid; gap: 12px; font-size: 14px; }
+.server-field { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 10px; align-items: start; min-width: 0; }
+.server-field dt { color: #9ca3af; }
+.server-field dd { min-width: 0; color: #e5e7eb; }
+.copy-inline { border: 1px solid #374151; color: #93c5fd; font-size: 12px; line-height: 1; margin-left: 8px; padding: 3px 6px; }
+.copy-inline:hover { background: #1d232b; color: #bfdbfe; }
+@media (min-width: 1180px) {
+    .server-detail-wide { max-width: 1180px; }
+    .server-archive-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .server-archive-col { border-bottom: 0; border-right: 1px solid #202833; }
+    .server-archive-col:last-child { border-right: 0; }
+}
+</style>
+<div x-data="serverDetail()" x-init="init()" class="p-6 server-detail-wide">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-100" x-text="s.name || '加载中...'"></h2>
+            <div class="text-sm text-gray-500" x-text="s.ip_address || '--'"></div>
+        </div>
+        <div class="flex gap-2">
+            <a :href="s.id ? s.id + '/edit' : '#'" class="btn-secondary text-sm">编辑</a>
+            <a href=".." class="text-sm text-gray-400 hover:text-white">返回列表</a>
+        </div>
+    </div>
+
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">服务器档案</div>
+        <div class="server-archive-grid">
+            <div class="server-archive-col">
+                <div class="server-archive-title">基础信息</div>
+                <dl class="server-field-list">
+                    <div class="server-field"><dt>名称</dt><dd x-text="s.name || '--'"></dd></div>
+                    <div class="server-field"><dt>IP</dt><dd><span x-text="s.ip_address||'--'"></span><button @click="copyText(s.ip_address, 'IP 已复制')" class="copy-inline" x-show="s.ip_address">复制</button></dd></div>
+                    <div class="server-field"><dt>类型</dt><dd x-text="serverTypeText()"></dd></div>
+                    <div class="server-field"><dt>系统</dt><dd x-text="s.os||'--'"></dd></div>
+                    <div class="server-field"><dt>机房</dt><dd x-text="s.location||'--'"></dd></div>
+                    <div class="server-field"><dt>客户</dt><dd><a :href="customerURL()" class="text-blue-400 hover:text-blue-300" x-text="s.customer_name||'--'"></a></dd></div>
+                    <div class="server-field"><dt>服务商</dt><dd><a :href="providerURL()" class="text-blue-400 hover:text-blue-300" x-text="s.provider_name||'--'"></a></dd></div>
+                </dl>
+            </div>
+            <div class="server-archive-col">
+                <div class="server-archive-title">配置规格</div>
+                <dl class="server-field-list">
+                    <div class="server-field"><dt>CPU</dt><dd x-text="s.cpu||'--'"></dd></div>
+                    <div class="server-field"><dt>内存</dt><dd x-text="s.ram||'--'"></dd></div>
+                    <div class="server-field"><dt>磁盘</dt><dd x-text="s.disk||'--'"></dd></div>
+                    <div class="server-field"><dt>流量</dt><dd x-text="s.bandwidth||'--'"></dd></div>
+                    <div class="server-field"><dt>状态</dt><dd><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></dd></div>
+                    <div class="server-field"><dt>监控</dt><dd x-text="monitorStatusText()" :class="monitorStatusClass()"></dd></div>
+                    <div class="server-field"><dt>HTTP</dt><dd x-text="httpProbeText()"></dd></div>
+                </dl>
+            </div>
+            <div class="server-archive-col">
+                <div class="server-archive-title">计费生命周期</div>
+                <dl class="server-field-list">
+                    <div class="server-field"><dt>购买日</dt><dd x-text="s.purchase_date||'--'"></dd></div>
+                    <div class="server-field"><dt>到期日</dt><dd><div :class="expiryClass()" x-text="s.expiry_date||'--'"></div><div class="text-xs text-gray-500 mt-1" x-text="expiryRelativeText()"></div></dd></div>
+                    <div class="server-field"><dt>周期</dt><dd x-text="renewalCycleText()"></dd></div>
+                    <div class="server-field"><dt>自动续费</dt><dd x-text="s.auto_renewal == 1 ? '是' : '否'"></dd></div>
+                    <div class="server-field"><dt>价格</dt><dd class="font-semibold text-gray-100" x-text="(s.purchase_price||0)+' '+s.currency"></dd></div>
+                    <div class="server-field" x-show="s.http_probe_last_at"><dt>探测时间</dt><dd x-text="s.http_probe_last_at"></dd></div>
+                    <div class="server-field" x-show="s.http_probe_last_error"><dt>探测错误</dt><dd x-text="s.http_probe_last_error" class="text-red-400 break-all"></dd></div>
+                </dl>
+            </div>
+        </div>
+        <div class="p-5 border-t border-[#202833]" x-show="s.notes">
+            <div class="text-sm text-gray-400 mb-2">备注</div>
+            <p class="text-sm text-gray-300" x-text="s.notes"></p>
+        </div>
+    </section>
+
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">登录与面板凭据</div>
+        <dl class="text-sm">
+            <div class="grid grid-cols-1 md:grid-cols-[120px_minmax(0,1fr)_auto] gap-3 p-5 border-b border-[#202833] items-start">
+                <dt class="text-gray-400">SSH</dt>
+                <dd class="text-gray-200">
+                    <div><span x-text="sshLoginText()"></span><button @click="copyText(sshLoginText(), 'SSH 登录信息已复制')" class="copy-inline" x-show="s.ssh_username || s.ssh_port">复制</button></div>
+                    <div class="mt-2 flex items-center gap-2" x-show="secrets['ssh-password']">
+                        <code class="text-xs text-green-200 break-all" x-text="secrets['ssh-password']"></code>
+                        <button @click="copySecret('ssh-password')" class="btn-secondary text-xs">复制</button>
+                    </div>
+                </dd>
+                <button @click="revealServerSecret('ssh-password')" class="btn-secondary text-xs">查看密码</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-[120px_minmax(0,1fr)_auto] gap-3 p-5 items-start">
+                <dt class="text-gray-400">服务器面板</dt>
+                <dd class="text-gray-200">
+                    <div x-text="s.panel_type && s.panel_type !== 'none' ? s.panel_type : '未配置'"></div>
+                    <div x-show="s.panel_url">
+                        <a class="text-blue-400 hover:text-blue-300 break-all" :href="s.panel_url" target="_blank" rel="noopener noreferrer" x-text="s.panel_url"></a>
+                        <button @click="copyText(s.panel_url, '面板链接已复制')" class="copy-inline">复制</button>
+                    </div>
+                    <div x-show="s.panel_username" class="text-gray-400">账号：<span x-text="s.panel_username"></span><button @click="copyText(s.panel_username, '面板账号已复制')" class="copy-inline">复制</button></div>
+                    <div class="mt-2 flex items-center gap-2" x-show="secrets['panel-password']">
+                        <code class="text-xs text-green-200 break-all" x-text="secrets['panel-password']"></code>
+                        <button @click="copySecret('panel-password')" class="btn-secondary text-xs">复制</button>
+                    </div>
+                </dd>
+                <button @click="revealServerSecret('panel-password')" class="btn-secondary text-xs">查看密码</button>
+            </div>
+        </dl>
+    </section>
+
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] flex items-center justify-between gap-3">
+            <div class="text-base font-semibold text-gray-100">添加到这台服务器的网站</div>
+            <a :href="websiteCreateURL()" class="btn-secondary text-sm">添加网站</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead><tr>
+                    <th class="table-header">名称</th><th class="table-header">域名</th><th class="table-header">客户</th><th class="table-header">状态</th><th class="table-header">到期日</th><th class="table-header">操作</th>
+                </tr></thead>
+                <tbody>
+                <template x-for="w in websites" :key="w.id">
+                    <tr class="border-t border-[#202833] hover:bg-[#1d232b]">
+                        <td class="table-cell text-white"><a :href="websiteURL(w.id)" class="hover:text-purple-200" x-text="w.name || w.domain"></a></td>
+                        <td class="table-cell"><a :href="externalURL(w.domain)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="w.domain"></a></td>
+                        <td class="table-cell"><a :href="websiteCustomerURL(w)" class="text-blue-400 hover:text-blue-300" x-text="w.customer_name || '--'"></a></td>
+                        <td class="table-cell"><span :class="w.status=='active'?'badge-success':'badge-danger'" x-text="w.status=='active'?'运行中':'已到期'"></span></td>
+                        <td class="table-cell text-gray-400" x-text="w.expiry_date || '--'"></td>
+                        <td class="table-cell"><a :href="websiteURL(w.id)" class="text-sm text-blue-400 hover:text-blue-300">详情</a></td>
+                    </tr>
+                </template>
+                </tbody>
+            </table>
+            <div class="text-center text-gray-500 py-8 text-sm" x-show="!websitesLoading && websites.length==0">这台服务器下暂无网站</div>
+        </div>
+    </section>
+
+    <section class="border border-[#2a3038] bg-[#171b21]">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] flex items-center justify-between gap-3">
+            <div class="text-base font-semibold text-gray-100">Agent 探针</div>
+            <button @click="hasAgent() ? showUninstallCommand() : showInstallCommand()" class="btn-secondary text-sm" :disabled="savingAgent">
+                <span x-show="!savingAgent" x-text="hasAgent() ? '卸载 Agent 探针' : '安装 Agent 探针'"></span>
+                <span x-show="savingAgent">生成中...</span>
+            </button>
+        </div>
+        <div class="p-5">
+        <div class="text-sm text-gray-400 mb-2">状态：<span x-text="hasAgent() ? '已安装或已上报' : '未安装'"></span></div>
+        <div class="text-sm text-gray-400 mb-3" x-show="s.last_seen_at">最后上报：<span x-text="s.last_seen_at"></span></div>
+        <div class="text-sm text-gray-400 mb-3" x-show="agentCommand">整段复制后，粘贴到这台被管理服务器的 root SSH 终端里回车执行。</div>
+        <template x-if="agentCommand">
+            <div class="p-3 bg-[#11151a] border border-[#2a3038] rounded">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-xs text-gray-500" x-text="agentCommandTitle"></div>
+                    <button @click="copyAgentCommand()" class="btn-secondary text-xs">复制命令</button>
+                </div>
+                <pre class="text-xs text-gray-200 whitespace-pre-wrap break-all" x-text="agentCommand"></pre>
+            </div>
+        </template>
+        <div class="text-sm text-gray-500 mt-2" x-show="agentCommandNote" x-text="agentCommandNote"></div>
+        </div>
+    </section>
+</div>
+<script>
+function serverDetail() {
+    return {
+        s: {}, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '',
+        secrets: {'ssh-password':'', 'panel-password':''},
+        async init() {
+            const id = window.location.pathname.split('/').filter(Boolean).pop();
+            try { const d = await api('/api/servers/'+id); this.s = d.data; await this.fetchWebsites(); }
+            catch(e) { this.websitesLoading = false; showToast(e.message,'error'); }
+        },
+        async fetchWebsites() {
+            this.websitesLoading = true;
+            try {
+                const d = await api('/api/websites?server_id=' + this.s.id + '&page_size=100');
+                this.websites = d.data.items || [];
+            } catch(e) {
+                showToast(e.message || '加载网站列表失败','error');
+            } finally {
+                this.websitesLoading = false;
+            }
+        },
+        hasAgent() {
+            return !!(this.s.agent_version || this.s.last_seen_at);
+        },
+        monitorStatusText() {
+            if (!this.hasAgent()) return '未安装监控';
+            return this.s.is_online ? '● 在线' : '○ 未知';
+        },
+        monitorStatusClass() {
+            if (!this.hasAgent()) return 'text-gray-400';
+            return this.s.is_online ? 'text-green-400' : 'text-yellow-400';
+        },
+        serverTypeText() {
+            return ({vps:'VPS', dedicated:'独立服务器', shared:'虚拟主机', other:'其他'}[this.s.server_type]) || this.s.server_type || '--';
+        },
+        renewalCycleText() {
+            return ({monthly:'月付', quarterly:'季付', yearly:'年付', '2year':'两年付', '3year':'三年付'}[this.s.renewal_cycle]) || this.s.renewal_cycle || '--';
+        },
+        httpProbeText() {
+            if (!this.s.http_probe_enabled) return '关闭';
+            if (this.s.http_probe_healthy === 1) return '开启，最近正常';
+            if (this.s.http_probe_healthy === 0) return '开启，最近异常';
+            return '开启，暂无结果';
+        },
+        expiryDaysLeft() {
+            if (!this.s.expiry_date) return null;
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const expiry = new Date(this.s.expiry_date + 'T00:00:00');
+            const days = Math.ceil((expiry - today) / 86400000);
+            return Number.isNaN(days) ? null : days;
+        },
+        expiryRelativeText() {
+            const days = this.expiryDaysLeft();
+            if (days === null) return '';
+            if (days < 0) return '已过期 ' + Math.abs(days) + ' 天';
+            if (days === 0) return '今天到期';
+            return days + ' 天后到期';
+        },
+        expiryClass() {
+            const days = this.expiryDaysLeft();
+            if (days === null) return 'text-gray-200';
+            if (days < 0 || days <= 7) return 'text-red-400 font-semibold';
+            if (days <= 30) return 'text-yellow-400 font-semibold';
+            return 'text-gray-200';
+        },
+        sshLoginText() {
+            const user = this.s.ssh_username || '--';
+            const port = this.s.ssh_port || 22;
+            return user + ':' + port;
+        },
+        customerURL() {
+            if (!this.s.customer_id) return '#';
+            return (document.body.dataset.panelPrefix || '') + '/customers/' + this.s.customer_id;
+        },
+        providerURL() {
+            if (!this.s.provider_id) return '#';
+            return (document.body.dataset.panelPrefix || '') + '/providers/' + this.s.provider_id;
+        },
+        websiteURL(id) {
+            return (document.body.dataset.panelPrefix || '') + '/websites/' + id;
+        },
+        websiteCustomerURL(w) {
+            if (!w || !w.customer_id) return '#';
+            return (document.body.dataset.panelPrefix || '') + '/customers/' + w.customer_id;
+        },
+        websiteCreateURL() {
+            return (document.body.dataset.panelPrefix || '') + '/websites/new';
+        },
+        externalURL(domain) {
+            if (!domain) return '#';
+            if (/^https?:\/\//i.test(domain)) return domain;
+            return 'https://' + domain;
+        },
+        panelCenterURL() {
+            return window.location.origin;
+        },
+        shellQuote(value) {
+            return "'" + String(value || '').replace(/'/g, "'\\''") + "'";
+        },
+        buildInstallCommand(agentKey) {
+            const centerURL = this.panelCenterURL();
+            const tlsSkipVerify = '{{.TLSMode}}' === 'self_signed';
+            return `#!/bin/sh
+set -e
+AGENT_VERSION="latest"
+CENTER_URL=${this.shellQuote(centerURL)}
+AGENT_API_KEY=${this.shellQuote(agentKey)}
+INTERVAL_SECONDS="60"
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64|amd64) ARCH="amd64" ;;
+  aarch64|arm64) ARCH="arm64" ;;
+  *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
+esac
+AGENT_URL="https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/server-panel-agent-linux-\${ARCH}"
+
+install -d /etc/server-panel
+curl -fsSL "$AGENT_URL" -o /usr/local/bin/server-panel-agent
+chmod +x /usr/local/bin/server-panel-agent
+cat >/etc/server-panel/agent.json <<EOF
+{"center_url":"${centerURL}","api_key":"${agentKey}","interval_seconds":60,"tls_skip_verify":${tlsSkipVerify}}
+EOF
+cat >/etc/systemd/system/server-panel-agent.service <<'EOF'
+[Unit]
+Description=Server Panel Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/server-panel-agent -config /etc/server-panel/agent.json
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now server-panel-agent
+systemctl status server-panel-agent --no-pager`;
+        },
+        buildUninstallCommand() {
+            return `#!/bin/sh
+set -e
+systemctl disable --now server-panel-agent || true
+rm -f /usr/local/bin/server-panel-agent /etc/systemd/system/server-panel-agent.service /etc/server-panel/agent.json
+systemctl daemon-reload || true
+echo "Server Panel Agent 已卸载"`;
+        },
+        async revealServerSecret(field) {
+            try {
+                const viewToken = await unlockViewPasswordPrompt();
+                if (!viewToken) return;
+                const d = await api('/api/servers/'+this.s.id+'/secrets/'+field, {headers:{'X-View-Token': viewToken}});
+                this.secrets[field] = d.data.value || '';
+                if (!this.secrets[field]) showToast('未保存'+(d.data.label || '该字段'),'warning');
+            } catch(e) {
+                showToast(e.message || '查看失败','error');
+            }
+        },
+        async copySecret(field) {
+            try {
+                await this.copyText(this.secrets[field] || '', '密码已复制');
+            } catch(e) {
+                showToast('复制失败，请手动选择密码','error');
+            }
+        },
+        async copyText(value, message) {
+            if (!value) return;
+            try {
+                await navigator.clipboard.writeText(String(value));
+                showToast(message || '已复制','success');
+            } catch(e) {
+                showToast('复制失败，请手动选择内容','error');
+            }
+        },
+        async showInstallCommand() {
+            this.savingAgent = true;
+            try {
+                const d = await api('/api/servers/'+this.s.id+'/agent-key/regenerate', {method:'POST'});
+                this.agentCommandTitle = '复制到被安装服务器执行';
+                this.agentCommand = this.buildInstallCommand(d.data.agent_key);
+                this.agentCommandNote = '执行后 Agent 会开始上报指标，服务器会自动出现在性能监控页面。再次点击安装会生成新 Key，旧 Agent 需要重新安装。';
+                showToast('Agent 安装命令已生成','success');
+            } catch(e) { showToast(e.message,'error'); }
+            this.savingAgent = false;
+        },
+        async showUninstallCommand() {
+            this.savingAgent = true;
+            try {
+                await api('/api/servers/'+this.s.id+'/agent/uninstall', {method:'POST'});
+                this.s.agent_version = '';
+                this.s.last_seen_at = '';
+                this.s.is_online = false;
+                this.agentCommandTitle = '复制到已安装 Agent 的服务器执行';
+                this.agentCommand = this.buildUninstallCommand();
+                this.agentCommandNote = '面板中的 Agent 监控状态已关闭。执行该命令后，目标机上的 Agent 服务会被停止并删除。';
+                showToast('Agent 卸载命令已生成','success');
+            } catch(e) { showToast(e.message,'error'); }
+            this.savingAgent = false;
+        },
+        async copyAgentCommand() {
+            try {
+                await navigator.clipboard.writeText(this.agentCommand);
+                showToast('命令已复制','success');
+            } catch(e) {
+                showToast('复制失败，请手动选择命令','error');
+            }
+        }
+    }
+}
+</script>
+{{end}}

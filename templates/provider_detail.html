@@ -1,0 +1,86 @@
+{{template "base" .}}
+{{define "provider_detail_content"}}
+<div x-data="providerDetail()" x-init="init()" class="p-6 max-w-6xl">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-100" x-text="provider.name || '加载中...'"></h2>
+            <a :href="externalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-400 hover:text-blue-300" x-text="provider.website || '--'"></a>
+        </div>
+        <div class="flex gap-2">
+            <a :href="provider.id ? provider.id + '/edit' : '#'" class="btn-secondary text-sm">编辑</a>
+            <a href=".." class="text-sm text-gray-400 hover:text-white">返回列表</a>
+        </div>
+    </div>
+
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">服务商信息</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
+            <dl class="p-5 text-sm space-y-3 border-b md:border-b-0 md:border-r border-[#202833]">
+                <div class="flex"><dt class="w-24 text-gray-400">名称</dt><dd class="text-gray-200" x-text="provider.name || '--'"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">官网</dt><dd><a :href="externalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="provider.website || '--'"></a></dd></div>
+            </dl>
+            <dl class="p-5 text-sm space-y-3">
+                <div class="flex"><dt class="w-24 text-gray-400">联系方式</dt><dd class="text-gray-200" x-text="provider.contact || '--'"></dd></div>
+            </dl>
+        </div>
+        <div class="p-5 border-t border-[#202833]" x-show="provider.notes">
+            <div class="text-sm text-gray-400 mb-2">备注</div>
+            <p class="text-sm text-gray-300" x-text="provider.notes"></p>
+        </div>
+    </section>
+
+    <section class="border border-[#2a3038] bg-[#171b21]">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">服务器资源</div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead><tr>
+                    <th class="table-header">名称</th><th class="table-header">IP</th><th class="table-header">客户</th><th class="table-header">状态</th><th class="table-header">到期日</th>
+                </tr></thead>
+                <tbody>
+                <template x-for="s in servers" :key="s.id">
+                    <tr class="border-t border-[#202833] hover:bg-[#1d232b]">
+                        <td class="table-cell text-white"><a :href="serverURL(s.id)" class="hover:text-purple-200" x-text="s.name"></a></td>
+                        <td class="table-cell text-gray-400" x-text="s.ip_address || '--'"></td>
+                        <td class="table-cell"><a :href="customerURL(s)" class="text-blue-400 hover:text-blue-300" x-text="s.customer_name || '--'"></a></td>
+                        <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></td>
+                        <td class="table-cell text-gray-400" x-text="s.expiry_date || '--'"></td>
+                    </tr>
+                </template>
+                </tbody>
+            </table>
+            <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && servers.length==0">暂无服务器资源</div>
+        </div>
+    </section>
+</div>
+<script>
+function providerDetail() {
+    return {
+        provider: {}, servers: [], loading: true,
+        async init() {
+            const id = window.location.pathname.split('/').filter(Boolean).pop();
+            try { const d = await api('/api/providers/' + id); this.provider = d.data; }
+            catch(e) { this.loading = false; showToast(e.message, 'error'); return; }
+            await this.fetchServers();
+        },
+        async fetchServers() {
+            this.loading = true;
+            try { const d = await api('/api/servers?provider_id=' + this.provider.id + '&page_size=100'); this.servers = d.data.items || []; }
+            catch(e) { showToast(e.message || '加载服务器资源失败', 'error'); }
+            finally { this.loading = false; }
+        },
+        serverURL(id) {
+            return (document.body.dataset.panelPrefix || '') + '/servers/' + id;
+        },
+        customerURL(server) {
+            if (!server || !server.customer_id) return '#';
+            return (document.body.dataset.panelPrefix || '') + '/customers/' + server.customer_id;
+        },
+        externalURL(url) {
+            if (!url) return '#';
+            if (/^https?:\/\//i.test(url)) return url;
+            return 'https://' + url;
+        }
+    }
+}
+</script>
+{{end}}

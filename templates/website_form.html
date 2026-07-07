@@ -1,0 +1,113 @@
+{{template "base" .}}
+{{define "website_form_content"}}
+<div x-data="websiteForm()" x-init="init()" class="p-6 max-w-2xl">
+    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑网站' : '添加网站'"></h2>
+    <div class="card space-y-4">
+        <div><label class="label">网站名称</label><input type="text" x-model="form.name" class="input-field" placeholder="例如：公司官网"></div>
+        <div><label class="label">域名 <span class="text-red-400">*</span></label><input type="text" x-model="form.domain" class="input-field" placeholder="example.com"></div>
+        <div>
+            <label class="label">网站类型</label>
+            <select x-model="form.site_type" class="input-field">
+                <option value="">-- 请选择 --</option>
+                <template x-for="t in siteTypes" :key="t"><option :value="t" x-text="t"></option></template>
+            </select>
+        </div>
+        <div><label class="label">所属服务器 <span class="text-red-400">*</span></label>
+            <select x-model.number="form.server_id" class="input-field">
+                <option :value="0">-- 请选择 --</option>
+                <template x-for="s in servers" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
+            </select>
+        </div>
+        <div>
+            <label class="label">所属客户</label>
+            <select x-model="form.customer_id" class="input-field">
+                <option value="">-- 请选择 --</option>
+                <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+            </select>
+        </div>
+        <hr class="border-gray-700">
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="label">面板类型</label>
+                <select x-model="form.panel_type" class="input-field">
+                    <option value="none">无</option><option value="baota">宝塔</option>
+                    <option value="wp-panel">WP Panel</option><option value="1panel">1Panel</option>
+                    <option value="cyberpanel">CyberPanel</option><option value="directadmin">DirectAdmin</option>
+                    <option value="cpanel">cPanel</option><option value="other">其他</option>
+                </select>
+            </div>
+            <div><label class="label">面板地址</label><input type="text" x-model="form.panel_url" class="input-field" placeholder="https://..."></div>
+            <div><label class="label">面板账号</label><input type="text" x-model="form.panel_username" class="input-field"></div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <label class="label">面板密码</label>
+                    <button type="button" @click="revealPanelPassword()" class="text-xs text-blue-400 hover:text-blue-300" x-show="isEdit">查看已保存密码</button>
+                </div>
+                <input type="password" x-model="form.panel_password" class="input-field" placeholder="（留空则不修改）">
+                <code class="block text-xs text-green-200 break-all mt-2" x-show="panelPassword" x-text="panelPassword"></code>
+            </div>
+        </div>
+        <div><label class="label">到期日期</label><input type="date" x-model="form.expiry_date" class="input-field"></div>
+        <div>
+            <label class="label">状态</label>
+            <select x-model="form.status" class="input-field w-48">
+                <option value="active">运行中</option><option value="expired">已到期</option>
+            </select>
+        </div>
+        <div><label class="label">备注</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
+        <div class="flex gap-3 pt-2">
+            <button @click="save()" class="btn-primary" :disabled="saving"><span x-show="!saving">保存</span><span x-show="saving">保存中...</span></button>
+            <a href="/{{.RandomSuffix}}/websites" class="btn-secondary">取消</a>
+        </div>
+    </div>
+</div>
+<script>
+function websiteForm() {
+    return {
+        isEdit: false, id: null, saving: false, panelPassword: '',
+        form: { name:'', domain:'', site_type:'', server_id:0, customer_id:'', panel_type:'none', panel_url:'', panel_username:'', panel_password:'', expiry_date:'', status:'active', notes:'' },
+        servers: [], customers: [], siteTypes: [],
+        async init() {
+            const parts = window.location.pathname.split('/').filter(Boolean);
+            const last = parts[parts.length-1];
+            if (last === 'edit') this.id = parts[parts.length-2];
+            else if (last !== 'new') this.id = last;
+            if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
+            if (this.id) { this.isEdit = true; await this.load(); }
+            try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {}
+            try { const d = await api('/api/customers?page_size=100'); this.customers = d.data.items || []; } catch(e) {}
+            try { const d = await api('/api/settings/site-type-list'); this.siteTypes = JSON.parse(d.data.svalue || '[]'); } catch(e) {}
+        },
+        async load() {
+            try { const d = await api('/api/websites/'+this.id); const w = d.data; Object.keys(this.form).forEach(k => { if (w[k] !== undefined && w[k] !== null) this.form[k] = w[k]; }); } catch(e) {}
+        },
+        async revealPanelPassword() {
+            try {
+                const viewToken = await unlockViewPasswordPrompt();
+                if (!viewToken) return;
+                const d = await api('/api/websites/'+this.id+'/secrets/panel-password', {headers:{'X-View-Token': viewToken}});
+                this.panelPassword = d.data.value || '';
+                if (!this.panelPassword) showToast('未保存网站面板密码','warning');
+            } catch(e) {}
+        },
+        async save() {
+            this.saving = true;
+            try {
+                if (!this.form.domain) { showToast('域名不能为空','error'); this.saving=false; return; }
+                if (!this.form.server_id) { showToast('请选择服务器','error'); this.saving=false; return; }
+                const payload = { ...this.form };
+                payload.server_id = parseInt(payload.server_id) || 0;
+                payload.customer_id = payload.customer_id ? parseInt(payload.customer_id) : null;
+                if (!payload.panel_password) delete payload.panel_password;
+                const method = this.isEdit ? 'PUT' : 'POST';
+                const url = this.isEdit ? '/api/websites/'+this.id : '/api/websites';
+                await api(url, {method, body: payload});
+                showToast('保存成功','success');
+                setTimeout(() => location.href = document.body.dataset.panelPrefix+'/websites', 500);
+            } catch(e) { showToast(e.message,'error'); }
+            this.saving = false;
+        }
+    }
+}
+</script>
+{{end}}

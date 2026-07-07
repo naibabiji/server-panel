@@ -1,0 +1,249 @@
+{{template "base" .}}
+{{define "server_form_content"}}
+<div x-data="serverForm()" x-init="init()" class="p-6 server-form-page">
+    <style>
+        .server-form-page { max-width: 1180px; }
+        .server-form-card { padding: 0; overflow: hidden; }
+        .server-form-grid { display: grid; grid-template-columns: 1fr; }
+        .server-form-section { padding: 20px; border-bottom: 1px solid #202833; }
+        .server-form-section:last-child { border-bottom: 0; }
+        .server-form-title { color: #c4b5fd; font-weight: 600; margin-bottom: 16px; }
+        .server-form-fields { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        .server-form-fields.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .server-form-span-2 { grid-column: 1 / -1; }
+        .server-form-actions { display: flex; gap: 12px; padding-top: 4px; }
+        @media (min-width: 860px) {
+            .server-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .server-form-section { border-right: 1px solid #202833; }
+            .server-form-section:nth-child(2n) { border-right: 0; }
+            .server-form-section.full { grid-column: 1 / -1; border-right: 0; }
+            .server-form-fields.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        @media (min-width: 1100px) {
+            .server-form-fields.compact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+    </style>
+    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑服务器' : '添加服务器'"></h2>
+    <div class="card server-form-card" x-show="!done">
+        <div class="server-form-grid">
+            <section class="server-form-section">
+                <div class="server-form-title">基础与归属</div>
+                <div class="server-form-fields">
+                    <div>
+                        <label class="label">服务器名称 <span class="text-red-400">*</span></label>
+                        <input type="text" x-model="form.name" class="input-field" placeholder="例如：香港-阿里云-VPS01">
+                    </div>
+                    <div class="server-form-fields compact">
+                        <div><label class="label">IP 地址</label><input type="text" x-model="form.ip_address" class="input-field" placeholder="1.2.3.4"></div>
+                        <div>
+                            <label class="label">服务器类型</label>
+                            <select x-model="form.server_type" class="input-field">
+                                <option value="vps">VPS</option><option value="dedicated">独立服务器</option>
+                                <option value="shared">虚拟主机</option><option value="other">其他</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="label">操作系统</label>
+                        <select x-model="form.os" class="input-field">
+                            <option value="">-- 请选择 --</option>
+                            <template x-for="os in osList" :key="os"><option :value="os" x-text="os"></option></template>
+                        </select>
+                    </div>
+                    <div class="server-form-fields compact">
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <label class="label">所属客户</label>
+                                <button type="button" @click="quickAddCustomer()" class="text-xs text-blue-400 hover:text-blue-300">+ 新增客户</button>
+                            </div>
+                            <select x-model="form.customer_id" class="input-field">
+                                <option value="">-- 请选择 --</option>
+                                <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+                            </select>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between">
+                                <label class="label">服务商</label>
+                                <button type="button" @click="quickAddProvider()" class="text-xs text-blue-400 hover:text-blue-300">+ 新增服务商</button>
+                            </div>
+                            <select x-model="form.provider_id" class="input-field">
+                                <option value="">-- 请选择 --</option>
+                                <template x-for="p in providers" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+                            </select>
+                        </div>
+                    </div>
+                    <div><label class="label">机房位置</label><input type="text" x-model="form.location" class="input-field" placeholder="香港/日本/美西"></div>
+                </div>
+            </section>
+
+            <section class="server-form-section">
+                <div class="server-form-title">规格与计费</div>
+                <div class="server-form-fields">
+                    <div class="server-form-fields compact">
+                        <div><label class="label">CPU</label><input type="text" x-model="form.cpu" class="input-field" placeholder="4C"></div>
+                        <div><label class="label">内存</label><input type="text" x-model="form.ram" class="input-field" placeholder="8GB"></div>
+                        <div><label class="label">磁盘</label><input type="text" x-model="form.disk" class="input-field" placeholder="80GB SSD"></div>
+                        <div><label class="label">流量</label><input type="text" x-model="form.bandwidth" class="input-field" placeholder="1TB/月"></div>
+                    </div>
+                    <div class="server-form-fields compact">
+                        <div><label class="label">购买日期</label><input type="date" x-model="form.purchase_date" class="input-field"></div>
+                        <div><label class="label">到期日期</label><input type="date" x-model="form.expiry_date" class="input-field"></div>
+                        <div>
+                            <label class="label">续费周期</label>
+                            <select x-model="form.renewal_cycle" class="input-field">
+                                <option value="">-- 请选择 --</option>
+                                <option value="monthly">月付</option><option value="quarterly">季付</option>
+                                <option value="yearly">年付</option><option value="2year">两年付</option><option value="3year">三年付</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label">自动续费</label>
+                            <select x-model="form.auto_renewal" class="input-field">
+                                <option :value="0">否</option><option :value="1">是</option>
+                            </select>
+                        </div>
+                        <div><label class="label">购买价格</label><input type="number" step="0.01" x-model="form.purchase_price" class="input-field"></div>
+                        <div>
+                            <label class="label">货币</label>
+                            <select x-model="form.currency" class="input-field">
+                                <option value="USD">USD</option><option value="CNY">CNY</option>
+                                <option value="EUR">EUR</option><option value="JPY">JPY</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="server-form-section full">
+                <div class="server-form-title">登录与面板凭据</div>
+                <div class="server-form-fields three">
+                    <div><label class="label">SSH 端口</label><input type="number" x-model="form.ssh_port" class="input-field" placeholder="22"></div>
+                    <div><label class="label">SSH 用户名</label><input type="text" x-model="form.ssh_username" class="input-field" placeholder="root"></div>
+                    <div><label class="label">SSH 密码</label><input type="password" x-model="form.ssh_password" class="input-field" placeholder="（加密存储）"></div>
+                    <div>
+                        <label class="label">面板类型</label>
+                        <select x-model="form.panel_type" class="input-field">
+                            <option value="none">无</option><option value="baota">宝塔</option>
+                            <option value="wp-panel">WP Panel</option><option value="1panel">1Panel</option>
+                            <option value="cyberpanel">CyberPanel</option><option value="directadmin">DirectAdmin</option>
+                            <option value="cpanel">cPanel</option><option value="other">其他</option>
+                        </select>
+                    </div>
+                    <div><label class="label">面板用户名</label><input type="text" x-model="form.panel_username" class="input-field"></div>
+                    <div><label class="label">面板密码</label><input type="password" x-model="form.panel_password" class="input-field" placeholder="（加密存储）"></div>
+                    <div class="server-form-span-2"><label class="label">面板地址</label><input type="text" x-model="form.panel_url" class="input-field" placeholder="https://..."></div>
+                </div>
+            </section>
+
+            <section class="server-form-section full">
+                <div class="server-form-title">状态与探测</div>
+                <div class="server-form-fields compact">
+                    <div>
+                        <label class="label">服务状态</label>
+                        <select x-model="form.status" class="input-field">
+                            <option value="active">活跃</option><option value="expired">过期</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">HTTP 探测</label>
+                        <select x-model="form.http_probe_enabled" class="input-field">
+                            <option :value="0">关闭</option><option :value="1">开启</option>
+                        </select>
+                        <div class="text-xs text-gray-500 mt-1">默认关闭。未安装 Agent 时，不会采集 CPU/内存/磁盘等性能数据。</div>
+                    </div>
+                    <div class="server-form-span-2"><label class="label">备注</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
+                </div>
+            </section>
+        </div>
+        <div class="server-form-section full">
+            <div class="server-form-actions">
+                <button @click="save()" class="btn-primary" :disabled="saving">
+                    <span x-show="!saving">保存</span><span x-show="saving">保存中...</span>
+                </button>
+                <a href="/{{.RandomSuffix}}/servers" class="btn-secondary">取消</a>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function serverForm() {
+    return {
+        isEdit: false, id: null, saving: false, done: false,
+        form: { name:'', ip_address:'', server_type:'vps', os:'', customer_id:'', cpu:'', ram:'', disk:'', bandwidth:'', provider_id:'', location:'', ssh_port:22, ssh_username:'root', ssh_password:'', panel_type:'none', panel_url:'', panel_username:'', panel_password:'', purchase_date:'', expiry_date:'', renewal_cycle:'', auto_renewal:0, purchase_price:0, currency:'USD', status:'active', http_probe_enabled:0, notes:'' },
+        customers: [], providers: [], osList: [],
+        async init() {
+            const path = window.location.pathname;
+            const parts = path.split('/').filter(Boolean);
+            const last = parts[parts.length-1];
+            if (last === 'edit') this.id = parts[parts.length-2];
+            else if (last === 'new') {}
+            else if (last && !['servers'].includes(last)) this.id = last;
+            if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
+            if (this.id) { this.isEdit = true; await this.load(); }
+            try { const d = await api('/api/customers?page_size=100'); this.customers = d.data.items || []; } catch(e) {}
+            try { const d = await api('/api/providers?page_size=100'); this.providers = d.data.items || []; } catch(e) {}
+            try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]'); } catch(e) {}
+        },
+        async refreshCustomers(selectedID) {
+            try {
+                const d = await api('/api/customers?page_size=100');
+                this.customers = d.data.items || [];
+                if (selectedID) this.form.customer_id = selectedID.toString();
+            } catch(e) {}
+        },
+        async refreshProviders(selectedID) {
+            try {
+                const d = await api('/api/providers?page_size=100');
+                this.providers = d.data.items || [];
+                if (selectedID) this.form.provider_id = selectedID.toString();
+            } catch(e) {}
+        },
+        async quickAddCustomer() {
+            const name = prompt('请输入客户名称:');
+            if (!name) return;
+            try {
+                const d = await api('/api/customers', {method:'POST', body:{name}});
+                await this.refreshCustomers(d.data.id);
+                showToast('客户已创建','success');
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        async quickAddProvider() {
+            const name = prompt('请输入服务商名称:');
+            if (!name) return;
+            try {
+                const d = await api('/api/providers', {method:'POST', body:{name}});
+                await this.refreshProviders(d.data.id);
+                showToast('服务商已创建','success');
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        async load() {
+            try { const d = await api('/api/servers/'+this.id); const s = d.data; Object.keys(this.form).forEach(k => { if (s[k] !== undefined && s[k] !== null) this.form[k] = typeof s[k] === 'number' ? s[k].toString() : s[k]; }); } catch(e) {}
+        },
+        async save() {
+            this.saving = true;
+            try {
+                if (!this.form.name) { showToast('服务器名称不能为空','error'); this.saving=false; return; }
+                const payload = { ...this.form };
+                payload.ssh_port = parseInt(payload.ssh_port) || 22;
+                payload.auto_renewal = parseInt(payload.auto_renewal) || 0;
+                payload.purchase_price = parseFloat(payload.purchase_price) || 0;
+                payload.http_probe_enabled = parseInt(payload.http_probe_enabled) || 0;
+                payload.customer_id = payload.customer_id ? parseInt(payload.customer_id) : null;
+                payload.provider_id = payload.provider_id ? parseInt(payload.provider_id) : null;
+                // 密码字段：只在管理员填写时提交明文，由后端加密存储
+                if (!payload.ssh_password) delete payload.ssh_password;
+                if (!payload.panel_password) delete payload.panel_password;
+                const method = this.isEdit ? 'PUT' : 'POST';
+                const url = this.isEdit ? '/api/servers/'+this.id : '/api/servers';
+                const d = await api(url, {method, body:payload});
+                this.done = true;
+                showToast('保存成功','success');
+                const target = !this.isEdit && d.data && d.data.id ? '/servers/' + d.data.id : '/servers';
+                setTimeout(() => location.href = document.body.dataset.panelPrefix + target, 500);
+            } catch(e) { showToast(e.message,'error'); }
+            this.saving = false;
+        }
+    }
+}
+</script>
+{{end}}

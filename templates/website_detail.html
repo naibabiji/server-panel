@@ -1,0 +1,102 @@
+{{template "base" .}}
+{{define "website_detail_content"}}
+<div x-data="websiteDetail()" x-init="init()" class="p-6 max-w-5xl">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-100" x-text="w.name || w.domain || '加载中...'"></h2>
+            <div class="text-sm text-gray-500" x-text="w.domain || '--'"></div>
+        </div>
+        <div class="flex gap-2">
+            <a :href="w.id ? w.id + '/edit' : '#'" class="btn-secondary text-sm">编辑</a>
+            <a href=".." class="text-sm text-gray-400 hover:text-white">返回列表</a>
+        </div>
+    </div>
+
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">网站档案</div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
+            <dl class="p-5 text-sm space-y-3 border-b md:border-b-0 md:border-r border-[#202833]">
+                <div class="flex"><dt class="w-24 text-gray-400">名称</dt><dd class="text-gray-200" x-text="w.name || '--'"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">域名</dt><dd><a :href="externalURL(w.domain)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="w.domain || '--'"></a></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">类型</dt><dd class="text-gray-200" x-text="w.site_type || '--'"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">状态</dt><dd><span :class="w.status=='active'?'badge-success':'badge-danger'" x-text="w.status=='active'?'运行中':'已到期'"></span></dd></div>
+            </dl>
+            <dl class="p-5 text-sm space-y-3">
+                <div class="flex"><dt class="w-24 text-gray-400">服务器</dt><dd><a :href="serverURL()" class="text-blue-400 hover:text-blue-300" x-text="w.server_name || '--'"></a></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">客户</dt><dd><a :href="customerURL()" class="text-blue-400 hover:text-blue-300" x-text="w.customer_name || '--'"></a></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">到期日</dt><dd class="text-gray-200" x-text="w.expiry_date || '--'"></dd></div>
+            </dl>
+        </div>
+        <div class="p-5 border-t border-[#202833]" x-show="w.notes">
+            <div class="text-sm text-gray-400 mb-2">备注</div>
+            <p class="text-sm text-gray-300" x-text="w.notes"></p>
+        </div>
+    </section>
+
+    <section class="border border-[#2a3038] bg-[#171b21]" x-show="hasPanel()">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">网站面板</div>
+        <dl class="text-sm">
+            <div class="grid grid-cols-1 md:grid-cols-[120px_minmax(0,1fr)_auto] gap-3 p-5 items-start">
+                <dt class="text-gray-400">面板信息</dt>
+                <dd class="text-gray-200">
+                    <div x-text="w.panel_type && w.panel_type !== 'none' ? w.panel_type : '未配置'"></div>
+                    <a class="text-blue-400 hover:text-blue-300 break-all" :href="w.panel_url" target="_blank" rel="noopener noreferrer" x-show="w.panel_url" x-text="w.panel_url"></a>
+                    <div x-show="w.panel_username" class="text-gray-400">账号：<span x-text="w.panel_username"></span></div>
+                    <div class="mt-2 flex items-center gap-2" x-show="panelPassword">
+                        <code class="text-xs text-green-200 break-all" x-text="panelPassword"></code>
+                        <button @click="copyPanelPassword()" class="btn-secondary text-xs">复制</button>
+                    </div>
+                </dd>
+                <button @click="revealPanelPassword()" class="btn-secondary text-xs">查看密码</button>
+            </div>
+        </dl>
+    </section>
+</div>
+<script>
+function websiteDetail() {
+    return {
+        w: {}, panelPassword: '',
+        async init() {
+            const id = window.location.pathname.split('/').filter(Boolean).pop();
+            try { const d = await api('/api/websites/' + id); this.w = d.data; }
+            catch(e) { showToast(e.message, 'error'); }
+        },
+        serverURL() {
+            if (!this.w.server_id) return '#';
+            return (document.body.dataset.panelPrefix || '') + '/servers/' + this.w.server_id;
+        },
+        hasPanel() {
+            return !!(this.w.panel_type && this.w.panel_type !== 'none');
+        },
+        customerURL() {
+            if (!this.w.customer_id) return '#';
+            return (document.body.dataset.panelPrefix || '') + '/customers/' + this.w.customer_id;
+        },
+        externalURL(domain) {
+            if (!domain) return '#';
+            if (/^https?:\/\//i.test(domain)) return domain;
+            return 'https://' + domain;
+        },
+        async revealPanelPassword() {
+            try {
+                const viewToken = await unlockViewPasswordPrompt();
+                if (!viewToken) return;
+                const d = await api('/api/websites/' + this.w.id + '/secrets/panel-password', {headers:{'X-View-Token': viewToken}});
+                this.panelPassword = d.data.value || '';
+                if (!this.panelPassword) showToast('未保存网站面板密码', 'warning');
+            } catch(e) {
+                showToast(e.message || '查看失败', 'error');
+            }
+        },
+        async copyPanelPassword() {
+            try {
+                await navigator.clipboard.writeText(this.panelPassword || '');
+                showToast('密码已复制', 'success');
+            } catch(e) {
+                showToast('复制失败，请手动选择密码', 'error');
+            }
+        }
+    }
+}
+</script>
+{{end}}

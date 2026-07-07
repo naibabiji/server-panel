@@ -1,0 +1,35 @@
+{{template "base" .}}
+{{define "alert_log_content"}}
+<div x-data="alertLogPage()" x-init="fetch()" class="p-6">
+    <h2 class="text-lg font-semibold text-purple-300 mb-4">告警日志</h2>
+    <div class="card overflow-x-auto">
+        <table class="w-full">
+            <thead><tr>
+                <th class="table-header">类型</th><th class="table-header">级别</th><th class="table-header">内容</th><th class="table-header">状态</th><th class="table-header">时间</th>
+            </tr></thead>
+            <tbody>
+            <template x-for="l in logs" :key="l.id">
+                <tr class="border-t border-gray-700/50 hover:bg-white/5">
+                    <td class="table-cell"><span class="badge-info text-xs" x-text="l.alert_type"></span></td>
+                    <td class="table-cell"><span :class="l.level=='critical'?'badge-danger':'badge-warning'" x-text="l.level"></span></td>
+                    <td class="table-cell text-sm text-gray-200" x-text="l.message"></td>
+                    <td class="table-cell"><span x-text="l.resolved?'已解决':'未解决'" class="text-xs" :class="l.resolved?'text-green-400':'text-yellow-400'"></span></td>
+                    <td class="table-cell text-gray-500 text-xs" x-text="fmtTime(l.created_at)"></td>
+                </tr>
+            </template>
+            </tbody>
+        </table>
+        <div class="text-center text-gray-500 py-8" x-show="logs.length==0">暂无告警记录</div>
+    </div>
+</div>
+<script>
+function alertLogPage() {
+    return {
+        logs: [],
+        async fetch() {
+            try { const d = await api('/api/alerts/log?page_size=50'); this.logs = d.data.items || []; } catch(e) {}
+        }
+    }
+}
+</script>
+{{end}}

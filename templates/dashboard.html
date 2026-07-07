@@ -1,0 +1,114 @@
+{{template "base" .}}
+{{define "dashboard_content"}}
+<div x-data="dashboardPage()" x-init="init()" class="p-6">
+    <div class="mb-5 pb-5 border-b border-[#202833]">
+        <h2 class="text-xl font-semibold text-purple-200">仪表盘</h2>
+        <div class="text-sm text-gray-500 mt-1">服务器状态、到期提醒和最近告警。</div>
+        <div class="flex flex-wrap gap-2 mt-3">
+            <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="panelUpdate.hasUpdate" x-text="'面板有新版本 ' + panelUpdate.latestVersion + ' 可用'"></a>
+            <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="sysUpdateCount > 0" x-text="sysUpdateCount + ' 个系统包可更新'"></a>
+        </div>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 border border-[#2a3038] bg-[#171b21] mb-6">
+        <div class="p-5 border-b lg:border-b-0 lg:border-r border-[#202833]"><div class="text-sm text-gray-400">总服务器</div><div class="text-2xl font-semibold mt-1" x-text="stats.total_servers">0</div></div>
+        <div class="p-5 border-b lg:border-b-0 lg:border-r border-[#202833]"><div class="text-sm text-gray-400">在线</div><div class="text-2xl font-semibold mt-1 text-green-400" x-text="stats.online_count">0</div></div>
+        <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">离线</div><div class="text-2xl font-semibold mt-1 text-red-400" x-text="stats.offline_count">0</div></div>
+        <div class="p-5"><div class="text-sm text-gray-400">即将到期</div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count">0</div></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <section class="border border-[#2a3038] bg-[#171b21]">
+            <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">即将到期的服务器</div>
+            <div class="p-5">
+                <div class="text-sm text-gray-500" x-show="!expiring.servers.length">暂无即将到期服务器</div>
+                <template x-for="item in expiring.servers" :key="'server-'+item.id">
+                    <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="text-sm text-gray-100" x-text="item.name"></div>
+                                <div class="text-xs text-gray-500" x-text="'到期日：' + item.expiry_date"></div>
+                            </div>
+                            <div class="text-sm text-yellow-400" x-text="daysText(item.days_left)"></div>
+                        </div>
+                    </a>
+                </template>
+            </div>
+        </section>
+        <section class="border border-[#2a3038] bg-[#171b21]">
+            <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">即将到期的网站</div>
+            <div class="p-5">
+                <div class="text-sm text-gray-500" x-show="!expiring.websites.length">暂无即将到期网站</div>
+                <template x-for="item in expiring.websites" :key="'website-'+item.id">
+                    <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="text-sm text-gray-100" x-text="item.name"></div>
+                                <div class="text-xs text-gray-500" x-text="websiteMeta(item)"></div>
+                            </div>
+                            <div class="text-sm text-yellow-400" x-text="daysText(item.days_left)"></div>
+                        </div>
+                    </a>
+                </template>
+            </div>
+        </section>
+    </div>
+    <div class="border border-[#2a3038] bg-[#171b21]">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">最近告警</div>
+        <div class="p-5">
+            <div class="text-sm text-gray-500" x-show="!alerts.length">暂无告警</div>
+            <template x-for="a in alerts" :key="a.id">
+                <div class="flex items-center justify-between py-3 border-b border-[#202833] last:border-0">
+                    <div><span :class="'badge-' + (a.level === 'critical' ? 'danger' : a.level === 'warning' ? 'warning' : 'info')" x-text="a.message" class="text-xs"></span></div>
+                    <div class="text-xs text-gray-500" x-text="fmtTime(a.created_at)"></div>
+                </div>
+            </template>
+         </div>
+    </div>
+</div>
+<script>
+function dashboardPage() {
+    return {
+        stats: { total_servers: 0, online_count: 0, offline_count: 0, expiring_count: 0 },
+        expiring: { servers: [], websites: [] },
+        alerts: [],
+        panelUpdate: { hasUpdate: false, latestVersion: '' },
+        sysUpdateCount: 0,
+        async init() {
+            try {
+                const d = await api('/api/dashboard/stats');
+                this.stats = d.data;
+            } catch(e) {}
+            try {
+                const d = await api('/api/dashboard/expiring');
+                this.expiring = d.data || { servers: [], websites: [] };
+                this.expiring.servers = this.expiring.servers || [];
+                this.expiring.websites = this.expiring.websites || [];
+            } catch(e) {}
+            try {
+                const d = await api('/api/dashboard/recent-alerts?limit=10');
+                this.alerts = d.data || [];
+            } catch(e) {}
+            try {
+                const d = await api('/api/update/check');
+                this.panelUpdate = { hasUpdate: d.data.has_update, latestVersion: d.data.latest_version };
+            } catch(e) {}
+            try {
+                const d = await api('/api/system/updates');
+                this.sysUpdateCount = d.data.count || 0;
+            } catch(e) {}
+        },
+        panelURL(path) {
+            return (document.body.dataset.panelPrefix || '') + path;
+        },
+        daysText(days) {
+            if (days <= 0) return '今天到期';
+            return days + ' 天';
+        },
+        websiteMeta(item) {
+            let text = '到期日：' + item.expiry_date;
+            if (item.server_name) text += ' · ' + item.server_name;
+            return text;
+        }
+    }
+}
+</script>
+{{end}}

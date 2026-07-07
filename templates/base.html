@@ -1,0 +1,114 @@
+{{define "base"}}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{.CSRFToken}}">
+    <title>{{.Title}}</title>
+    <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css">
+    <script defer src="{{.AssetPrefix}}/js/alpine.min.js"></script>
+    <script src="{{.AssetPrefix}}/js/app.js"></script>
+    <script defer src="{{.AssetPrefix}}/js/chart.min.js"></script>
+</head>
+<body class="bg-[#0d1117] text-gray-200" data-panel-prefix="/{{.RandomSuffix}}">
+<div x-data="layout()" @resize.window="onResize()" class="flex h-screen overflow-hidden">
+    <!-- 移动端遮罩 -->
+    <div x-show="sidebarOpen" @click="sidebarOpen=false" class="fixed inset-0 bg-black/50 z-40 lg:hidden" x-cloak></div>
+    <!-- 侧边栏 -->
+    <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+           class="fixed lg:static lg:translate-x-0 z-50 w-56 h-full bg-[#11161d] border-r border-[#252c35] flex flex-col transition-transform duration-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-[#252c35]">
+            <div class="text-lg font-semibold text-purple-200">{{.PanelTitle}}</div>
+            <div class="text-xs text-gray-500">{{.PanelVersion}}</div>
+        </div>
+        <nav class="flex-1 py-3 px-3 space-y-1 overflow-y-auto" id="sidebar-nav">
+            <a href="/{{.RandomSuffix}}/" class="sidebar-link {{if eq .Active "dashboard"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                仪表盘
+            </a>
+            <a href="/{{.RandomSuffix}}/monitor" class="sidebar-link {{if eq .Active "monitor"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                性能监控
+            </a>
+            <a href="/{{.RandomSuffix}}/servers" class="sidebar-link {{if eq .Active "server_list"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
+                服务器管理
+            </a>
+            <a href="/{{.RandomSuffix}}/websites" class="sidebar-link {{if eq .Active "website_list"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+                网站管理
+            </a>
+            <a href="/{{.RandomSuffix}}/customers" class="sidebar-link {{if eq .Active "customer_list"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                客户管理
+            </a>
+            <a href="/{{.RandomSuffix}}/providers" class="sidebar-link {{if eq .Active "provider_list"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                服务商管理
+            </a>
+            <a href="/{{.RandomSuffix}}/firewall" class="sidebar-link {{if eq .Active "firewall"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                安全防御
+            </a>
+            <a href="/{{.RandomSuffix}}/alerts" class="sidebar-link {{if eq .Active "alert_rules"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                告警管理
+            </a>
+            <a href="/{{.RandomSuffix}}/alerts/log" class="sidebar-link {{if eq .Active "alert_log"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                告警日志
+            </a>
+            <a href="/{{.RandomSuffix}}/settings" class="sidebar-link {{if eq .Active "settings"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.46 2.37a1.724 1.724 0 001.065 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.46a1.724 1.724 0 00-2.573 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.46-2.37a1.724 1.724 0 00-1.065-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.46.996.608 2.296.07 2.573-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                系统设置
+            </a>
+        </nav>
+        <div class="px-3 py-3 border-t border-[#252c35]">
+            <a href="#" @click.prevent="logout()" class="sidebar-link text-gray-400 hover:text-red-400">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                退出登录
+            </a>
+        </div>
+    </aside>
+    <!-- 主内容区 -->
+    <main class="flex-1 overflow-y-auto">
+        <div class="sticky top-0 z-30 bg-[#0d1117]/95 backdrop-blur border-b border-[#252c35] px-5 py-3 flex items-center justify-between">
+            <button @click="sidebarOpen=!sidebarOpen" class="lg:hidden text-gray-400 hover:text-white">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+        </div>
+        {{if eq .ContentTemplate "dashboard_content"}}{{template "dashboard_content" .}}{{end}}
+                {{if eq .ContentTemplate "server_list_content"}}{{template "server_list_content" .}}{{end}}
+                {{if eq .ContentTemplate "server_detail_content"}}{{template "server_detail_content" .}}{{end}}
+                {{if eq .ContentTemplate "server_form_content"}}{{template "server_form_content" .}}{{end}}
+                {{if eq .ContentTemplate "customer_list_content"}}{{template "customer_list_content" .}}{{end}}
+                {{if eq .ContentTemplate "customer_detail_content"}}{{template "customer_detail_content" .}}{{end}}
+                {{if eq .ContentTemplate "customer_form_content"}}{{template "customer_form_content" .}}{{end}}
+                {{if eq .ContentTemplate "website_list_content"}}{{template "website_list_content" .}}{{end}}
+                {{if eq .ContentTemplate "website_detail_content"}}{{template "website_detail_content" .}}{{end}}
+                {{if eq .ContentTemplate "website_form_content"}}{{template "website_form_content" .}}{{end}}
+                {{if eq .ContentTemplate "provider_list_content"}}{{template "provider_list_content" .}}{{end}}
+                {{if eq .ContentTemplate "provider_detail_content"}}{{template "provider_detail_content" .}}{{end}}
+                {{if eq .ContentTemplate "provider_form_content"}}{{template "provider_form_content" .}}{{end}}
+                {{if eq .ContentTemplate "monitor_content"}}{{template "monitor_content" .}}{{end}}
+                {{if eq .ContentTemplate "monitor_detail_content"}}{{template "monitor_detail_content" .}}{{end}}
+                {{if eq .ContentTemplate "firewall_content"}}{{template "firewall_content" .}}{{end}}
+                {{if eq .ContentTemplate "alert_rules_content"}}{{template "alert_rules_content" .}}{{end}}
+                {{if eq .ContentTemplate "alert_log_content"}}{{template "alert_log_content" .}}{{end}}
+                {{if eq .ContentTemplate "settings_content"}}{{template "settings_content" .}}{{end}}
+    </main>
+</div>
+<script>
+function layout() {
+    return {
+        sidebarOpen: window.innerWidth >= 1024,
+        onResize() { this.sidebarOpen = window.innerWidth >= 1024; },
+        async logout() {
+            try { await api('/api/auth/logout', {method:'POST'}); } catch(e) {}
+            window.location.href = (document.body.dataset.panelPrefix || '') + '/login';
+        }
+    }
+}
+</script>
+</body>
+</html>{{end}}

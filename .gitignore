@@ -1,0 +1,17 @@
+nul
+server-panel.exe
+server-panel
+vpsd-agent
+vpsd-agent.exe
+bin/
+*.db
+*.local-secrets.md
+docs/
+CLAUDE.md
+sign-release.sh
+tools/sign-checksums/
+tools/smoke_api_test.sh
+ui-prototypes/
+*.hex
+server-panel-release-key*
+*-release-key*

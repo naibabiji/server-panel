@@ -1,0 +1,136 @@
+{{define "status_public.html"}}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Status</title>
+    <style>
+        :root { --bg: #0f0f11; --card: #1a1a1f; --border: #27272a; --text: #e4e4e7; --sub: #a1a1aa; --green: #4ade80; --red: #f87171; --purple: #a78bfa; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; display: flex; justify-content: center; padding: 40px 16px; }
+        .container { max-width: 640px; width: 100%; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+        h1 { font-size: 20px; font-weight: 700; color: var(--purple); margin-bottom: 4px; }
+        .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+        .dot.green { background: var(--green); }
+        .dot.red { background: var(--red); }
+        .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: var(--sub); }
+        .footer { text-align: center; color: #52525b; font-size: 12px; margin-top: 24px; }
+        .pwd-box { text-align: center; }
+        .pwd-box input { padding: 10px 14px; background: #27272a; border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 15px; width: 100%; max-width: 280px; outline: none; }
+        .pwd-box button { margin-top: 8px; padding: 8px 20px; background: var(--purple); border: none; border-radius: 8px; color: #fff; font-size: 14px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="container" id="app">
+    <!-- Password gate -->
+    <div id="pwd-gate" class="card pwd-box" style="display:none">
+        <h2 style="margin-bottom:12px;font-size:16px;">需要密码</h2>
+        <input type="password" id="pwd-input" placeholder="请输入访问密码">
+        <button onclick="verifyPwd()">验证</button>
+        <div id="pwd-error" style="color:var(--red);font-size:13px;margin-top:8px;display:none;">密码错误</div>
+    </div>
+
+    <!-- Status content -->
+    <div id="status-content" style="display:none">
+        <div class="card">
+            <h1 id="server-name">Loading...</h1>
+            <div style="margin-top:8px"><span id="online-dot" class="dot"></span><span id="online-text"></span></div>
+        </div>
+        <div class="card">
+            <div class="stat-row"><span class="stat-label">HTTP 探测</span><span id="probe-status">--</span></div>
+            <div class="stat-row"><span class="stat-label">最后探测</span><span id="probe-last">--</span></div>
+        </div>
+        <div class="card">
+            <div class="stat-row"><span class="stat-label">CPU</span><span id="stat-cpu">--</span></div>
+            <div class="stat-row"><span class="stat-label">内存</span><span id="stat-mem">--</span></div>
+            <div class="stat-row"><span class="stat-label">磁盘</span><span id="stat-disk">--</span></div>
+            <div class="stat-row"><span class="stat-label">负载</span><span id="stat-load">--</span></div>
+        </div>
+        <div class="card">
+            <div class="stat-row"><span class="stat-label">域名</span><span class="stat-label">到期日</span></div>
+            <div id="website-list"></div>
+        </div>
+        <div class="footer">Powered by Server Panel</div>
+    </div>
+</div>
+<script>
+const token = window.location.pathname.split('/').filter(Boolean).pop();
+
+async function loadStatus() {
+    try {
+        const resp = await fetch('/api/status/'+token+'/info');
+        if (resp.status === 403) {
+            document.getElementById('pwd-gate').style.display = 'block';
+            return;
+        }
+        const d = await resp.json();
+        if (!d.success) { document.getElementById('pwd-gate').style.display='block'; return; }
+
+        document.getElementById('pwd-gate').style.display = 'none';
+        document.getElementById('status-content').style.display = 'block';
+
+        const info = d.data;
+        document.getElementById('server-name').textContent = info.name;
+        const dot = document.getElementById('online-dot');
+        dot.className = 'dot ' + (info.is_online ? 'green' : 'red');
+        document.getElementById('online-text').textContent = info.is_online ? '在线' : '离线';
+
+        const ph = info.http_probe_healthy;
+        document.getElementById('probe-status').textContent = ph === null ? '--' : (ph === 1 ? '正常' : '异常');
+        document.getElementById('probe-last').textContent = info.http_probe_last_at || '--';
+
+        // Load latest metrics
+        try {
+            const m = await fetch('/api/status/'+token+'/metrics');
+            const md = await m.json();
+            if (md.success && md.data && md.data.length) {
+                const latest = md.data[md.data.length-1];
+                document.getElementById('stat-cpu').textContent = (latest.cpu||0).toFixed(1)+'%';
+                document.getElementById('stat-mem').textContent = (latest.mem||0).toFixed(1)+'%';
+                document.getElementById('stat-disk').textContent = (latest.disk||0).toFixed(1)+'%';
+                document.getElementById('stat-load').textContent = (latest.load||0).toFixed(2);
+            }
+        } catch(e) {}
+
+        // Load websites
+        try {
+            const w = await fetch('/api/status/'+token+'/websites');
+            const wd = await w.json();
+            if (wd.success && wd.data) {
+                const list = document.getElementById('website-list');
+                list.replaceChildren(...wd.data.map(w => {
+                    const row = document.createElement('div');
+                    row.className = 'stat-row';
+
+                    const domain = document.createElement('span');
+                    domain.textContent = w.domain || '';
+
+                    const expiry = document.createElement('span');
+                    expiry.style.color = 'var(--sub)';
+                    expiry.textContent = w.expiry_date || '--';
+
+                    row.append(domain, expiry);
+                    return row;
+                }));
+            }
+        } catch(e) {}
+    } catch(e) { console.error(e); }
+}
+
+async function verifyPwd() {
+    const pw = document.getElementById('pwd-input').value;
+    try {
+        const r = await fetch('/api/status/'+token+'/verify', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+        const d = await r.json();
+        if (d.success) { document.getElementById('pwd-error').style.display='none'; loadStatus(); }
+        else { document.getElementById('pwd-error').style.display='block'; }
+    } catch(e) {}
+}
+
+loadStatus();
+</script>
+</body>
+</html>{{end}}
