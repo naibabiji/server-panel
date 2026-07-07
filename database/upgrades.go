@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -52,6 +53,16 @@ var upgrades = []Upgrade{
 			)`,
 			`CREATE INDEX IF NOT EXISTS idx_operation_logs_created ON operation_logs(created_at)`,
 		},
+	},
+	{
+		Version:     "1.5.0",
+		Description: "Replace free-text CPU/RAM/disk spec fields with numeric columns",
+		SQL: []string{
+			`ALTER TABLE servers ADD COLUMN cpu_cores REAL NOT NULL DEFAULT 0`,
+			`ALTER TABLE servers ADD COLUMN ram_gb REAL NOT NULL DEFAULT 0`,
+			`ALTER TABLE servers ADD COLUMN disk_gb REAL NOT NULL DEFAULT 0`,
+		},
+		Func: migrateServerSpecsToNumeric,
 	},
 }
 
@@ -188,6 +199,94 @@ func migrateUsersToCustomers() error {
 	_, _ = DB.Exec(`DROP INDEX IF EXISTS idx_servers_user`)
 	_, _ = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_servers_customer ON servers(customer_id)`)
 	_, _ = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_websites_customer ON websites(customer_id)`)
+	return nil
+}
+
+var specLeadingNumberRe = regexp.MustCompile(`^[\d.]+`)
+
+// parseSpecNumber splits a legacy free-text spec value (e.g. "512MB", "4C",
+// "80GB SSD") into its leading numeric part and whatever text follows it.
+func parseSpecNumber(s string) (num float64, unit string) {
+	s = strings.TrimSpace(s)
+	m := specLeadingNumberRe.FindString(s)
+	if m == "" {
+		return 0, ""
+	}
+	v, err := strconv.ParseFloat(m, 64)
+	if err != nil {
+		return 0, ""
+	}
+	return v, strings.ToUpper(strings.TrimSpace(s[len(m):]))
+}
+
+// parseSpecGB converts a legacy free-text RAM/disk value to a GB float,
+// recognizing MB/TB suffixes so a value like "512MB" backfills to 0.5 GB
+// instead of silently becoming 512 GB.
+func parseSpecGB(s string) float64 {
+	num, unit := parseSpecNumber(s)
+	switch {
+	case strings.HasPrefix(unit, "TB") || strings.HasPrefix(unit, "T"):
+		return num * 1024
+	case strings.HasPrefix(unit, "MB") || strings.HasPrefix(unit, "M"):
+		return num / 1024
+	default:
+		return num
+	}
+}
+
+// migrateServerSpecsToNumeric backfills the new cpu_cores/ram_gb/disk_gb
+// columns from the legacy free-text cpu/ram/disk columns, then drops the
+// legacy columns. It's safe to re-run: if the legacy columns are already
+// gone (e.g. a prior run got interrupted after the drop), it's a no-op.
+func migrateServerSpecsToNumeric() error {
+	hasLegacy, err := columnExists("servers", "cpu")
+	if err != nil {
+		return err
+	}
+	if !hasLegacy {
+		return nil
+	}
+
+	rows, err := DB.Query(`SELECT id, cpu, ram, disk FROM servers`)
+	if err != nil {
+		return err
+	}
+	type legacySpec struct {
+		id             int64
+		cpu, ram, disk string
+	}
+	var specs []legacySpec
+	for rows.Next() {
+		var sp legacySpec
+		if err := rows.Scan(&sp.id, &sp.cpu, &sp.ram, &sp.disk); err != nil {
+			rows.Close()
+			return err
+		}
+		specs = append(specs, sp)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	for _, sp := range specs {
+		cpuCores, _ := parseSpecNumber(sp.cpu)
+		ramGB := parseSpecGB(sp.ram)
+		diskGB := parseSpecGB(sp.disk)
+		if _, err := DB.Exec(
+			`UPDATE servers SET cpu_cores = ?, ram_gb = ?, disk_gb = ? WHERE id = ?`,
+			cpuCores, ramGB, diskGB, sp.id,
+		); err != nil {
+			return err
+		}
+	}
+
+	for _, col := range []string{"cpu", "ram", "disk"} {
+		if _, err := DB.Exec(`ALTER TABLE servers DROP COLUMN ` + col); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

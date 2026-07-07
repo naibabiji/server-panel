@@ -66,7 +66,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 	query := `SELECT s.id, s.name, s.ip_address, s.server_type, s.os, s.customer_id, COALESCE(u.name,''),
-		s.cpu, s.ram, s.disk, s.bandwidth, s.provider_id, COALESCE(p.name,''),
+		s.cpu_cores, s.ram_gb, s.disk_gb, s.bandwidth, s.provider_id, COALESCE(p.name,''),
 		s.location, s.ssh_port, s.ssh_username, s.panel_type, s.panel_url, s.panel_username,
 		s.purchase_date, s.expiry_date, s.renewal_cycle, s.auto_renewal, s.purchase_price, s.currency,
 		s.status, s.agent_version, s.last_seen_at, s.is_online,
@@ -91,7 +91,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 		var probeHealthy sql.NullInt64
 		var lastSeen, probeLast sql.NullString
 		err := rows.Scan(&s.ID, &s.Name, &s.IPAddress, &s.ServerType, &s.OS, &s.CustomerID, &s.CustomerName,
-			&s.CPU, &s.RAM, &s.Disk, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
+			&s.CPUCores, &s.RAMGB, &s.DiskGB, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
 			&s.Location, &s.SSHPort, &s.SSHUsername, &s.PanelType, &s.PanelURL, &s.PanelUsername,
 			&s.PurchaseDate, &s.ExpiryDate, &s.RenewalCycle, &s.AutoRenewal, &s.PurchasePrice, &s.Currency,
 			&s.Status, &s.AgentVersion, &lastSeen, &s.IsOnline,
@@ -128,7 +128,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 
 	err := h.DB.QueryRow(
 		`SELECT s.id, s.name, s.ip_address, s.server_type, s.os, s.customer_id, COALESCE(u.name,''),
-		s.cpu, s.ram, s.disk, s.bandwidth, s.provider_id, COALESCE(p.name,''),
+		s.cpu_cores, s.ram_gb, s.disk_gb, s.bandwidth, s.provider_id, COALESCE(p.name,''),
 		s.location, s.ssh_port, s.ssh_username, s.ssh_password_enc, s.panel_type, s.panel_url, s.panel_username,
 		s.panel_password_enc, s.purchase_date, s.expiry_date, s.renewal_cycle, s.auto_renewal, s.purchase_price, s.currency,
 		s.status, s.agent_api_key_enc, s.agent_version, s.last_seen_at, s.is_online,
@@ -139,7 +139,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 		LEFT JOIN providers p ON s.provider_id = p.id
 		WHERE s.id = ?`, id,
 	).Scan(&s.ID, &s.Name, &s.IPAddress, &s.ServerType, &s.OS, &s.CustomerID, &s.CustomerName,
-		&s.CPU, &s.RAM, &s.Disk, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
+		&s.CPUCores, &s.RAMGB, &s.DiskGB, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
 		&s.Location, &s.SSHPort, &s.SSHUsername, &s.SSHPasswordEnc, &s.PanelType, &s.PanelURL, &s.PanelUsername,
 		&s.PanelPasswordEnc, &s.PurchaseDate, &s.ExpiryDate, &s.RenewalCycle, &s.AutoRenewal, &s.PurchasePrice, &s.Currency,
 		&s.Status, &s.AgentAPIKeyEnc, &s.AgentVersion, &lastSeen, &s.IsOnline,
@@ -192,12 +192,12 @@ func (h *ServerHandler) Create(c *gin.Context) {
 	}
 
 	result, err := h.DB.Exec(
-		`INSERT INTO servers (name, ip_address, server_type, os, customer_id, cpu, ram, disk, bandwidth,
+		`INSERT INTO servers (name, ip_address, server_type, os, customer_id, cpu_cores, ram_gb, disk_gb, bandwidth,
 		 provider_id, location, ssh_port, ssh_username, ssh_password_enc, panel_type, panel_url,
 		 panel_username, panel_password_enc, purchase_date, expiry_date, renewal_cycle,
 		 auto_renewal, purchase_price, currency, status, agent_api_key_hash, agent_api_key_enc, http_probe_enabled, notes)
 		 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		s.Name, s.IPAddress, s.ServerType, s.OS, s.CustomerID, s.CPU, s.RAM, s.Disk, s.Bandwidth,
+		s.Name, s.IPAddress, s.ServerType, s.OS, s.CustomerID, s.CPUCores, s.RAMGB, s.DiskGB, s.Bandwidth,
 		s.ProviderID, s.Location, s.SSHPort, s.SSHUsername, sshPasswordEnc, s.PanelType, s.PanelURL,
 		s.PanelUsername, panelPasswordEnc, s.PurchaseDate, s.ExpiryDate, s.RenewalCycle,
 		s.AutoRenewal, s.PurchasePrice, s.Currency, s.Status, "", "", s.HTTPProbeEnabled, s.Notes,
@@ -356,12 +356,12 @@ func (h *ServerHandler) Update(c *gin.Context) {
 	}
 
 	query := `UPDATE servers SET name=?, ip_address=?, server_type=?, os=?, customer_id=?,
-		cpu=?, ram=?, disk=?, bandwidth=?, provider_id=?, location=?,
+		cpu_cores=?, ram_gb=?, disk_gb=?, bandwidth=?, provider_id=?, location=?,
 		ssh_port=?, ssh_username=?, panel_type=?, panel_url=?, panel_username=?,
 		purchase_date=?, expiry_date=?, renewal_cycle=?, auto_renewal=?,
 		purchase_price=?, currency=?, status=?, http_probe_enabled=?, notes=?, updated_at=CURRENT_TIMESTAMP`
 	args := []interface{}{s.Name, s.IPAddress, s.ServerType, s.OS, s.CustomerID,
-		s.CPU, s.RAM, s.Disk, s.Bandwidth, s.ProviderID, s.Location,
+		s.CPUCores, s.RAMGB, s.DiskGB, s.Bandwidth, s.ProviderID, s.Location,
 		s.SSHPort, s.SSHUsername, s.PanelType, s.PanelURL, s.PanelUsername,
 		s.PurchaseDate, s.ExpiryDate, s.RenewalCycle, s.AutoRenewal,
 		s.PurchasePrice, s.Currency, s.Status, s.HTTPProbeEnabled, s.Notes}

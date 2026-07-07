@@ -57,9 +57,9 @@ type Server struct {
 	OS                 string  `json:"os"`
 	CustomerID         *int64  `json:"customer_id"`
 	CustomerName       string  `json:"customer_name,omitempty"`
-	CPU                string  `json:"cpu"`
-	RAM                string  `json:"ram"`
-	Disk               string  `json:"disk"`
+	CPUCores           float64 `json:"cpu_cores"`
+	RAMGB              float64 `json:"ram_gb"`
+	DiskGB             float64 `json:"disk_gb"`
 	Bandwidth          string  `json:"bandwidth"`
 	ProviderID         *int64  `json:"provider_id"`
 	ProviderName       string  `json:"provider_name,omitempty"`
