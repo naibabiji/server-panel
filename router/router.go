@@ -53,6 +53,7 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 	// Agent routes
 	ag := r.Group("")
 	ag.Use(middleware.MaxBodyBytes(64 * 1024))
+	ag.Use(middleware.AgentIPRateLimit())
 	ag.Use(middleware.AgentAuth(db))
 	{
 		ah := &handlers.AgentDataHandler{DB: db}
