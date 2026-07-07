@@ -49,7 +49,7 @@
                 <div class="server-archive-title">配置规格</div>
                 <dl class="server-field-list">
                     <div class="server-field"><dt>CPU</dt><dd x-text="s.cpu||'--'"></dd></div>
-                    <div class="server-field"><dt>内存</dt><dd x-text="s.ram||'--'"></dd></div>
+                    <div class="server-field"><dt>内存</dt><dd x-text="s.ram ? (parseFloat(s.ram) < 1 ? Math.round(parseFloat(s.ram)*1024)+' MB' : s.ram) : '--'"></dd></div>
                     <div class="server-field"><dt>磁盘</dt><dd x-text="s.disk||'--'"></dd></div>
                     <div class="server-field"><dt>流量</dt><dd x-text="s.bandwidth||'--'"></dd></div>
                     <div class="server-field"><dt>状态</dt><dd><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></dd></div>

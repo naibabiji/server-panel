@@ -3,6 +3,12 @@
 <div x-data="serverForm()" x-init="init()" class="p-6 server-form-page">
     <style>
         .server-form-page { max-width: 1180px; }
+        .input-with-unit { position: relative; }
+        .input-with-unit .input-field { padding-right: 46px; }
+        .input-with-unit .unit {
+            position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+            color: #6b7280; font-size: 0.8rem; pointer-events: none; user-select: none;
+        }
         .server-form-card { padding: 0; overflow: hidden; }
         .server-form-grid { display: grid; grid-template-columns: 1fr; }
         .server-form-section { padding: 20px; border-bottom: 1px solid #202833; }
@@ -80,9 +86,13 @@
                 <div class="server-form-title">规格与计费</div>
                 <div class="server-form-fields">
                     <div class="server-form-fields compact">
-                        <div><label class="label">CPU</label><input type="text" x-model="form.cpu" class="input-field" placeholder="4C"></div>
-                        <div><label class="label">内存</label><input type="text" x-model="form.ram" class="input-field" placeholder="8GB"></div>
-                        <div><label class="label">磁盘</label><input type="text" x-model="form.disk" class="input-field" placeholder="80GB SSD"></div>
+                        <div><label class="label">CPU</label><div class="input-with-unit"><input type="number" min="0" step="1" x-model="form.cpu" class="input-field" placeholder="4"><span class="unit">核</span></div></div>
+                        <div>
+                            <label class="label">内存</label>
+                            <div class="input-with-unit"><input type="number" min="0" step="0.5" x-model="form.ram" class="input-field" placeholder="8"><span class="unit">GB</span></div>
+                            <div class="text-xs text-gray-500 mt-1" x-show="form.ram !== '' &amp;&amp; parseFloat(form.ram) > 0 &amp;&amp; parseFloat(form.ram) < 1" x-text="'≈ ' + Math.round(parseFloat(form.ram) * 1024) + ' MB'"></div>
+                        </div>
+                        <div><label class="label">磁盘</label><div class="input-with-unit"><input type="number" min="0" step="1" x-model="form.disk" class="input-field" placeholder="80"><span class="unit">GB</span></div></div>
                         <div><label class="label">流量</label><input type="text" x-model="form.bandwidth" class="input-field" placeholder="1TB/月"></div>
                     </div>
                     <div class="server-form-fields compact">
@@ -178,11 +188,13 @@ function serverForm() {
             if (last === 'edit') this.id = parts[parts.length-2];
             else if (last === 'new') {}
             else if (last && !['servers'].includes(last)) this.id = last;
-            if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
-            if (this.id) { this.isEdit = true; await this.load(); }
+            if (this.id) this.isEdit = true;
+            // 先加载下拉数据源，确保编辑回显时选项已存在，下拉才能正确选中
             try { const d = await api('/api/customers?page_size=100'); this.customers = d.data.items || []; } catch(e) {}
             try { const d = await api('/api/providers?page_size=100'); this.providers = d.data.items || []; } catch(e) {}
             try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]'); } catch(e) {}
+            if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
+            if (this.id) { await this.load(); }
         },
         async refreshCustomers(selectedID) {
             try {
@@ -216,8 +228,26 @@ function serverForm() {
                 showToast('服务商已创建','success');
             } catch(e) { showToast(e.message,'error'); }
         },
+        parseLeadingNumber(v) {
+            if (v === null || v === undefined || v === '') return '';
+            const m = String(v).match(/[\d.]+/);
+            return m ? m[0] : '';
+        },
         async load() {
-            try { const d = await api('/api/servers/'+this.id); const s = d.data; Object.keys(this.form).forEach(k => { if (s[k] !== undefined && s[k] !== null) this.form[k] = typeof s[k] === 'number' ? s[k].toString() : s[k]; }); } catch(e) {}
+            try {
+                const d = await api('/api/servers/'+this.id); const s = d.data;
+                Object.keys(this.form).forEach(k => {
+                    if (k === 'cpu' || k === 'ram' || k === 'disk') {
+                        this.form[k] = this.parseLeadingNumber(s[k]);
+                    } else if (s[k] !== undefined && s[k] !== null) {
+                        this.form[k] = typeof s[k] === 'number' ? s[k].toString() : s[k];
+                    }
+                });
+                // 保存的操作系统若不在当前 OS 列表中（自定义或已被移除），注入以便正确回显
+                if (this.form.os && !this.osList.includes(this.form.os)) {
+                    this.osList = [this.form.os, ...this.osList];
+                }
+            } catch(e) {}
         },
         async save() {
             this.saving = true;
@@ -230,6 +260,11 @@ function serverForm() {
                 payload.http_probe_enabled = parseInt(payload.http_probe_enabled) || 0;
                 payload.customer_id = payload.customer_id ? parseInt(payload.customer_id) : null;
                 payload.provider_id = payload.provider_id ? parseInt(payload.provider_id) : null;
+                // 规格：用户只填数字，按固定单位拼回存储格式（内存 0.5 即 0.5GB / 512MB）
+                payload.cpu = payload.cpu ? this.parseLeadingNumber(payload.cpu) + ' 核' : '';
+                const ramNum = payload.ram ? parseFloat(this.parseLeadingNumber(payload.ram)) : 0;
+                payload.ram = ramNum ? ramNum + ' GB' : '';
+                payload.disk = payload.disk ? this.parseLeadingNumber(payload.disk) + ' GB' : '';
                 // 密码字段：只在管理员填写时提交明文，由后端加密存储
                 if (!payload.ssh_password) delete payload.ssh_password;
                 if (!payload.panel_password) delete payload.panel_password;

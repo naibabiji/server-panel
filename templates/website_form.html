@@ -19,7 +19,10 @@
             </select>
         </div>
         <div>
-            <label class="label">所属客户</label>
+            <div class="flex items-center justify-between">
+                <label class="label">所属客户</label>
+                <button type="button" @click="quickAddCustomer()" class="text-xs text-blue-400 hover:text-blue-300">+ 新增客户</button>
+            </div>
             <select x-model="form.customer_id" class="input-field">
                 <option value="">-- 请选择 --</option>
                 <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
@@ -72,14 +75,45 @@ function websiteForm() {
             const last = parts[parts.length-1];
             if (last === 'edit') this.id = parts[parts.length-2];
             else if (last !== 'new') this.id = last;
-            if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
-            if (this.id) { this.isEdit = true; await this.load(); }
+            if (this.id) this.isEdit = true;
+            // 先加载下拉数据源，确保编辑回显时选项已存在，下拉才能正确选中
             try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {}
             try { const d = await api('/api/customers?page_size=100'); this.customers = d.data.items || []; } catch(e) {}
             try { const d = await api('/api/settings/site-type-list'); this.siteTypes = JSON.parse(d.data.svalue || '[]'); } catch(e) {}
+            if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
+            if (this.id) { await this.load(); }
         },
         async load() {
-            try { const d = await api('/api/websites/'+this.id); const w = d.data; Object.keys(this.form).forEach(k => { if (w[k] !== undefined && w[k] !== null) this.form[k] = w[k]; }); } catch(e) {}
+            try {
+                const d = await api('/api/websites/'+this.id); const w = d.data;
+                Object.keys(this.form).forEach(k => { if (w[k] !== undefined && w[k] !== null) this.form[k] = w[k]; });
+                // 若保存的引用不在当前下拉列表中（如已被删除），注入以便正确回显
+                if (w.customer_id && !this.customers.some(c => c.id === w.customer_id)) {
+                    this.customers = [{id: w.customer_id, name: '客户 #'+w.customer_id}, ...this.customers];
+                }
+                if (w.server_id && !this.servers.some(s => s.id === w.server_id)) {
+                    this.servers = [{id: w.server_id, name: '服务器 #'+w.server_id}, ...this.servers];
+                }
+                if (w.site_type && !this.siteTypes.includes(w.site_type)) {
+                    this.siteTypes = [w.site_type, ...this.siteTypes];
+                }
+            } catch(e) {}
+        },
+        async refreshCustomers(selectedID) {
+            try {
+                const d = await api('/api/customers?page_size=100');
+                this.customers = d.data.items || [];
+                if (selectedID !== undefined && selectedID !== null) this.form.customer_id = selectedID;
+            } catch(e) {}
+        },
+        async quickAddCustomer() {
+            const name = prompt('请输入客户名称:');
+            if (!name) return;
+            try {
+                const d = await api('/api/customers', {method:'POST', body:{name}});
+                await this.refreshCustomers(d.data.id);
+                showToast('客户已创建','success');
+            } catch(e) { showToast(e.message,'error'); }
         },
         async revealPanelPassword() {
             try {
