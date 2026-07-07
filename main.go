@@ -116,6 +116,7 @@ func main() {
 
 	executor.StartMetricCleanup(1 * time.Hour)
 	executor.StartHTTPProber(5 * time.Minute)
+	executor.StartAgentOfflineChecker(60 * time.Second)
 	executor.StartAlertChecker(60 * time.Second)
 	executor.StartAutoRenewalChecker(24 * time.Hour)
 	executor.InitNFTables(cfg.Panel.TLSPort)
@@ -145,12 +146,30 @@ func main() {
 			go func() {
 				addrChallenge := fmt.Sprintf(":%d", cfg.Panel.ACMEChallengePort)
 				log.Printf("ACME challenge server listening on %s", addrChallenge)
-				if err := http.ListenAndServe(addrChallenge, manager.HTTPHandler(nil)); err != nil {
+				challengeSrv := &http.Server{
+					Addr:              addrChallenge,
+					Handler:           manager.HTTPHandler(nil),
+					ReadHeaderTimeout: 15 * time.Second,
+					ReadTimeout:       30 * time.Second,
+					IdleTimeout:       2 * time.Minute,
+				}
+				if err := challengeSrv.ListenAndServe(); err != nil {
 					log.Printf("ACME challenge server error: %v", err)
 				}
 			}()
 			log.Printf("HTTPS server listening on %s (mode: acme, domain: %s)", addrTLS, cfg.Panel.Domain)
-			srv := &http.Server{Addr: addrTLS, Handler: r, TLSConfig: manager.TLSConfig()}
+			srv := &http.Server{
+				Addr:              addrTLS,
+				Handler:           r,
+				TLSConfig:         manager.TLSConfig(),
+				ReadHeaderTimeout: 15 * time.Second,
+				ReadTimeout:       60 * time.Second,
+				IdleTimeout:       2 * time.Minute,
+				// WriteTimeout intentionally unset: it bounds the whole
+				// request lifecycle including handler time, and the system
+				// package update endpoint runs "apt upgrade" synchronously
+				// for up to 2 hours (handlers/system_update.go).
+			}
 			if err := srv.ListenAndServeTLS("", ""); err != nil {
 				log.Printf("TLS server error: %v", err)
 			}
@@ -158,7 +177,15 @@ func main() {
 		}
 		if cfg.Panel.TLSPort > 0 && cfg.Panel.TLSCertPath != "" && cfg.Panel.TLSKeyPath != "" {
 			log.Printf("HTTPS server listening on %s (mode: %s)", addrTLS, cfg.Panel.TLSMode)
-			if err := r.RunTLS(addrTLS, cfg.Panel.TLSCertPath, cfg.Panel.TLSKeyPath); err != nil {
+			srv := &http.Server{
+				Addr:              addrTLS,
+				Handler:           r,
+				ReadHeaderTimeout: 15 * time.Second,
+				ReadTimeout:       60 * time.Second,
+				IdleTimeout:       2 * time.Minute,
+				// WriteTimeout intentionally unset, see comment above.
+			}
+			if err := srv.ListenAndServeTLS(cfg.Panel.TLSCertPath, cfg.Panel.TLSKeyPath); err != nil {
 				log.Printf("TLS server error: %v", err)
 			}
 		}
