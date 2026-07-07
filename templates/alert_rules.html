@@ -31,7 +31,7 @@
     </div>
 
     <!-- Add Rule Modal -->
-    <div class="modal-overlay" x-show="showModal" @click.self="showModal=false">
+    <div class="modal-overlay" x-show="showModal" x-cloak @click.self="showModal=false">
         <div class="modal-content">
             <h3 class="text-lg font-semibold text-purple-300 mb-4">添加告警规则</h3>
             <div class="space-y-3">
