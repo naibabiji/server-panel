@@ -297,7 +297,7 @@ func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 			return
 		}
 
-		c.Redirect(http.StatusFound, prefix+"/settings?view_password_required=1")
+		c.Redirect(http.StatusFound, prefix+"/settings?view_password_required=1#security")
 		c.Abort()
 	}
 }

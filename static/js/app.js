@@ -23,7 +23,7 @@ function api(path, options = {}) {
                 throw new Error('Service busy, please retry later');
             }
             if (resp.status === 428) {
-                window.location.href = prefix + '/settings?view_password_required=1';
+                window.location.href = prefix + '/settings?view_password_required=1#security';
                 throw new Error('请先设置查看密码');
             }
             const contentType = resp.headers.get('content-type') || '';
@@ -55,7 +55,7 @@ function api(path, options = {}) {
 
 function redirectToViewPasswordSettings() {
     const prefix = document.body.dataset.panelPrefix || '';
-    window.location.href = prefix + '/settings?view_password_required=1';
+    window.location.href = prefix + '/settings?view_password_required=1#security';
 }
 
 async function requireViewPasswordBeforeCreate() {
