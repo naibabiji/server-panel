@@ -210,7 +210,7 @@ remove_service_only() {
 }
 
 handle_existing_install() {
-    local mode reinstall_choice
+    local mode
 
     if [ ! -f "$CONFIG_FILE" ]; then
         return
@@ -220,7 +220,7 @@ handle_existing_install() {
     warn "检测到已有安装: $CONFIG_FILE"
     mode="${INSTALL_MODE:-}"
     case "$mode" in
-        upgrade)
+        ""|upgrade)
             upgrade_existing
             exit 0
             ;;
@@ -231,29 +231,9 @@ handle_existing_install() {
         exit)
             exit 0
             ;;
-        "")
-            ;;
         *)
             err "INSTALL_MODE 只能是 upgrade、reinstall 或 exit"
             ;;
-    esac
-
-    if [ ! -t 0 ]; then
-        err "当前通过管道运行，无法交互选择已有安装处理方式。请显式指定：
-  保留配置和数据库，仅升级二进制：
-    curl -fsSL https://raw.githubusercontent.com/${REPO}/master/install.sh | INSTALL_MODE=upgrade bash
-  重新生成配置和登录信息（保留数据库文件）：
-    curl -fsSL https://raw.githubusercontent.com/${REPO}/master/install.sh | INSTALL_MODE=reinstall bash"
-    fi
-
-    echo "  1) 升级/覆盖二进制（保留配置、数据库、证书）"
-    echo "  2) 重新生成配置（保留数据库文件，重置登录信息）"
-    echo "  3) 退出"
-    prompt reinstall_choice "请选择 [1-3]: " "3"
-    case "$reinstall_choice" in
-        1) upgrade_existing; exit 0 ;;
-        2) remove_service_only ;;
-        *) exit 0 ;;
     esac
 }
 
