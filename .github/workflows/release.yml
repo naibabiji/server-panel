@@ -46,7 +46,7 @@ jobs:
           GOOS: linux
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -trimpath -ldflags "-s -w" -o "dist/server-panel-agent-linux-${{ matrix.suffix }}" ./agent
+          go build -trimpath -ldflags "-s -w -X main.Version=${GITHUB_REF_NAME:-manual}" -o "dist/server-panel-agent-linux-${{ matrix.suffix }}" ./agent
 
       - name: Checksums
         run: |

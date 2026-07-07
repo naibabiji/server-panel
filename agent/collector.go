@@ -3,9 +3,9 @@ package main
 import (
 	"bufio"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 type MetricSnapshot struct {
@@ -108,28 +108,21 @@ func (s *MetricSnapshot) collectMemory() {
 }
 
 func (s *MetricSnapshot) collectDisk() {
-	out, err := exec.Command("df", "-B1", "-P", "/").Output()
-	if err != nil {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs("/", &stat); err != nil {
 		return
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) < 2 {
+	bsize := uint64(stat.Bsize)
+	total := stat.Blocks * bsize
+	free := stat.Bfree * bsize
+	if total == 0 {
 		return
 	}
-	fields := strings.Fields(lines[1])
-	if len(fields) < 6 {
-		return
-	}
+	used := total - free
 
-	total, _ := strconv.ParseInt(fields[1], 10, 64)
-	used, _ := strconv.ParseInt(fields[2], 10, 64)
-	if total <= 0 {
-		return
-	}
-
-	s.DiskTotal = total
-	s.DiskUsed = used
+	s.DiskTotal = int64(total)
+	s.DiskUsed = int64(used)
 	s.DiskPercent = float64(used) / float64(total) * 100
 }
 

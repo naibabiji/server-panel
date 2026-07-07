@@ -9,6 +9,10 @@ import (
 	"time"
 )
 
+// Version is injected at build time via -ldflags "-X main.Version=...",
+// matching the panel binary's own build (see .github/workflows/release.yml).
+var Version = "dev"
+
 func main() {
 	configPath := flag.String("config", "/etc/server-panel/agent.json", "配置文件路径")
 	flag.Parse()
@@ -42,7 +46,7 @@ func main() {
 
 func doReport(cfg *AgentConfig) {
 	snapshot := Collect()
-	if err := Report(cfg.CenterURL, cfg.APIKey, snapshot, cfg.TLSSkipVerify); err != nil {
+	if err := Report(cfg.CenterURL, cfg.APIKey, Version, snapshot, cfg.TLSSkipVerify); err != nil {
 		log.Printf("Report failed: %v", err)
 	} else {
 		log.Printf("Report OK — CPU: %.1f%%, MEM: %.1f%%, LOAD: %.2f",

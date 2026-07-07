@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-func Report(centerURL, apiKey string, snapshot *MetricSnapshot, skipVerify bool) error {
+func Report(centerURL, apiKey, version string, snapshot *MetricSnapshot, skipVerify bool) error {
 	payload := map[string]interface{}{
-		"agent_version":      "1.0.0",
+		"agent_version":      version,
 		"cpu_percent":        snapshot.CPUPercent,
 		"memory_percent":     snapshot.MemoryPercent,
 		"memory_used_bytes":  snapshot.MemoryUsed,
