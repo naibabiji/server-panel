@@ -71,7 +71,7 @@
                             <div class="sm:col-span-2"><label class="label">私钥路径</label><input type="text" x-model="tls.tls_key_path" class="input-field" disabled></div>
                         </div>
                         <div class="flex flex-wrap gap-2 mt-3">
-                            <button @click="saveTLS()" class="btn-primary text-sm">保存 TLS 配置</button>
+                            <button @click="saveTLS()" class="btn-primary text-sm">保存域名与 TLS 配置</button>
                             <button @click="issueSelfSigned()" class="btn-secondary text-sm">生成自签证书</button>
                         </div>
                         <div class="mt-4 border border-[#202833] bg-[#11151a] p-3">
@@ -368,7 +368,7 @@ function settingsPage() {
                 domain: (this.tls.domain || '').trim(),
                 acme_email: (this.tls.acme_email || '').trim()
             };
-            try { const d = await api('/api/settings/tls', {method:'PUT', body}); showToast(d.data.message || 'TLS 配置已保存','success'); } catch(e) { showToast(e.message,'error'); }
+            try { const d = await api('/api/settings/tls', {method:'PUT', body}); showToast(d.data.message || '域名与 TLS 配置已保存','success'); } catch(e) { showToast(e.message,'error'); }
         },
         async issueSelfSigned() {
             const ok = await confirmModal('生成新的自签证书后服务会自动重启生效，期间面板会短暂无法访问。确认继续？');
