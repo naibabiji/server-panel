@@ -236,33 +236,53 @@ func parseSpecGB(s string) float64 {
 
 // migrateServerSpecsToNumeric backfills the new cpu_cores/ram_gb/disk_gb
 // columns from the legacy free-text cpu/ram/disk columns, then drops the
-// legacy columns. It's safe to re-run: if the legacy columns are already
-// gone (e.g. a prior run got interrupted after the drop), it's a no-op.
+// legacy columns. Each legacy column is checked and migrated independently,
+// so it's safe to re-run even if a prior run was interrupted partway through
+// (e.g. after dropping "cpu" but before dropping "ram"/"disk") — it just
+// finishes whichever legacy columns are still present.
 func migrateServerSpecsToNumeric() error {
-	hasLegacy, err := columnExists("servers", "cpu")
+	if err := migrateServerSpecColumn("cpu", "cpu_cores", func(s string) float64 {
+		n, _ := parseSpecNumber(s)
+		return n
+	}); err != nil {
+		return err
+	}
+	if err := migrateServerSpecColumn("ram", "ram_gb", parseSpecGB); err != nil {
+		return err
+	}
+	if err := migrateServerSpecColumn("disk", "disk_gb", parseSpecGB); err != nil {
+		return err
+	}
+	return nil
+}
+
+// migrateServerSpecColumn backfills numericCol from legacyCol and drops
+// legacyCol. It's a no-op if legacyCol doesn't exist (already migrated).
+func migrateServerSpecColumn(legacyCol, numericCol string, convert func(string) float64) error {
+	exists, err := columnExists("servers", legacyCol)
 	if err != nil {
 		return err
 	}
-	if !hasLegacy {
+	if !exists {
 		return nil
 	}
 
-	rows, err := DB.Query(`SELECT id, cpu, ram, disk FROM servers`)
+	rows, err := DB.Query(fmt.Sprintf(`SELECT id, %s FROM servers`, legacyCol))
 	if err != nil {
 		return err
 	}
-	type legacySpec struct {
-		id             int64
-		cpu, ram, disk string
+	type legacyValue struct {
+		id  int64
+		val string
 	}
-	var specs []legacySpec
+	var values []legacyValue
 	for rows.Next() {
-		var sp legacySpec
-		if err := rows.Scan(&sp.id, &sp.cpu, &sp.ram, &sp.disk); err != nil {
+		var v legacyValue
+		if err := rows.Scan(&v.id, &v.val); err != nil {
 			rows.Close()
 			return err
 		}
-		specs = append(specs, sp)
+		values = append(values, v)
 	}
 	if err := rows.Err(); err != nil {
 		rows.Close()
@@ -270,24 +290,15 @@ func migrateServerSpecsToNumeric() error {
 	}
 	rows.Close()
 
-	for _, sp := range specs {
-		cpuCores, _ := parseSpecNumber(sp.cpu)
-		ramGB := parseSpecGB(sp.ram)
-		diskGB := parseSpecGB(sp.disk)
-		if _, err := DB.Exec(
-			`UPDATE servers SET cpu_cores = ?, ram_gb = ?, disk_gb = ? WHERE id = ?`,
-			cpuCores, ramGB, diskGB, sp.id,
-		); err != nil {
+	updateSQL := fmt.Sprintf(`UPDATE servers SET %s = ? WHERE id = ?`, numericCol)
+	for _, v := range values {
+		if _, err := DB.Exec(updateSQL, convert(v.val), v.id); err != nil {
 			return err
 		}
 	}
 
-	for _, col := range []string{"cpu", "ram", "disk"} {
-		if _, err := DB.Exec(`ALTER TABLE servers DROP COLUMN ` + col); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err = DB.Exec(`ALTER TABLE servers DROP COLUMN ` + legacyCol)
+	return err
 }
 
 func tableExists(name string) (bool, error) {

@@ -316,7 +316,7 @@ if [ -f /etc/server-panel/agent.json ]; then
   AGENT_URL="$(grep -o '"center_url":"[^"]*"' /etc/server-panel/agent.json | sed 's/"center_url":"//;s/"//')"
   AGENT_KEY="$(grep -o '"api_key":"[^"]*"' /etc/server-panel/agent.json | sed 's/"api_key":"//;s/"//')"
   CURL_INSECURE=""
-  grep -q '"tls_skip_verify":true' /etc/server-panel/agent.json && CURL_INSECURE="-k"
+  grep -Eq '"tls_skip_verify"[[:space:]]*:[[:space:]]*true' /etc/server-panel/agent.json && CURL_INSECURE="-k"
   if [ -n "$AGENT_URL" ] && [ -n "$AGENT_KEY" ]; then
     curl -fsS $CURL_INSECURE -X POST -H "X-Agent-API-Key: $AGENT_KEY" "\${AGENT_URL%/}/agent/uninstall" || true
   fi
