@@ -222,7 +222,10 @@ function passwordPromptModal(label, options = {}) {
         label,
         message: options.message || '',
         type: 'password',
-        autocomplete: options.autocomplete || 'current-password',
+        // new-password (not current-password) so Chrome/Firefox/Edge don't
+        // treat this as the site's login credential worth offering to save
+        // or autofill - it's a separate view-password passphrase.
+        autocomplete: options.autocomplete || 'new-password',
         placeholder: options.placeholder || '',
         confirmText: options.confirmText || '确认',
     });

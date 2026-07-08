@@ -350,12 +350,12 @@
                     </div>
                     <div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div><label class="label">BasicAuth 用户名</label><input type="text" x-model="acct.basic_username" class="input-field"></div>
-                            <div><label class="label">BasicAuth 新密码</label><input type="password" x-model="acct.basic_password" class="input-field" placeholder="留空不修改"></div>
-                            <div><label class="label">面板登录用户名</label><input type="text" x-model="acct.web_username" class="input-field"></div>
-                            <div><label class="label">当前面板密码</label><input type="password" x-model="acct.old_password" class="input-field"></div>
-                            <div><label class="label">面板新密码</label><input type="password" x-model="acct.web_password" class="input-field" placeholder="留空不修改"></div>
-                            <div><label class="label">确认新密码</label><input type="password" x-model="acct.web_password2" class="input-field"></div>
+                            <div><label class="label">BasicAuth 用户名</label><input type="text" x-model="acct.basic_username" class="input-field" autocomplete="off"></div>
+                            <div><label class="label">BasicAuth 新密码</label><input type="password" x-model="acct.basic_password" class="input-field" placeholder="留空不修改" autocomplete="new-password"></div>
+                            <div><label class="label">面板登录用户名</label><input type="text" x-model="acct.web_username" class="input-field" autocomplete="off"></div>
+                            <div><label class="label">当前面板密码</label><input type="password" x-model="acct.old_password" class="input-field" autocomplete="new-password"></div>
+                            <div><label class="label">面板新密码</label><input type="password" x-model="acct.web_password" class="input-field" placeholder="留空不修改" autocomplete="new-password"></div>
+                            <div><label class="label">确认新密码</label><input type="password" x-model="acct.web_password2" class="input-field" autocomplete="new-password"></div>
                         </div>
                         <div class="flex gap-2 mt-3"><button @click="saveAccount()" class="btn-primary text-sm">保存并重新登录</button></div>
                     </div>
@@ -377,8 +377,8 @@
                             <div><label class="label">SMTP 主机</label><input type="text" x-model="smtp.smtp_host" class="input-field"></div>
                             <div><label class="label">端口</label><input type="number" x-model="smtp.smtp_port" class="input-field"></div>
                             <div><label class="label">加密方式</label><select x-model="smtp.smtp_encryption" class="input-field"><option value="starttls">STARTTLS</option><option value="ssl">SSL</option><option value="none">无</option></select></div>
-                            <div><label class="label">发件账号</label><input type="text" x-model="smtp.smtp_user" class="input-field"></div>
-                            <div><label class="label">密码/授权码</label><input type="password" x-model="smtp.smtp_pass" class="input-field"></div>
+                            <div><label class="label">发件账号</label><input type="text" x-model="smtp.smtp_user" class="input-field" autocomplete="off"></div>
+                            <div><label class="label">密码/授权码</label><input type="password" x-model="smtp.smtp_pass" class="input-field" autocomplete="new-password"></div>
                             <div><label class="label">管理员邮箱</label><input type="email" x-model="smtp.admin_email" class="input-field"></div>
                         </div>
                         <div class="flex gap-2 mt-3"><button @click="saveSMTP()" class="btn-primary text-sm">保存 SMTP</button><button @click="testSMTP()" class="btn-secondary text-sm">发送测试邮件</button></div>
