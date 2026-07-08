@@ -49,7 +49,12 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 		return result, err
 	}
 
-	dir := filepath.Join(cfg.Panel.DataDir, "backups", "database")
+	dir, err := backupDirPath(cfg)
+	if err != nil {
+		setBackupStatus("failed", "", err.Error())
+		RecordOperationLog("database_backup", trigger, "failed", err.Error())
+		return result, err
+	}
 	dbPath, err := database.BackupDatabase(dir)
 	if err != nil {
 		setBackupStatus("failed", "", err.Error())
@@ -262,6 +267,13 @@ func setBackupStatus(status, runAt, errMsg string) {
 	if runAt != "" {
 		_, _ = db.Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('backup_last_run_at', ?)", runAt)
 	}
+}
+
+func backupDirPath(cfg *config.Config) (string, error) {
+	if cfg == nil {
+		return "", fmt.Errorf("配置未加载")
+	}
+	return filepath.Join(cfg.Panel.DataDir, "backups", "database"), nil
 }
 
 func formatBackupSize(bytes int64) string {

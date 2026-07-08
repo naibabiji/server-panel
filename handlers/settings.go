@@ -285,6 +285,67 @@ func (h *SettingsHandler) RunDatabaseBackup(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(result))
 }
 
+func (h *SettingsHandler) ListBackups(c *gin.Context) {
+	items, err := executor.ListDatabaseBackups()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取备份列表失败: "+err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, models.SuccessResponse(items))
+}
+
+func (h *SettingsHandler) DownloadBackup(c *gin.Context) {
+	filename := c.Query("file")
+	path, err := executor.ResolveBackupPath(filename)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的备份文件"))
+		return
+	}
+	c.FileAttachment(path, filepath.Base(path))
+}
+
+func (h *SettingsHandler) RestoreBackup(c *gin.Context) {
+	var req struct {
+		Filename string `json:"filename"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Filename) == "" {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("请提供备份文件名"))
+		return
+	}
+	if err := executor.ScheduleRestore(strings.TrimSpace(req.Filename)); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("恢复失败: "+err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
+		"message": "校验通过，面板将在数秒内自动重启并完成恢复，请勿关闭本页面",
+	}))
+}
+
+func (h *SettingsHandler) RestoreBackupUpload(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("请选择要上传的备份文件"))
+		return
+	}
+	if !strings.HasSuffix(strings.ToLower(fileHeader.Filename), ".tar.gz") {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("仅支持 .tar.gz 备份文件"))
+		return
+	}
+	filename, err := executor.SaveUploadedBackup(fileHeader)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("保存上传文件失败: "+err.Error()))
+		return
+	}
+	if err := executor.ScheduleRestore(filename); err != nil {
+		_ = executor.RemoveBackupFile(filename)
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("恢复失败: "+err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
+		"message": "上传校验通过，面板将在数秒内自动重启并完成恢复，请勿关闭本页面",
+	}))
+}
+
 // 账户安全（统一管理面板登录 + BasicAuth）
 func (h *SettingsHandler) sessionUser(c *gin.Context) string {
 	if u, ok := c.Get("session_username"); ok {

@@ -215,6 +215,7 @@
                         <div class="flex flex-wrap gap-2 mt-3">
                             <button @click="saveBackup()" class="btn-primary text-sm">保存备份设置</button>
                             <button @click="runBackup()" class="btn-secondary text-sm" :disabled="backupRun.running">立即备份</button>
+                            <button @click="openBackupList()" class="btn-secondary text-sm">备份列表</button>
                         </div>
                     </div>
                 </div>
@@ -235,19 +236,60 @@
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-t border-[#202833]">
                     <div>
                         <div class="text-sm font-semibold text-gray-100 mb-1">恢复备份</div>
-                        <div class="text-sm text-gray-500 leading-6">用于服务器/面板重装后的灾难恢复，只能在命令行操作。</div>
+                        <div class="text-sm text-gray-500 leading-6">可直接从已有本地备份或上传的备份文件（.tar.gz）恢复数据库和密钥。恢复前会自动把当前数据库和密钥另存为 <code class="text-gray-400">.pre-restore</code> 备份，恢复过程中面板会自动重启。</div>
                     </div>
                     <div class="text-sm text-gray-400 leading-6">
-                        <ol class="list-decimal list-inside space-y-1">
+                        <div>从已有本地备份恢复：打开「<button type="button" @click="openBackupList()" class="text-purple-300 underline">备份列表</button>」，选择要恢复的文件。</div>
+                        <div class="border-t border-[#202833] pt-3 mt-3">
+                            <div class="mb-2">或上传备份文件恢复：</div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <input type="file" accept=".gz,.tar.gz" @change="restoreUpload.file = $event.target.files[0]" class="input-field text-xs">
+                                <button @click="uploadRestore()" class="btn-danger text-sm" :disabled="restoreUpload.uploading">上传并恢复</button>
+                            </div>
+                        </div>
+                        <div class="border border-[#202833] bg-[#11151a] p-3 mt-3" x-show="restoreRun.running || restoreRun.message">
+                            <div class="text-sm" :class="restoreRun.running ? 'text-gray-300' : 'text-green-400'" x-text="restoreRun.message"></div>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-3">如果面板服务本身无法启动（例如重装系统后的灾难恢复），可改用命令行：</div>
+                        <ol class="list-decimal list-inside space-y-1 mt-1">
                             <li>把备份文件（.tar.gz）传到新服务器上</li>
                             <li>停止面板服务：<code class="text-purple-300">systemctl stop server-panel</code></li>
                             <li>执行恢复：<code class="text-purple-300">server-panel -config &lt;配置文件路径&gt; -restore-backup=&lt;备份文件路径&gt;</code></li>
                             <li>重新启动服务：<code class="text-purple-300">systemctl start server-panel</code></li>
                         </ol>
-                        <div class="text-xs text-gray-500 mt-2">恢复前会自动把当前数据库和密钥另存为 <code class="text-gray-400">.pre-restore</code> 备份，不会直接覆盖丢失。</div>
                     </div>
                 </div>
             </section>
+
+            <div x-show="backupListModalOpen" class="modal-overlay" x-cloak>
+                <div class="modal-content max-w-3xl">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                            <div class="text-base font-semibold text-gray-100">备份列表</div>
+                            <div class="text-xs text-gray-500 mt-1" x-text="'共 ' + backupList.length + ' 份本地备份'"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="loadBackupList()" class="btn-secondary text-sm">刷新</button>
+                            <button @click="backupListModalOpen=false" class="btn-secondary text-sm">关闭</button>
+                        </div>
+                    </div>
+                    <div class="space-y-2 max-h-[60vh] overflow-y-auto">
+                        <template x-for="item in backupList" :key="item.filename">
+                            <div class="border border-[#202833] bg-[#11151a] p-3 flex flex-wrap items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="text-sm text-gray-200 break-all" x-text="item.filename"></div>
+                                    <div class="text-xs text-gray-500 mt-1" x-text="item.mod_time + ' · ' + item.size_human"></div>
+                                </div>
+                                <div class="flex gap-2 shrink-0">
+                                    <a :href="backupDownloadUrl(item.filename)" class="btn-secondary text-xs">下载</a>
+                                    <button @click="restoreExisting(item.filename)" class="btn-danger text-xs">恢复此备份</button>
+                                </div>
+                            </div>
+                        </template>
+                        <div class="text-sm text-gray-500 py-8 text-center" x-show="backupList.length === 0">暂无本地备份</div>
+                    </div>
+                </div>
+            </div>
 
             <div x-show="opLogModalOpen" class="modal-overlay" x-cloak>
                 <div class="modal-content max-w-5xl">
@@ -379,6 +421,10 @@ function settingsPage() {
         autoUpdate: { enabled:false, mode:'patch_only', window:'03:00-05:00', release_delay_minutes:'15', signature_timeout_minutes:'120', last_check_at:'', last_status:'', last_error:'', last_success_at:'', last_success_version:'' },
         backup: { auto_enabled:false, frequency:'weekly', email_enabled:false, keep_count:'10', max_email_mb:'20', last_run_at:'', last_status:'', last_error:'', admin_email:'' },
         backupRun: { running:false, message:'', status:'', filename:'', size_human:'', email_sent:false, email_skipped_reason:'' },
+        backupListModalOpen: false,
+        backupList: [],
+        restoreUpload: { file:null, uploading:false },
+        restoreRun: { running:false, message:'' },
         sysUpdate: { packages:[], count:0, checking:false, updating:false, output:'' },
         opLogs: { items:[], total:0, page:1, page_size:20 },
         opLogModalOpen: false,
@@ -617,6 +663,72 @@ function settingsPage() {
         },
         formatBackupTime(value) {
             return fmtTime(value);
+        },
+        backupDownloadUrl(filename) {
+            const prefix = document.body.dataset.panelPrefix || '';
+            return prefix + '/api/settings/backup/download?file=' + encodeURIComponent(filename);
+        },
+        async openBackupList() {
+            this.backupListModalOpen = true;
+            try { await this.loadBackupList(); } catch(e) { showToast(e.message,'error'); }
+        },
+        async loadBackupList() {
+            const d = await api('/api/settings/backup/list');
+            this.backupList = d.data || [];
+        },
+        async restoreExisting(filename) {
+            const ok = await confirmModal(`确认从 ${filename} 恢复吗？这会覆盖当前数据库和已保存的加密凭据，恢复过程中面板会自动重启。确认继续？`);
+            if (!ok) return;
+            try {
+                const d = await api('/api/settings/backup/restore', {method:'POST', body:{filename}});
+                showToast(d.data.message || '已安排恢复','success');
+                this.backupListModalOpen = false;
+                this._waitForRestoreRestart();
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        async uploadRestore() {
+            const file = this.restoreUpload.file;
+            if (!file) { showToast('请选择备份文件','error'); return; }
+            const ok = await confirmModal(`确认上传并从 ${file.name} 恢复吗？这会覆盖当前数据库和已保存的加密凭据，恢复过程中面板会自动重启。确认继续？`);
+            if (!ok) return;
+            const formData = new FormData();
+            formData.append('file', file);
+            this.restoreUpload.uploading = true;
+            try {
+                const d = await api('/api/settings/backup/restore-upload', {method:'POST', body: formData});
+                showToast(d.data.message || '已安排恢复','success');
+                this.restoreUpload.file = null;
+                this._waitForRestoreRestart();
+            } catch(e) {
+                showToast(e.message,'error');
+            } finally {
+                this.restoreUpload.uploading = false;
+            }
+        },
+        _waitForRestoreRestart() {
+            if (this._restoreTimer) clearInterval(this._restoreTimer);
+            this.restoreRun = { running:true, message:'面板正在重启并恢复中，请稍候...' };
+            let attempts = 0;
+            // 先等待一小段时间再开始轮询：调度恢复后面板会延迟 ~800ms 才真正
+            // 重启，太早轮询 /healthz 会打到还没重启的旧进程，误判为已恢复。
+            setTimeout(() => {
+                this._restoreTimer = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const resp = await fetch('/healthz', {cache:'no-store'});
+                        if (resp.ok) {
+                            clearInterval(this._restoreTimer);
+                            location.reload();
+                            return;
+                        }
+                    } catch(e) {}
+                    if (attempts >= 120) {
+                        clearInterval(this._restoreTimer);
+                        this.restoreRun.running = false;
+                        this.restoreRun.message = '面板重启超时，请手动刷新页面确认状态';
+                    }
+                }, 1000);
+            }, 2000);
         },
         async checkSysUpdate() {
             this.sysUpdate.checking = true;

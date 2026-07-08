@@ -75,6 +75,10 @@ func main() {
 	os.MkdirAll(cfg.Panel.DataDir, 0700)
 	os.MkdirAll(cfg.Panel.LogDir, 0700)
 
+	if err := applyPendingRestoreIfAny(cfg); err != nil {
+		log.Fatalf("恢复备份失败: %v", err)
+	}
+
 	if *restoreBackup != "" {
 		if err := runRestoreBackup(cfg, *restoreBackup); err != nil {
 			log.Fatalf("恢复备份失败: %v", err)
@@ -206,6 +210,20 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-quit
 	log.Printf("Received signal %v, shutting down...", sig)
+}
+
+// applyPendingRestoreIfAny checks for a restore scheduled from the web UI
+// (executor.ScheduleRestore, triggered by settings.html's backup list/upload
+// restore buttons) and applies it before the database is opened. Must run on
+// every normal boot, since RestartPanelService()'s systemctl restart is what
+// actually re-invokes this binary after the marker is written.
+func applyPendingRestoreIfAny(cfg *config.Config) error {
+	archivePath, ok := executor.ConsumePendingRestore()
+	if !ok {
+		return nil
+	}
+	fmt.Printf("检测到待处理的恢复请求，正在从 %s 恢复...\n", archivePath)
+	return runRestoreBackup(cfg, archivePath)
 }
 
 // runRestoreBackup restores a database.CreateFullBackupArchive backup onto
