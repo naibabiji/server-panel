@@ -254,11 +254,10 @@ func runRestoreBackup(cfg *config.Config, archivePath string) error {
 		fmt.Printf("当前密钥已另存为 %s\n", liveSecretKeyPath+preRestoreSuffix)
 	}
 
-	// Apply the secret key before touching the database: a plain file write
-	// has no atomicity guarantee, so if it fails we want to bail out while
-	// the live db/key are still untouched, rather than after the db has
-	// already been swapped to a new file that a leftover stale key can't
-	// decrypt.
+	// Apply the secret key before touching the database, so a failure here
+	// (copyFile/os.Remove) leaves both live files exactly as they were,
+	// rather than pairing an already-swapped-in new db with a stale key
+	// that can't decrypt it.
 	if secretKeyPath != "" {
 		if err := copyFile(secretKeyPath, liveSecretKeyPath); err != nil {
 			return fmt.Errorf("写入密钥失败: %w", err)
@@ -298,12 +297,29 @@ func runRestoreBackup(cfg *config.Config, archivePath string) error {
 	return nil
 }
 
+// copyFile copies src to dst by writing to a temporary file in dst's
+// directory and renaming it into place. Every caller here overwrites either
+// a live file the panel depends on, or a .pre-restore copy a later rollback
+// may depend on, so a plain os.WriteFile(dst, ...) is not safe: it opens
+// dst with O_TRUNC, and a disk-full or I/O error partway through the write
+// leaves dst truncated/corrupted rather than in its original state. The
+// rename is atomic, so dst always ends up either fully replaced or
+// untouched.
 func copyFile(src, dst string) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0600)
+	tmp := fmt.Sprintf("%s.tmp.%d", dst, time.Now().UnixNano())
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 // restoreLiveSecretKey undoes whatever runRestoreBackup's secret-key step

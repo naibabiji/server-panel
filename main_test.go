@@ -27,6 +27,43 @@ func newMinimalBackupDB(t *testing.T, path string) {
 	}
 }
 
+func TestCopyFileLeavesDestinationUntouchedOnWriteFailure(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src")
+	if err := os.WriteFile(src, []byte("new content"), 0600); err != nil {
+		t.Fatalf("write src: %v", err)
+	}
+
+	dstDir := filepath.Join(dir, "dstdir")
+	if err := os.Mkdir(dstDir, 0700); err != nil {
+		t.Fatalf("mkdir dstdir: %v", err)
+	}
+	dst := filepath.Join(dstDir, "dst")
+	if err := os.WriteFile(dst, []byte("original content"), 0600); err != nil {
+		t.Fatalf("write dst: %v", err)
+	}
+
+	// Read-only directory: copyFile can't create its temp file, so the
+	// existing dst must survive completely unmodified - not truncated by
+	// an in-place os.WriteFile(dst, ...).
+	if err := os.Chmod(dstDir, 0500); err != nil {
+		t.Fatalf("chmod dstdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dstDir, 0700) })
+
+	if err := copyFile(src, dst); err == nil {
+		t.Fatal("expected copyFile to fail when its directory is read-only")
+	}
+
+	data, err := os.ReadFile(dst)
+	if err != nil {
+		t.Fatalf("read dst after failed copy: %v", err)
+	}
+	if string(data) != "original content" {
+		t.Errorf("dst after failed copy = %q, want untouched %q", data, "original content")
+	}
+}
+
 func TestRunRestoreBackupRemovesStaleKeyWhenArchiveHasNone(t *testing.T) {
 	srcDir := t.TempDir()
 	dbPath := filepath.Join(srcDir, "server-panel.db")
