@@ -317,45 +317,50 @@ function niceLoadAxisMax(values) {
     return Math.ceil(target / step) * step;
 }
 
-function makeChart(canvasId, label, color) {
+// compact renders a minimal "sparkline" (no axes/legend, thin line, no
+// points) for tight spaces like the Dashboard's per-metric cards, instead
+// of the full interactive chart templates/monitor_detail.html uses - same
+// data, same shared function, just a different presentation.
+function makeChart(canvasId, label, color, compact) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return null;
     return new Chart(ctx, {
         type: 'line',
         data: { labels: [], datasets: [{
             label, data: [],
-            borderColor: color, borderWidth: 2, tension: 0.3,
+            borderColor: color, borderWidth: compact ? 1.5 : 2, tension: 0.3,
             fill: true, backgroundColor: hexToRGBA(color, 0.12),
-            pointRadius: (c) => c.dataIndex === c.dataset.data.length - 1 ? 4 : 0,
-            pointHoverRadius: 5, pointHitRadius: 12,
+            pointRadius: compact ? 0 : (c) => c.dataIndex === c.dataset.data.length - 1 ? 4 : 0,
+            pointHoverRadius: compact ? 0 : 5, pointHitRadius: compact ? 0 : 12,
             pointBackgroundColor: color, pointBorderColor: '#171b21', pointBorderWidth: 2
         }] },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
+            layout: compact ? { padding: 0 } : undefined,
             plugins: {
-                legend: { labels: { color: '#a1a1aa', font: { size: 11 } } },
-                tooltip: {
+                legend: { display: !compact, labels: { color: '#a1a1aa', font: { size: 11 } } },
+                tooltip: compact ? { enabled: false } : {
                     backgroundColor: '#11151a', borderColor: '#2a3038', borderWidth: 1,
                     titleColor: '#e5e7eb', bodyColor: '#e5e7eb', padding: 10, displayColors: false
                 }
             },
             scales: {
-                x: { ticks: { color: '#52525b', maxTicksLimit: 10 }, grid: { color: '#27272a' } },
-                y: { ticks: { color: '#52525b' }, grid: { color: '#27272a' }, beginAtZero: true }
+                x: { display: !compact, ticks: { color: '#52525b', maxTicksLimit: 10 }, grid: { color: '#27272a' } },
+                y: { display: !compact, ticks: { color: '#52525b' }, grid: { color: '#27272a' }, beginAtZero: true }
             }
         }
     });
 }
 
-function updateCharts(points) {
+function updateCharts(points, compact) {
     destroyCharts();
     if (!points || !points.length) return;
 
     const labels = points.map(p => fmtTime(p.t));
 
-    charts.cpu = makeChart('cpuChart', 'CPU %', '#a78bfa');
+    charts.cpu = makeChart('cpuChart', 'CPU %', '#a78bfa', compact);
     if (charts.cpu) {
         const data = points.map(p => p.cpu);
         charts.cpu.data.labels = labels;
@@ -365,7 +370,7 @@ function updateCharts(points) {
         charts.cpu.update();
     }
 
-    charts.mem = makeChart('memChart', 'Memory %', '#4ade80');
+    charts.mem = makeChart('memChart', 'Memory %', '#4ade80', compact);
     if (charts.mem) {
         const data = points.map(p => p.mem);
         charts.mem.data.labels = labels;
@@ -375,7 +380,7 @@ function updateCharts(points) {
         charts.mem.update();
     }
 
-    charts.load = makeChart('loadChart', 'Load 1m', '#fbbf24');
+    charts.load = makeChart('loadChart', 'Load 1m', '#fbbf24', compact);
     if (charts.load) {
         const data = points.map(p => p.load1);
         charts.load.data.labels = labels;
