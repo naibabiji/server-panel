@@ -221,11 +221,12 @@ function passwordPromptModal(label, options = {}) {
         title: options.title || '密码验证',
         label,
         message: options.message || '',
-        type: 'password',
-        // new-password (not current-password) so Chrome/Firefox/Edge don't
-        // treat this as the site's login credential worth offering to save
-        // or autofill - it's a separate view-password passphrase.
-        autocomplete: options.autocomplete || 'new-password',
+        // type=text, not password: this is the panel's last line of
+        // defense (it gates decrypting every other saved secret), so it
+        // must never be offered to the browser's password manager to
+        // remember or autofill - only ever typed in by hand.
+        type: 'text',
+        autocomplete: options.autocomplete || 'off',
         placeholder: options.placeholder || '',
         confirmText: options.confirmText || '确认',
     });

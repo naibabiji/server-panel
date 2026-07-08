@@ -46,7 +46,7 @@
                     <label class="label">面板密码</label>
                     <button type="button" @click="revealPanelPassword()" class="text-xs text-blue-400 hover:text-blue-300" x-show="isEdit">查看已保存密码</button>
                 </div>
-                <input type="password" x-model="form.panel_password" class="input-field" placeholder="（留空则不修改）" autocomplete="new-password">
+                <input type="text" x-model="form.panel_password" class="input-field" placeholder="（留空则不修改）" autocomplete="off">
                 <code class="block text-xs text-green-200 break-all mt-2" x-show="panelPassword" x-text="panelPassword"></code>
             </div>
         </div>
