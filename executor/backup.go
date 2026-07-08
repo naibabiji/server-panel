@@ -12,6 +12,7 @@ import (
 
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/timeutil"
 )
 
 const (
@@ -113,7 +114,7 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 		result.Message += "，但" + strings.Join(warnings, "；")
 	}
 
-	setBackupStatus(result.Status, time.Now().Format(time.RFC3339), strings.Join(warnings, "；"))
+	setBackupStatus(result.Status, timeutil.NowDisplay(), strings.Join(warnings, "；"))
 	RecordOperationLog("database_backup", trigger, result.Status, result.Message)
 	return result, nil
 }
@@ -158,7 +159,11 @@ func autoBackupDue(now time.Time, lastRun, frequency string) bool {
 	if strings.TrimSpace(lastRun) == "" {
 		return true
 	}
-	last, err := time.Parse(time.RFC3339, lastRun)
+	last, err := time.ParseInLocation(timeutil.DisplayLayout, lastRun, time.UTC)
+	if err != nil {
+		// 兼容历史存储的 RFC3339 值。
+		last, err = time.Parse(time.RFC3339, lastRun)
+	}
 	if err != nil {
 		return true
 	}
@@ -185,7 +190,7 @@ func sendDatabaseBackupEmail(result DatabaseBackupResult) (string, error) {
 		return "", fmt.Errorf("读取备份文件失败: %w", err)
 	}
 	body := fmt.Sprintf("Server Panel 备份已生成，附件包含数据库和密钥（server-panel.db + secret.key）。\n\n文件名：%s\n大小：%s\n生成时间：%s\n\n此附件可解密面板中保存的所有敏感信息，请妥善保存，不要转发给无关人员。",
-		result.Filename, result.SizeHuman, time.Now().Format("2006-01-02 15:04:05"))
+		result.Filename, result.SizeHuman, timeutil.NowDisplay())
 	err = SendMailWithAttachments("", "Server Panel 备份", body, []MailAttachment{{
 		Filename:    result.Filename,
 		ContentType: "application/gzip",

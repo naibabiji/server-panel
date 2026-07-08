@@ -103,7 +103,16 @@ function formatBytes(bytes) {
 
 function fmtTime(t) {
     if (!t) return '--';
-    return new Date(t.replace(' ', 'T')).toLocaleString('zh-CN');
+    let s = String(t).trim();
+    // 归一化为带时区的 ISO：无时区后缀则按 UTC 处理，避免被浏览器当作本地时间。
+    if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(s)) {
+        s = s.replace(' ', 'T') + 'Z';
+    }
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '--';
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} `
+         + `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 }
 
 function formatUptime(seconds) {

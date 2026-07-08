@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/naibabiji/server-panel/timeutil"
 )
 
 func AgentAuth(db *sql.DB) gin.HandlerFunc {
@@ -54,7 +55,7 @@ func AgentAuth(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		now := time.Now().UTC().Format("2006-01-02 15:04:05")
+		now := timeutil.NowDisplay()
 		_, _ = db.Exec(
 			"UPDATE servers SET last_seen_at = ?, is_online = 1 WHERE id = ?",
 			now, serverID,

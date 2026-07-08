@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/timeutil"
 )
 
 func StartHTTPProber(fallbackInterval time.Duration) {
@@ -69,7 +70,7 @@ func runProbe() {
 		}
 	}
 
-	now := time.Now().UTC().Format("2006-01-02 15:04:05")
+	now := timeutil.NowDisplay()
 	for _, serverID := range serverIDs {
 		domain := pickRandomDomain(db, serverID)
 		if domain == "" {

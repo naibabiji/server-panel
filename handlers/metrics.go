@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
 	"github.com/naibabiji/server-panel/models"
+	"github.com/naibabiji/server-panel/timeutil"
 )
 
 type MetricsHandler struct {
@@ -145,7 +146,7 @@ func (h *MetricsHandler) GetServerMetrics(c *gin.Context) {
 		`SELECT recorded_at, cpu_percent, memory_percent, disk_percent, load_avg_1, load_avg_5, load_avg_15,
 		 net_rx_bytes, net_tx_bytes
 		 FROM metrics WHERE server_id = ? AND recorded_at >= ? ORDER BY recorded_at`,
-		serverID, since.Format("2006-01-02 15:04:05"))
+		serverID, timeutil.Display(since))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
 		return
@@ -234,14 +235,14 @@ func bucketMetricPoints(points []MetricPoint, bucketMinutes int) []MetricPoint {
 	order := []int64{}
 
 	for _, p := range points {
-		t, err := time.ParseInLocation("2006-01-02 15:04:05", p.Time, time.Local)
+		t, err := time.ParseInLocation("2006-01-02 15:04:05", p.Time, time.UTC)
 		if err != nil {
 			continue
 		}
 		key := (t.Unix() / bucketSeconds) * bucketSeconds
 		b, ok := buckets[key]
 		if !ok {
-			b = &metricBucket{point: MetricPoint{Time: time.Unix(key, 0).Format("2006-01-02 15:04:05")}}
+			b = &metricBucket{point: MetricPoint{Time: timeutil.Display(time.Unix(key, 0))}}
 			buckets[key] = b
 			order = append(order, key)
 		}

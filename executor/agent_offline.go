@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/timeutil"
 )
 
 // agentOfflineThreshold is how long a server can go without a metrics report
@@ -31,7 +32,7 @@ func markStaleAgentsOffline() {
 	if db == nil {
 		return
 	}
-	cutoff := time.Now().UTC().Add(-agentOfflineThreshold).Format("2006-01-02 15:04:05")
+	cutoff := timeutil.Display(time.Now().Add(-agentOfflineThreshold))
 	if _, err := db.Exec(
 		`UPDATE servers SET is_online = 0
 		 WHERE is_online = 1 AND last_seen_at IS NOT NULL AND last_seen_at < ?`,

@@ -41,7 +41,7 @@ function monitorPage() {
             try {
                 const d = await api('/api/monitor/overview');
                 this.servers = d.data || [];
-                this.lastUpdate = new Date().toLocaleTimeString('zh-CN');
+                this.lastUpdate = fmtTime(new Date().toISOString());
             } catch(e) {}
             this.loading = false;
         }

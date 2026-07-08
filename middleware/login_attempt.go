@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/naibabiji/server-panel/executor"
+	"github.com/naibabiji/server-panel/timeutil"
 )
 
 type LoginAttemptTracker struct {
@@ -57,7 +58,7 @@ func (t *LoginAttemptTracker) IsBanned(ip string) bool {
 
 func (t *LoginAttemptTracker) countRecent(ip string) int {
 	var count int
-	cutoff := time.Now().UTC().Add(-t.AttemptWindow).Format("2006-01-02 15:04:05")
+	cutoff := timeutil.Display(time.Now().Add(-t.AttemptWindow))
 	err := t.DB.QueryRow(
 		`SELECT COUNT(*) FROM login_attempts
 		 WHERE ip_address = ? AND created_at > ?`,
@@ -75,6 +76,6 @@ func (t *LoginAttemptTracker) banIP(ip string, attemptType string) {
 }
 
 func (t *LoginAttemptTracker) CleanupOldAttempts() {
-	cutoff := time.Now().UTC().Add(-t.AttemptWindow).Format("2006-01-02 15:04:05")
+	cutoff := timeutil.Display(time.Now().Add(-t.AttemptWindow))
 	_, _ = t.DB.Exec("DELETE FROM login_attempts WHERE created_at < ?", cutoff)
 }

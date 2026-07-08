@@ -99,10 +99,7 @@ function updateCharts(points) {
     destroyCharts();
     if (!points || !points.length) return;
 
-    const labels = points.map(p => {
-        const d = new Date(p.t.replace(' ', 'T'));
-        return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-    });
+    const labels = points.map(p => fmtTime(p.t));
 
     charts.cpu = makeChart('cpuChart', 'CPU %', '#a78bfa');
     if (charts.cpu) {
