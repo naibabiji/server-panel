@@ -32,6 +32,13 @@
   }
   .input-field {
     @apply w-full bg-[#11151a] border border-[#323943] rounded-none px-3 py-2 text-gray-100 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500;
+    /* Native date/select popups otherwise render with the browser's light
+       default palette, making the date input's calendar icon nearly
+       invisible against this dark theme. */
+    color-scheme: dark;
+  }
+  .input-field[type="date"] {
+    @apply cursor-pointer;
   }
   .label {
     @apply block text-sm font-medium text-gray-400 mb-1;
