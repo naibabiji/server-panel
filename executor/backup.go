@@ -75,13 +75,15 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 	result.Status = "success"
 	result.Message = "数据库备份已生成"
 
+	var warnings []string
+
 	keepCount := backupSettingInt("backup_keep_count", backupDefaultKeepCount)
 	if keepCount < 1 {
 		keepCount = backupDefaultKeepCount
 	}
 	if err := pruneDatabaseBackups(dir, keepCount); err != nil {
 		result.Status = "warning"
-		result.Message = "数据库备份已生成，但清理旧备份失败: " + err.Error()
+		warnings = append(warnings, "清理旧备份失败: "+err.Error())
 	}
 
 	if emailEnabled {
@@ -89,16 +91,18 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 		if emailErr != nil {
 			result.Status = "warning"
 			result.EmailSkippedReason = emailErr.Error()
-			if result.Message == "" || result.Message == "数据库备份已生成" {
-				result.Message = "数据库备份已生成，但邮件未发送: " + emailErr.Error()
-			}
+			warnings = append(warnings, "邮件未发送: "+emailErr.Error())
 		} else if emailStatus != "" {
 			result.EmailSent = true
 			result.Message = emailStatus
 		}
 	}
 
-	setBackupStatus(result.Status, time.Now().Format(time.RFC3339), result.EmailSkippedReason)
+	if len(warnings) > 0 {
+		result.Message += "，但" + strings.Join(warnings, "；")
+	}
+
+	setBackupStatus(result.Status, time.Now().Format(time.RFC3339), strings.Join(warnings, "；"))
 	RecordOperationLog("database_backup", trigger, result.Status, result.Message)
 	return result, nil
 }
