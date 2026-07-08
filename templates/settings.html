@@ -185,7 +185,7 @@
             <section id="backup" class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">备份</div>
-                    <div class="text-sm text-gray-500 mt-1">生成面板 SQLite 数据库快照，可选发送到管理员邮箱。</div>
+                    <div class="text-sm text-gray-500 mt-1">生成数据库和密钥的打包备份（.tar.gz），可选发送到管理员邮箱。密钥用于解密已保存的服务器/网站密码，不包含在内的话恢复后这些密码将无法解密。</div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                     <div>
@@ -230,6 +230,21 @@
                             <div>大小：<span x-text="backupRun.size_human"></span></div>
                             <div>邮件：<span x-text="backupRun.email_sent ? '已发送' : (backupRun.email_skipped_reason || '未发送')"></span></div>
                         </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-t border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">恢复备份</div>
+                        <div class="text-sm text-gray-500 leading-6">用于服务器/面板重装后的灾难恢复，只能在命令行操作。</div>
+                    </div>
+                    <div class="text-sm text-gray-400 leading-6">
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>把备份文件（.tar.gz）传到新服务器上</li>
+                            <li>停止面板服务：<code class="text-purple-300">systemctl stop server-panel</code></li>
+                            <li>执行恢复：<code class="text-purple-300">server-panel -config &lt;配置文件路径&gt; -restore-backup=&lt;备份文件路径&gt;</code></li>
+                            <li>重新启动服务：<code class="text-purple-300">systemctl start server-panel</code></li>
+                        </ol>
+                        <div class="text-xs text-gray-500 mt-2">恢复前会自动把当前数据库和密钥另存为 <code class="text-gray-400">.pre-restore</code> 备份，不会直接覆盖丢失。</div>
                     </div>
                 </div>
             </section>
@@ -394,7 +409,7 @@ function settingsPage() {
                     };
                 } catch(e) {} })(),
                 this.loadBackup().catch(() => {}),
-                this.checkUpdate().catch(() => {}),
+                this.checkUpdate(true).catch(() => {}),
                 this.checkSysUpdate().catch(() => {}),
             ]);
         },
@@ -458,7 +473,7 @@ function settingsPage() {
                 showToast(d.data.message || '证书已上传','success');
             } catch(e) { showToast(e.message,'error'); }
         },
-        async checkUpdate() {
+        async checkUpdate(silent = false) {
             this.update.checking = true;
             try {
                 const d = await api('/api/update/check');
@@ -466,6 +481,9 @@ function settingsPage() {
                 this.update.hasUpdate = d.data.has_update;
                 this.update.latestVersion = d.data.latest_version;
                 this.update.releaseNotes = d.data.release_notes;
+                if (!silent && !this.update.hasUpdate) {
+                    showToast('已是最新版本 ' + this.update.current_version, 'success');
+                }
             } catch(e) { showToast(e.message,'error'); }
             this.update.checking = false;
         },
@@ -581,14 +599,14 @@ function settingsPage() {
             } catch(e) { showToast(e.message,'error'); }
         },
         async runBackup() {
-            const ok = await confirmModal('立即生成数据库备份吗？');
+            const ok = await confirmModal('立即生成备份（数据库 + 密钥）吗？');
             if (!ok) return;
             this.backupRun = { running:true, message:'', status:'', filename:'', size_human:'', email_sent:false, email_skipped_reason:'' };
             try {
                 const d = await api('/api/settings/backup/run', {method:'POST', body:{email_enabled: !!this.backup.email_enabled}});
                 this.backupRun = Object.assign({running:false}, d.data || {});
                 const toastType = this.backupRun.status === 'warning' ? 'warning' : 'success';
-                showToast(this.backupRun.message || '数据库备份已生成', toastType);
+                showToast(this.backupRun.message || '备份已生成', toastType);
                 await this.loadBackup();
             } catch(e) {
                 this.backupRun.running = false;

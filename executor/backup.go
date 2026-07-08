@@ -49,13 +49,24 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 	}
 
 	dir := filepath.Join(cfg.Panel.DataDir, "backups", "database")
-	path, err := database.BackupDatabase(dir)
+	dbPath, err := database.BackupDatabase(dir)
 	if err != nil {
 		setBackupStatus("failed", "", err.Error())
 		RecordOperationLog("database_backup", trigger, "failed", err.Error())
 		return result, err
 	}
-	if err := database.VerifyDBBackup(path); err != nil {
+	if err := database.VerifyDBBackup(dbPath); err != nil {
+		setBackupStatus("failed", "", err.Error())
+		RecordOperationLog("database_backup", trigger, "failed", err.Error())
+		return result, err
+	}
+
+	// Bundle the secret encryption key alongside the database: without it,
+	// restoring this backup onto a panel with a different key (e.g. after a
+	// fresh install) leaves every encrypted field permanently unreadable.
+	secretKeyPath := filepath.Join(cfg.Panel.DataDir, "secret.key")
+	path, err := database.CreateFullBackupArchive(dbPath, secretKeyPath, dir)
+	if err != nil {
 		setBackupStatus("failed", "", err.Error())
 		RecordOperationLog("database_backup", trigger, "failed", err.Error())
 		return result, err
@@ -73,7 +84,7 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 	result.SizeBytes = info.Size()
 	result.SizeHuman = formatBackupSize(info.Size())
 	result.Status = "success"
-	result.Message = "数据库备份已生成"
+	result.Message = "备份已生成（含数据库与密钥）"
 
 	var warnings []string
 
@@ -173,21 +184,21 @@ func sendDatabaseBackupEmail(result DatabaseBackupResult) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("读取备份文件失败: %w", err)
 	}
-	body := fmt.Sprintf("Server Panel 数据库备份已生成。\n\n文件名：%s\n大小：%s\n生成时间：%s\n\n请妥善保存该附件。",
+	body := fmt.Sprintf("Server Panel 备份已生成，附件包含数据库和密钥（server-panel.db + secret.key）。\n\n文件名：%s\n大小：%s\n生成时间：%s\n\n此附件可解密面板中保存的所有敏感信息，请妥善保存，不要转发给无关人员。",
 		result.Filename, result.SizeHuman, time.Now().Format("2006-01-02 15:04:05"))
-	err = SendMailWithAttachments("", "Server Panel 数据库备份", body, []MailAttachment{{
+	err = SendMailWithAttachments("", "Server Panel 备份", body, []MailAttachment{{
 		Filename:    result.Filename,
-		ContentType: "application/octet-stream",
+		ContentType: "application/gzip",
 		Data:        data,
 	}})
 	if err != nil {
 		return "", err
 	}
-	return "数据库备份已生成并发送到管理员邮箱", nil
+	return "备份已生成并发送到管理员邮箱", nil
 }
 
 func pruneDatabaseBackups(dir string, keepCount int) error {
-	entries, err := filepath.Glob(filepath.Join(dir, "server-panel.db.bak.*"))
+	entries, err := filepath.Glob(filepath.Join(dir, "server-panel-backup.*.tar.gz"))
 	if err != nil {
 		return err
 	}

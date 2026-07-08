@@ -63,6 +63,14 @@ journalctl -u server-panel -f
 server-panel --reset-password
 ```
 
+从设置页生成的备份（含数据库和加密密钥）恢复数据，比如服务器重装后：
+
+```bash
+systemctl stop server-panel
+server-panel -config /www/server/server-panel/config.json -restore-backup=/path/to/server-panel-backup.<timestamp>.tar.gz
+systemctl start server-panel
+```
+
 ## 授权协议
 
 本项目基于 [GPL-3.0](LICENSE) 协议开源。

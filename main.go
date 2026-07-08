@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -32,6 +33,7 @@ var (
 	hashPassword   = flag.String("hash-password", "", "生成指定密码的 bcrypt 哈希后退出")
 	showInfo       = flag.Bool("info", false, "打印版本/端口/路径信息后退出（更新前的冒烟测试）")
 	updateWatchdog = flag.String("update-watchdog", "", "内部使用：以看护进程身份监控更新后的健康检查并按需回滚")
+	restoreBackup  = flag.String("restore-backup", "", "从设置页生成的备份归档(.tar.gz)恢复数据库和密钥后退出；请先停止 server-panel 服务再执行")
 )
 
 func main() {
@@ -72,6 +74,13 @@ func main() {
 
 	os.MkdirAll(cfg.Panel.DataDir, 0700)
 	os.MkdirAll(cfg.Panel.LogDir, 0700)
+
+	if *restoreBackup != "" {
+		if err := runRestoreBackup(cfg, *restoreBackup); err != nil {
+			log.Fatalf("恢复备份失败: %v", err)
+		}
+		return
+	}
 
 	if err := database.Open(cfg.SQLite.Path); err != nil {
 		log.Fatalf("Failed to open database: %v", err)
@@ -197,6 +206,78 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-quit
 	log.Printf("Received signal %v, shutting down...", sig)
+}
+
+// runRestoreBackup restores a database.CreateFullBackupArchive backup onto
+// this panel's live paths. It must run before database.Open, since it
+// replaces the live database file out from under it; the server must be
+// stopped for the duration (there is no live DB connection to guard here
+// because callers invoke this ahead of the normal startup path).
+func runRestoreBackup(cfg *config.Config, archivePath string) error {
+	if _, err := os.Stat(archivePath); err != nil {
+		return fmt.Errorf("找不到备份文件: %w", err)
+	}
+
+	tmpDir, err := os.MkdirTemp("", "server-panel-restore-*")
+	if err != nil {
+		return fmt.Errorf("创建临时目录失败: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath, secretKeyPath, err := database.ExtractFullBackupArchive(archivePath, tmpDir)
+	if err != nil {
+		return err
+	}
+	if err := database.VerifyDBBackup(dbPath); err != nil {
+		return fmt.Errorf("备份数据库校验失败，未执行恢复: %w", err)
+	}
+
+	liveDBPath := cfg.SQLite.Path
+	liveSecretKeyPath := filepath.Join(cfg.Panel.DataDir, "secret.key")
+	preRestoreSuffix := "." + time.Now().UTC().Format("20060102-150405") + ".pre-restore"
+
+	if err := os.MkdirAll(filepath.Dir(liveDBPath), 0700); err != nil {
+		return fmt.Errorf("创建数据库目录失败: %w", err)
+	}
+	if _, err := os.Stat(liveDBPath); err == nil {
+		if err := copyFile(liveDBPath, liveDBPath+preRestoreSuffix); err != nil {
+			return fmt.Errorf("备份当前数据库失败，未执行恢复: %w", err)
+		}
+		fmt.Printf("当前数据库已另存为 %s\n", liveDBPath+preRestoreSuffix)
+	}
+	if secretKeyPath != "" {
+		if _, err := os.Stat(liveSecretKeyPath); err == nil {
+			if err := copyFile(liveSecretKeyPath, liveSecretKeyPath+preRestoreSuffix); err != nil {
+				return fmt.Errorf("备份当前密钥失败，未执行恢复: %w", err)
+			}
+			fmt.Printf("当前密钥已另存为 %s\n", liveSecretKeyPath+preRestoreSuffix)
+		}
+	}
+
+	if err := database.RestoreDatabaseFile(dbPath, liveDBPath); err != nil {
+		return fmt.Errorf("写入数据库失败: %w", err)
+	}
+	fmt.Printf("数据库已恢复到 %s\n", liveDBPath)
+
+	if secretKeyPath != "" {
+		if err := copyFile(secretKeyPath, liveSecretKeyPath); err != nil {
+			return fmt.Errorf("写入密钥失败: %w", err)
+		}
+		fmt.Printf("密钥已恢复到 %s\n", liveSecretKeyPath)
+	} else {
+		fmt.Println("警告: 备份中不包含 secret.key。若数据库中仍以旧版设置项形式保存着加密密钥会自动生效；否则已加密的敏感字段（SSH/面板密码等）将无法解密。")
+	}
+
+	fmt.Println("恢复完成，请启动 server-panel 服务。")
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0600)
 }
 
 func runUnbanAll() {
