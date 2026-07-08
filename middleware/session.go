@@ -88,6 +88,15 @@ func SessionRequired() gin.HandlerFunc {
 			return
 		}
 
+		// GlobalSessionStore.Get already slid the server-side record's
+		// expiry forward by 30 minutes; refresh the browser's copy of the
+		// cookie to match. Without this, the cookie keeps the fixed
+		// Max-Age it was given at login and the browser stops sending it
+		// 30 minutes after login regardless of activity, silently
+		// defeating the server-side sliding window - the user gets logged
+		// out on a fixed timer even though they were active the whole time.
+		c.SetCookie("sp_session", token, 1800, "/", "", IsSecureRequest(c), true)
+
 		c.Set("session_username", session.Username)
 		c.Set("session_token", token)
 		c.Next()
