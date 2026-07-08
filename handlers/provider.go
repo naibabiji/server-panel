@@ -91,6 +91,10 @@ func (h *ProviderHandler) Create(c *gin.Context) {
 	if !validateProviderInput(c, &p) {
 		return
 	}
+	if h.providerNameTaken(p.Name, 0) {
+		c.JSON(http.StatusConflict, models.ErrorResponse("服务商已存在（名称不区分大小写）"))
+		return
+	}
 
 	result, err := h.db().Exec(
 		"INSERT INTO providers (name, website, contact, notes) VALUES (?,?,?,?)",
@@ -112,6 +116,10 @@ func (h *ProviderHandler) Update(c *gin.Context) {
 		return
 	}
 	if !validateProviderInput(c, &p) {
+		return
+	}
+	if idNum, err := strconv.ParseInt(id, 10, 64); err == nil && h.providerNameTaken(p.Name, idNum) {
+		c.JSON(http.StatusConflict, models.ErrorResponse("服务商已存在（名称不区分大小写）"))
 		return
 	}
 
@@ -142,6 +150,20 @@ func (h *ProviderHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
+}
+
+// providerNameTaken reports whether another provider already has this name,
+// compared case-insensitively so "DigitalOcean" and "digitalocean" are
+// treated as the same provider. excludeID is the provider being updated (0
+// when creating), so renaming a provider back to its own name isn't flagged
+// as a conflict with itself.
+func (h *ProviderHandler) providerNameTaken(name string, excludeID int64) bool {
+	var existingID int64
+	err := h.db().QueryRow(
+		"SELECT id FROM providers WHERE LOWER(name) = LOWER(?) AND id != ?",
+		name, excludeID,
+	).Scan(&existingID)
+	return err == nil
 }
 
 func validateProviderInput(c *gin.Context, p *models.Provider) bool {
