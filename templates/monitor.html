@@ -9,7 +9,7 @@
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">服务器</th><th class="table-header">状态</th><th class="table-header">CPU</th><th class="table-header">内存</th><th class="table-header">磁盘</th><th class="table-header">负载</th><th class="table-header">运行时间</th><th class="table-header">Agent</th>
+                <th class="table-header">服务器</th><th class="table-header">状态</th><th class="table-header">CPU</th><th class="table-header">内存</th><th class="table-header">磁盘</th><th class="table-header">负载</th><th class="table-header">运行时间</th>
             </tr></thead>
             <tbody>
             <template x-for="s in servers" :key="s.id">
@@ -21,7 +21,6 @@
                     <td class="table-cell" x-text="(s.disk_percent||0).toFixed(1)+'%'"></td>
                     <td class="table-cell" x-text="(s.load_avg_1||0).toFixed(2)"></td>
                     <td class="table-cell text-gray-400" x-text="formatUptime(s.uptime_seconds||0)"></td>
-                    <td class="table-cell"><span class="badge-info text-xs" x-text="s.agent_version || '--'"></span></td>
                 </tr>
             </template>
             </tbody>
