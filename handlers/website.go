@@ -128,6 +128,10 @@ func (h *WebsiteHandler) Create(c *gin.Context) {
 	if !validateWebsiteInput(c, &w) {
 		return
 	}
+	if h.websiteDomainTaken(w.Domain, 0) {
+		c.JSON(http.StatusConflict, models.ErrorResponse("该域名已添加过网站"))
+		return
+	}
 	panelPasswordEnc, ok := encryptOptionalPassword(c, w.PanelPassword)
 	if !ok {
 		return
@@ -154,6 +158,10 @@ func (h *WebsiteHandler) Update(c *gin.Context) {
 		return
 	}
 	if !validateWebsiteInput(c, &w) {
+		return
+	}
+	if idNum, err := strconv.ParseInt(id, 10, 64); err == nil && h.websiteDomainTaken(w.Domain, idNum) {
+		c.JSON(http.StatusConflict, models.ErrorResponse("该域名已添加过网站"))
 		return
 	}
 	panelPasswordEnc, ok := encryptOptionalPassword(c, w.PanelPassword)
@@ -243,6 +251,20 @@ func (h *WebsiteHandler) Delete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
+}
+
+// websiteDomainTaken reports whether another website already uses this
+// domain, compared case-insensitively (domains aren't case-sensitive).
+// excludeID is the website being updated (0 when creating), so saving a
+// website without changing its own domain isn't flagged as a conflict with
+// itself.
+func (h *WebsiteHandler) websiteDomainTaken(domain string, excludeID int64) bool {
+	var existingID int64
+	err := h.db().QueryRow(
+		"SELECT id FROM websites WHERE LOWER(domain) = LOWER(?) AND id != ?",
+		domain, excludeID,
+	).Scan(&existingID)
+	return err == nil
 }
 
 func validateWebsiteInput(c *gin.Context, w *models.Website) bool {
