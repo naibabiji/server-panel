@@ -176,7 +176,38 @@ function inputModal(options = {}) {
         input.style.cssText = 'width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #374151;border-radius:8px;color:#f9fafb;padding:10px 12px;font-size:14px;outline:none;';
         input.onfocus = () => { input.style.borderColor = '#8b5cf6'; input.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.18)'; };
         input.onblur = () => { input.style.borderColor = '#374151'; input.style.boxShadow = 'none'; };
-        dialog.appendChild(input);
+
+        // 密码字段：保留 type=password 的掩码防肩窥，同时结构性退出浏览器密码管理器
+        // ——无 <form>/无配对用户名、readonly-until-focus 阻止聚焦自动填充、
+        // new-password 阻止已存密码填充、第三方管理器 ignore 属性——让浏览器不记录、
+        // 不自动填充、不提示保存。另附显隐开关便于核对输入。
+        if (input.type === 'password') {
+            input.setAttribute('readonly', '');
+            input.addEventListener('focus', () => input.removeAttribute('readonly'), { once: true });
+            input.setAttribute('data-lpignore', 'true');
+            input.setAttribute('data-1p-ignore', '');
+            input.setAttribute('data-form-type', 'other');
+            input.style.paddingRight = '44px';
+
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'position:relative;';
+            const toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.tabIndex = -1;
+            toggle.textContent = '显示';
+            toggle.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#9ca3af;cursor:pointer;font-size:12px;padding:2px 4px;';
+            toggle.onclick = () => {
+                const showing = input.type === 'text';
+                input.type = showing ? 'password' : 'text';
+                toggle.textContent = showing ? '显示' : '隐藏';
+                input.focus();
+            };
+            wrap.appendChild(input);
+            wrap.appendChild(toggle);
+            dialog.appendChild(wrap);
+        } else {
+            dialog.appendChild(input);
+        }
 
         const actions = document.createElement('div');
         actions.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;margin-top:18px;';
@@ -221,12 +252,10 @@ function passwordPromptModal(label, options = {}) {
         title: options.title || '密码验证',
         label,
         message: options.message || '',
-        // type=text, not password: this is the panel's last line of
-        // defense (it gates decrypting every other saved secret), so it
-        // must never be offered to the browser's password manager to
-        // remember or autofill - only ever typed in by hand.
-        type: 'text',
-        autocomplete: options.autocomplete || 'off',
+        // type=password 保留掩码防肩窥；靠无 <form>/无用户名 + readonly-until-focus
+        // + new-password + 第三方管理器 ignore 属性，让浏览器不记录此主口令。
+        type: 'password',
+        autocomplete: options.autocomplete || 'new-password',
         placeholder: options.placeholder || '',
         confirmText: options.confirmText || '确认',
     });
