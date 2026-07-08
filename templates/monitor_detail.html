@@ -18,7 +18,13 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" x-show="loading" x-cloak>
+        <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
+        <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
+        <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
+        <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" x-show="!loading">
         <div class="card">
             <div class="text-xs text-gray-400">CPU</div>
             <div class="text-xl font-bold mt-1 text-purple-400" x-text="(latest.cpu_percent||0).toFixed(1)+'%'"></div>
@@ -46,7 +52,7 @@
 // globals defined in static/js/app.js (also used by templates/dashboard.html).
 function monitorDetail() {
     return {
-        server: {}, latest: {}, currentRange: '24h',
+        server: {}, latest: {}, currentRange: '24h', loading: true,
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
             await Promise.all([
@@ -54,6 +60,7 @@ function monitorDetail() {
                 (async () => { try { const d = await api('/api/monitor/'+id+'/latest'); this.latest = d.data; } catch(e) {} })(),
                 this.loadCharts(),
             ]);
+            this.loading = false;
         },
         async loadCharts(range) {
             const r = range || this.currentRange;

@@ -2,7 +2,21 @@
 {{define "website_form_content"}}
 <div x-data="websiteForm()" x-init="init()" class="p-6 max-w-2xl">
     <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑网站' : '添加网站'"></h2>
-    <div class="card space-y-4">
+    <div class="card space-y-4" x-show="loading" x-cloak>
+        <div class="skeleton-block h-9"></div>
+        <div class="skeleton-block h-9"></div>
+        <div class="skeleton-block h-9"></div>
+        <div class="skeleton-block h-9"></div>
+        <hr class="border-gray-700">
+        <div class="grid grid-cols-2 gap-4">
+            <div class="skeleton-block h-9"></div>
+            <div class="skeleton-block h-9"></div>
+            <div class="skeleton-block h-9"></div>
+            <div class="skeleton-block h-9"></div>
+        </div>
+        <div class="skeleton-block h-9"></div>
+    </div>
+    <div class="card space-y-4" x-show="!loading">
         <div><label class="label">网站名称</label><input type="text" x-model="form.name" class="input-field" placeholder="例如：公司官网"></div>
         <div><label class="label">域名 <span class="text-red-400">*</span></label><input type="text" x-model="form.domain" class="input-field" placeholder="example.com"></div>
         <div>
@@ -67,7 +81,7 @@
 <script>
 function websiteForm() {
     return {
-        isEdit: false, id: null, saving: false, panelPassword: '',
+        isEdit: false, id: null, saving: false, loading: false, panelPassword: '',
         form: { name:'', domain:'', site_type:'', server_id:0, customer_id:'', panel_type:'none', panel_url:'', panel_username:'', panel_password:'', expiry_date:'', status:'active', notes:'' },
         servers: [], customers: [], siteTypes: [],
         async init() {
@@ -83,7 +97,11 @@ function websiteForm() {
                 (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypes = JSON.parse(d.data.svalue || '[]'); } catch(e) {} })(),
             ]);
             if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
-            if (this.id) { await this.load(); }
+            if (this.id) {
+                this.loading = true;
+                await this.load();
+                this.loading = false;
+            }
         },
         async load() {
             try {

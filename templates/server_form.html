@@ -30,7 +30,24 @@
         }
     </style>
     <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑服务器' : '添加服务器'"></h2>
-    <div class="card server-form-card" x-show="!done">
+    <div class="card server-form-card" x-show="loading" x-cloak>
+        <div class="server-form-grid">
+            <template x-for="n in 4" :key="n">
+                <div class="server-form-section">
+                    <div class="skeleton-block h-4 w-28 mb-4"></div>
+                    <div class="server-form-fields">
+                        <div class="skeleton-block h-9"></div>
+                        <div class="server-form-fields compact">
+                            <div class="skeleton-block h-9"></div>
+                            <div class="skeleton-block h-9"></div>
+                        </div>
+                        <div class="skeleton-block h-9"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+    <div class="card server-form-card" x-show="!done && !loading">
         <div class="server-form-grid">
             <section class="server-form-section">
                 <div class="server-form-title">基础与归属</div>
@@ -178,7 +195,7 @@
 <script>
 function serverForm() {
     return {
-        isEdit: false, id: null, saving: false, done: false,
+        isEdit: false, id: null, saving: false, done: false, loading: false,
         form: { name:'', ip_address:'', server_type:'vps', os:'', customer_id:'', cpu_cores:'', ram_gb:'', disk_gb:'', bandwidth:'', provider_id:'', location:'', ssh_port:22, ssh_username:'root', ssh_password:'', panel_type:'none', panel_url:'', panel_username:'', panel_password:'', purchase_date:'', expiry_date:'', renewal_cycle:'', auto_renewal:0, purchase_price:0, currency:'USD', status:'active', http_probe_enabled:0, notes:'' },
         customers: [], providers: [], osList: [],
         async init() {
@@ -196,7 +213,11 @@ function serverForm() {
                 (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]'); } catch(e) {} })(),
             ]);
             if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
-            if (this.id) { await this.load(); }
+            if (this.id) {
+                this.loading = true;
+                await this.load();
+                this.loading = false;
+            }
         },
         async refreshCustomers(selectedID) {
             try {

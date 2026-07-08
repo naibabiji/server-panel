@@ -12,7 +12,19 @@
         </div>
     </div>
 
-    <section class="border border-[#2a3038] bg-[#171b21] mb-5">
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5" x-show="loading" x-cloak>
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]"><div class="skeleton-block h-4 w-24"></div></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
+            <div class="skeleton-block h-4"></div>
+            <div class="skeleton-block h-4"></div>
+            <div class="skeleton-block h-4"></div>
+            <div class="skeleton-block h-4"></div>
+            <div class="skeleton-block h-4"></div>
+            <div class="skeleton-block h-4"></div>
+        </div>
+    </section>
+
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5" x-show="!loading">
         <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">网站档案</div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
             <dl class="p-5 text-sm space-y-3 border-b md:border-b-0 md:border-r border-[#202833]">
@@ -55,11 +67,12 @@
 <script>
 function websiteDetail() {
     return {
-        w: {}, panelPassword: '',
+        w: {}, loading: true, panelPassword: '',
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
             try { const d = await api('/api/websites/' + id); this.w = d.data; }
             catch(e) { showToast(e.message, 'error'); }
+            this.loading = false;
         },
         serverURL() {
             if (!this.w.server_id) return '#';

@@ -2,7 +2,13 @@
 {{define "provider_form_content"}}
 <div x-data="providerForm()" x-init="init()" class="p-6 max-w-2xl">
     <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑服务商' : '添加服务商'"></h2>
-    <div class="card space-y-4">
+    <div class="card space-y-4" x-show="loading" x-cloak>
+        <div class="skeleton-block h-9"></div>
+        <div class="skeleton-block h-9"></div>
+        <div class="skeleton-block h-9"></div>
+        <div class="skeleton-block h-9"></div>
+    </div>
+    <div class="card space-y-4" x-show="!loading">
         <div><label class="label">服务商名称 <span class="text-red-400">*</span></label><input type="text" x-model="form.name" class="input-field" placeholder="例如：阿里云"></div>
         <div><label class="label">官网地址</label><input type="text" x-model="form.website" class="input-field" placeholder="https://..."></div>
         <div><label class="label">客服联系方式</label><input type="text" x-model="form.contact" class="input-field" placeholder="电话/工单系统/账号"></div>
@@ -16,14 +22,19 @@
 <script>
 function providerForm() {
     return {
-        isEdit: false, id: null, saving: false,
+        isEdit: false, id: null, saving: false, loading: false,
         form: { name:'', website:'', contact:'', notes:'' },
         async init() {
             const parts = window.location.pathname.split('/').filter(Boolean);
             const last = parts[parts.length-1];
             if (last === 'edit') this.id = parts[parts.length-2];
             else if (last !== 'new') this.id = last;
-            if (this.id) { this.isEdit = true; await this.load(); }
+            if (this.id) {
+                this.isEdit = true;
+                this.loading = true;
+                await this.load();
+                this.loading = false;
+            }
         },
         async load() {
             try { const d = await api('/api/providers/'+this.id); Object.assign(this.form, d.data); } catch(e) {}

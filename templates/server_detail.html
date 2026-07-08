@@ -30,7 +30,32 @@
         </div>
     </div>
 
-    <section class="border border-[#2a3038] bg-[#171b21] mb-5">
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5" x-show="loading" x-cloak>
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]"><div class="skeleton-block h-4 w-24"></div></div>
+        <div class="server-archive-grid">
+            <template x-for="n in 3" :key="n">
+                <div class="server-archive-col">
+                    <div class="skeleton-block h-3 w-20 mb-4"></div>
+                    <div class="space-y-3">
+                        <div class="skeleton-block h-4"></div>
+                        <div class="skeleton-block h-4"></div>
+                        <div class="skeleton-block h-4"></div>
+                        <div class="skeleton-block h-4"></div>
+                        <div class="skeleton-block h-4"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </section>
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5" x-show="loading" x-cloak>
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]"><div class="skeleton-block h-4 w-32"></div></div>
+        <div class="p-5 space-y-3">
+            <div class="skeleton-block h-9"></div>
+            <div class="skeleton-block h-9"></div>
+        </div>
+    </section>
+
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5" x-show="!loading">
         <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">服务器档案</div>
         <div class="server-archive-grid">
             <div class="server-archive-col">
@@ -76,7 +101,7 @@
         </div>
     </section>
 
-    <section class="border border-[#2a3038] bg-[#171b21] mb-5">
+    <section class="border border-[#2a3038] bg-[#171b21] mb-5" x-show="!loading">
         <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">登录与面板凭据</div>
         <dl class="text-sm">
             <div class="grid grid-cols-1 md:grid-cols-[120px_minmax(0,1fr)_auto] gap-3 p-5 border-b border-[#202833] items-start">
@@ -168,12 +193,12 @@
 <script>
 function serverDetail() {
     return {
-        s: {}, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false,
+        s: {}, loading: true, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false,
         secrets: {'ssh-password':'', 'panel-password':''},
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
-            try { const d = await api('/api/servers/'+id); this.s = d.data; await this.fetchWebsites(); }
-            catch(e) { this.websitesLoading = false; showToast(e.message,'error'); }
+            try { const d = await api('/api/servers/'+id); this.s = d.data; this.loading = false; await this.fetchWebsites(); }
+            catch(e) { this.loading = false; this.websitesLoading = false; showToast(e.message,'error'); }
         },
         async fetchWebsites() {
             this.websitesLoading = true;
