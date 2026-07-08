@@ -34,12 +34,6 @@ curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/insta
 
 安装脚本会自动下载 GitHub 最新 Release 中匹配当前架构的 `server-panel-linux-amd64` 或 `server-panel-linux-arm64` 二进制，生成自签 TLS 证书、随机访问路径、面板密码和 BasicAuth 密码。
 
-指定版本安装：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/install.sh | VERSION=v1.4.3 bash
-```
-
 已有安装时，默认会保留配置、数据库、证书和登录信息，只覆盖升级二进制。
 
 如果需要重新生成配置和登录信息：
