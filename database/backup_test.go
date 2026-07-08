@@ -1,6 +1,8 @@
 package database
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -83,28 +85,50 @@ func TestFullBackupArchiveWithoutSecretKey(t *testing.T) {
 	}
 }
 
-func TestExtractFullBackupArchiveRejectsMissingDB(t *testing.T) {
-	dir := t.TempDir()
-	// An archive with no server-panel.db entry (e.g. someone renamed/corrupted it).
-	archivePath, err := CreateFullBackupArchive(mustWriteTempFile(t, dir, "server-panel.db", "content"), filepath.Join(dir, "missing.key"), dir)
-	if err != nil {
-		t.Fatalf("CreateFullBackupArchive: %v", err)
-	}
-	// Sanity: a well-formed archive still extracts fine.
-	if _, _, err := ExtractFullBackupArchive(archivePath, t.TempDir()); err != nil {
-		t.Fatalf("well-formed archive should extract: %v", err)
-	}
-
-	if _, _, err := ExtractFullBackupArchive(filepath.Join(dir, "nonexistent.tar.gz"), t.TempDir()); err == nil {
+func TestExtractFullBackupArchiveRejectsNonexistentArchive(t *testing.T) {
+	if _, _, err := ExtractFullBackupArchive(filepath.Join(t.TempDir(), "nonexistent.tar.gz"), t.TempDir()); err == nil {
 		t.Fatal("expected error extracting a nonexistent archive")
 	}
 }
 
-func mustWriteTempFile(t *testing.T, dir, name, content string) string {
-	t.Helper()
-	path := filepath.Join(dir, name)
-	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
-		t.Fatalf("write %s: %v", path, err)
+func TestExtractFullBackupArchiveRejectsArchiveMissingDBEntry(t *testing.T) {
+	dir := t.TempDir()
+	// A well-formed tar.gz that simply never had a server-panel.db entry
+	// (e.g. corrupted upstream, or hand-edited) - CreateFullBackupArchive
+	// can't produce this shape itself, so build it directly.
+	archivePath := filepath.Join(dir, "server-panel-backup.no-db.tar.gz")
+	writeRawArchive(t, archivePath, map[string]string{
+		secretKeyArchiveName: "fake-secret-key-base64",
+	})
+
+	if _, _, err := ExtractFullBackupArchive(archivePath, t.TempDir()); err == nil {
+		t.Fatal("expected error extracting an archive missing the database entry")
 	}
-	return path
+}
+
+func writeRawArchive(t *testing.T, path string, entries map[string]string) {
+	t.Helper()
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create %s: %v", path, err)
+	}
+	defer f.Close()
+
+	gw := gzip.NewWriter(f)
+	tw := tar.NewWriter(gw)
+	for name, content := range entries {
+		hdr := &tar.Header{Name: name, Mode: 0600, Size: int64(len(content))}
+		if err := tw.WriteHeader(hdr); err != nil {
+			t.Fatalf("write header for %s: %v", name, err)
+		}
+		if _, err := tw.Write([]byte(content)); err != nil {
+			t.Fatalf("write content for %s: %v", name, err)
+		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("close tar writer: %v", err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatalf("close gzip writer: %v", err)
+	}
 }

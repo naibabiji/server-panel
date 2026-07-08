@@ -245,28 +245,46 @@ func runRestoreBackup(cfg *config.Config, archivePath string) error {
 		}
 		fmt.Printf("当前数据库已另存为 %s\n", liveDBPath+preRestoreSuffix)
 	}
-	if secretKeyPath != "" {
-		if _, err := os.Stat(liveSecretKeyPath); err == nil {
-			if err := copyFile(liveSecretKeyPath, liveSecretKeyPath+preRestoreSuffix); err != nil {
-				return fmt.Errorf("备份当前密钥失败，未执行恢复: %w", err)
-			}
-			fmt.Printf("当前密钥已另存为 %s\n", liveSecretKeyPath+preRestoreSuffix)
+	liveSecretKeyExisted := false
+	if _, err := os.Stat(liveSecretKeyPath); err == nil {
+		liveSecretKeyExisted = true
+		if err := copyFile(liveSecretKeyPath, liveSecretKeyPath+preRestoreSuffix); err != nil {
+			return fmt.Errorf("备份当前密钥失败，未执行恢复: %w", err)
 		}
+		fmt.Printf("当前密钥已另存为 %s\n", liveSecretKeyPath+preRestoreSuffix)
 	}
 
-	if err := database.RestoreDatabaseFile(dbPath, liveDBPath); err != nil {
-		return fmt.Errorf("写入数据库失败: %w", err)
-	}
-	fmt.Printf("数据库已恢复到 %s\n", liveDBPath)
-
+	// Apply the secret key before touching the database: a plain file write
+	// has no atomicity guarantee, so if it fails we want to bail out while
+	// the live db/key are still untouched, rather than after the db has
+	// already been swapped to a new file that a leftover stale key can't
+	// decrypt.
 	if secretKeyPath != "" {
 		if err := copyFile(secretKeyPath, liveSecretKeyPath); err != nil {
 			return fmt.Errorf("写入密钥失败: %w", err)
 		}
 		fmt.Printf("密钥已恢复到 %s\n", liveSecretKeyPath)
+	} else if liveSecretKeyExisted {
+		// The backup predates secret.key or its source panel never wrote
+		// one. Move the current (now-irrelevant, since we're about to swap
+		// in a different database) key out of the way so
+		// handlers.GetSecretEncryptionKey falls back to whatever key the
+		// restored database itself carries in the legacy
+		// settings.secret_encryption_key row - if we left this file in
+		// place, that fallback would never trigger, since the file-exists
+		// check short-circuits it.
+		if err := os.Remove(liveSecretKeyPath); err != nil {
+			return fmt.Errorf("移除当前密钥失败: %w", err)
+		}
+		fmt.Println("警告: 备份中不包含 secret.key，已移除当前密钥文件。面板下次启动时会改用恢复出的数据库里保存的旧版密钥设置项（如果存在）；如果也不存在，说明源面板从未生成过任何加密密钥，恢复后新生成的密钥无法解密任何历史敏感字段。")
 	} else {
-		fmt.Println("警告: 备份中不包含 secret.key。若数据库中仍以旧版设置项形式保存着加密密钥会自动生效；否则已加密的敏感字段（SSH/面板密码等）将无法解密。")
+		fmt.Println("警告: 备份中不包含 secret.key，当前也没有已有密钥文件。面板下次启动时会尝试使用恢复出的数据库里保存的旧版密钥设置项（如果存在），否则会生成一把新密钥，届时已加密的敏感字段（SSH/面板密码等）将无法解密。")
 	}
+
+	if err := database.RestoreDatabaseFile(dbPath, liveDBPath); err != nil {
+		return fmt.Errorf("写入数据库失败（密钥可能已被恢复或移除，如需回滚请检查 %s 目录下的 .pre-restore 文件）: %w", filepath.Dir(liveSecretKeyPath), err)
+	}
+	fmt.Printf("数据库已恢复到 %s\n", liveDBPath)
 
 	fmt.Println("恢复完成，请启动 server-panel 服务。")
 	return nil

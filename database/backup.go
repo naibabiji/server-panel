@@ -128,6 +128,11 @@ func writeBackupArchive(archivePath, dbPath, secretKeyPath string) error {
 		if err := addFileToTar(tw, secretKeyPath, secretKeyArchiveName); err != nil {
 			return fmt.Errorf("failed to add secret key to archive: %w", err)
 		}
+	} else if !os.IsNotExist(statErr) {
+		// Anything other than "the key file doesn't exist yet" (permission
+		// denied, I/O error, ...) must fail the backup loudly rather than
+		// silently ship a "successful" archive that's missing the key.
+		return fmt.Errorf("failed to stat secret key: %w", statErr)
 	}
 
 	if err := tw.Close(); err != nil {
