@@ -378,7 +378,7 @@
                             <div><label class="label">端口</label><input type="number" x-model="smtp.smtp_port" class="input-field"></div>
                             <div><label class="label">加密方式</label><select x-model="smtp.smtp_encryption" class="input-field"><option value="starttls">STARTTLS</option><option value="ssl">SSL</option><option value="none">无</option></select></div>
                             <div><label class="label">发件账号</label><input type="text" x-model="smtp.smtp_user" class="input-field" autocomplete="off"></div>
-                            <div><label class="label">密码/授权码</label><input type="text" x-model="smtp.smtp_pass" class="input-field" autocomplete="off"></div>
+                            <div><label class="label">密码/授权码</label><input type="password" x-model="smtp.smtp_pass" class="input-field" autocomplete="off"></div>
                             <div><label class="label">管理员邮箱</label><input type="email" x-model="smtp.admin_email" class="input-field"></div>
                         </div>
                         <div class="flex gap-2 mt-3"><button @click="saveSMTP()" class="btn-primary text-sm">保存 SMTP</button><button @click="testSMTP()" class="btn-secondary text-sm">发送测试邮件</button></div>
