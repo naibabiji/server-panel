@@ -16,15 +16,24 @@ function api(path, options = {}) {
     return fetch(url, { ...options, headers })
         .then(async (resp) => {
             if (resp.status === 401 && !path.startsWith('/api/auth/login')) {
+                // Session expired/invalid: the page is navigating away to
+                // /login right now, so never resolve or reject - that way
+                // no caller's own catch(e){showToast(e.message,'error')}
+                // gets a chance to flash an error first (previously this
+                // threw a hardcoded English "Unauthorized", which every
+                // caller's catch block would display verbatim in the
+                // instant before the redirect actually took effect).
                 window.location.href = prefix + '/login';
-                throw new Error('Unauthorized');
+                return new Promise(() => {});
             }
             if (resp.status === 503) {
                 throw new Error('Service busy, please retry later');
             }
             if (resp.status === 428) {
+                // Same reasoning as the 401 case above: navigating away, so
+                // don't let a caller's catch block flash a toast first.
                 window.location.href = prefix + '/settings?view_password_required=1#security';
-                throw new Error('请先设置查看密码');
+                return new Promise(() => {});
             }
             const contentType = resp.headers.get('content-type') || '';
             if (!contentType.includes('application/json')) {
@@ -45,10 +54,8 @@ function api(path, options = {}) {
             return data;
         })
         .catch(err => {
-            if (err.message !== 'Unauthorized') {
-                console.error('Fetch failed:', err.message, 'URL:', url);
-                showToast(err.message, 'error');
-            }
+            console.error('Fetch failed:', err.message, 'URL:', url);
+            showToast(err.message, 'error');
             throw err;
         });
 }
@@ -280,4 +287,100 @@ function confirmModal(message) {
         overlay.querySelector('#modal-confirm').onclick = () => { overlay.remove(); resolve(true); };
         overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
     });
+}
+
+// Shared CPU/memory/load chart rendering, used by both
+// templates/monitor_detail.html (managed servers) and templates/dashboard.html
+// (the panel's own host) against the same MetricPoint JSON shape
+// ({t, cpu, mem, disk, load1, load5, load15, rx, tx}), each with its own
+// #cpuChart/#memChart/#loadChart canvases (never on screen at the same time,
+// so reusing those element ids across pages is fine).
+let charts = {};
+
+function destroyCharts() {
+    Object.values(charts).forEach(c => c.destroy());
+    charts = {};
+}
+
+function hexToRGBA(hex, alpha) {
+    const n = parseInt(hex.replace('#', ''), 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+// Load 不是百分比，仍然按数据范围给一个规整上限。
+function niceLoadAxisMax(values) {
+    const nums = (values || []).filter(v => typeof v === 'number' && isFinite(v));
+    const max = nums.length ? Math.max(...nums) : 0;
+    const floor = 1;
+    let target = Math.max(max * 1.25, floor);
+    const step = target > 10 ? 1 : 0.5;
+    return Math.ceil(target / step) * step;
+}
+
+function makeChart(canvasId, label, color) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return null;
+    return new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{
+            label, data: [],
+            borderColor: color, borderWidth: 2, tension: 0.3,
+            fill: true, backgroundColor: hexToRGBA(color, 0.12),
+            pointRadius: (c) => c.dataIndex === c.dataset.data.length - 1 ? 4 : 0,
+            pointHoverRadius: 5, pointHitRadius: 12,
+            pointBackgroundColor: color, pointBorderColor: '#171b21', pointBorderWidth: 2
+        }] },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#a1a1aa', font: { size: 11 } } },
+                tooltip: {
+                    backgroundColor: '#11151a', borderColor: '#2a3038', borderWidth: 1,
+                    titleColor: '#e5e7eb', bodyColor: '#e5e7eb', padding: 10, displayColors: false
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#52525b', maxTicksLimit: 10 }, grid: { color: '#27272a' } },
+                y: { ticks: { color: '#52525b' }, grid: { color: '#27272a' }, beginAtZero: true }
+            }
+        }
+    });
+}
+
+function updateCharts(points) {
+    destroyCharts();
+    if (!points || !points.length) return;
+
+    const labels = points.map(p => fmtTime(p.t));
+
+    charts.cpu = makeChart('cpuChart', 'CPU %', '#a78bfa');
+    if (charts.cpu) {
+        const data = points.map(p => p.cpu);
+        charts.cpu.data.labels = labels;
+        charts.cpu.data.datasets[0].data = data;
+        charts.cpu.options.scales.y.min = 0;
+        charts.cpu.options.scales.y.max = 100;
+        charts.cpu.update();
+    }
+
+    charts.mem = makeChart('memChart', 'Memory %', '#4ade80');
+    if (charts.mem) {
+        const data = points.map(p => p.mem);
+        charts.mem.data.labels = labels;
+        charts.mem.data.datasets[0].data = data;
+        charts.mem.options.scales.y.min = 0;
+        charts.mem.options.scales.y.max = 100;
+        charts.mem.update();
+    }
+
+    charts.load = makeChart('loadChart', 'Load 1m', '#fbbf24');
+    if (charts.load) {
+        const data = points.map(p => p.load1);
+        charts.load.data.labels = labels;
+        charts.load.data.datasets[0].data = data;
+        charts.load.options.scales.y.suggestedMax = niceLoadAxisMax(data);
+        charts.load.update();
+    }
 }

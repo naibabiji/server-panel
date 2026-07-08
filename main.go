@@ -128,6 +128,7 @@ func main() {
 	})
 
 	executor.StartMetricCleanup(1 * time.Hour)
+	executor.StartHostMetricsCollector(60 * time.Second)
 	executor.StartHTTPProber(5 * time.Minute)
 	executor.StartAgentOfflineChecker(60 * time.Second)
 	executor.StartAlertChecker(60 * time.Second)

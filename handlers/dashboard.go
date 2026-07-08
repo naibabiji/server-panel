@@ -3,11 +3,15 @@ package handlers
 import (
 	"database/sql"
 	"net/http"
+	"os"
+	"runtime"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
 	"github.com/naibabiji/server-panel/models"
+	"github.com/naibabiji/server-panel/timeutil"
 )
 
 type DashboardHandler struct{}
@@ -189,4 +193,95 @@ func (h *DashboardHandler) GetRecentAlerts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(alerts))
+}
+
+type hostMetricsLatestResponse struct {
+	models.MetricSample
+	Hostname string `json:"hostname"`
+	CPUCores int    `json:"cpu_cores"`
+}
+
+// GetHostMetricsLatest returns the most recent sample of the machine the
+// panel process itself runs on (see executor/host_metrics.go), plus static
+// host info for the Dashboard's performance-section header.
+func (h *DashboardHandler) GetHostMetricsLatest(c *gin.Context) {
+	db := database.GetDB()
+
+	var resp hostMetricsLatestResponse
+	err := db.QueryRow(
+		`SELECT cpu_percent, memory_percent, memory_used, memory_total,
+		 disk_percent, disk_used, disk_total, net_rx_bytes, net_tx_bytes,
+		 load_avg_1, load_avg_5, load_avg_15, uptime_seconds, recorded_at
+		 FROM host_metrics ORDER BY recorded_at DESC LIMIT 1`,
+	).Scan(&resp.CPUPercent, &resp.MemoryPercent, &resp.MemoryUsed, &resp.MemoryTotal,
+		&resp.DiskPercent, &resp.DiskUsed, &resp.DiskTotal, &resp.NetRXBytes, &resp.NetTXBytes,
+		&resp.LoadAvg1, &resp.LoadAvg5, &resp.LoadAvg15, &resp.UptimeSeconds, &resp.RecordedAt)
+	if err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("暂无性能数据"))
+		return
+	}
+
+	resp.Hostname, _ = os.Hostname()
+	resp.CPUCores = runtime.NumCPU()
+
+	c.JSON(http.StatusOK, models.SuccessResponse(resp))
+}
+
+// GetHostMetrics returns bucketed history for the panel's own host, same
+// range/bucketing scheme as MetricsHandler.GetServerMetrics (handlers/metrics.go)
+// and the same MetricPoint JSON shape, so the Dashboard reuses the exact
+// same chart-rendering JS as templates/monitor_detail.html.
+func (h *DashboardHandler) GetHostMetrics(c *gin.Context) {
+	db := database.GetDB()
+
+	rangeParam := c.DefaultQuery("range", "24h")
+	since := time.Now().Add(-24 * time.Hour)
+	bucketMinutes := 1
+	switch rangeParam {
+	case "7d":
+		since = time.Now().Add(-7 * 24 * time.Hour)
+		bucketMinutes = 5
+	case "15d":
+		since = time.Now().Add(-15 * 24 * time.Hour)
+		bucketMinutes = 5
+	case "30d":
+		since = time.Now().Add(-30 * 24 * time.Hour)
+		bucketMinutes = 5
+	}
+
+	rows, err := db.Query(
+		`SELECT recorded_at, cpu_percent, memory_percent, disk_percent, load_avg_1, load_avg_5, load_avg_15,
+		 net_rx_bytes, net_tx_bytes
+		 FROM host_metrics WHERE recorded_at >= ? ORDER BY recorded_at`,
+		timeutil.Display(since))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		return
+	}
+	defer rows.Close()
+
+	rawPoints := []MetricPoint{}
+	for rows.Next() {
+		var p MetricPoint
+		var netRX, netTX sql.NullInt64
+		var timeStr string
+		if err := rows.Scan(&timeStr, &p.CPU, &p.Memory, &p.Disk, &p.Load1, &p.Load5, &p.Load15, &netRX, &netTX); err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取性能数据失败"))
+			return
+		}
+		p.Time = timeStr
+		if netRX.Valid {
+			p.NetRX = netRX.Int64
+		}
+		if netTX.Valid {
+			p.NetTX = netTX.Int64
+		}
+		rawPoints = append(rawPoints, p)
+	}
+
+	if bucketMinutes > 1 {
+		rawPoints = bucketMetricPoints(rawPoints, bucketMinutes)
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(rawPoints))
 }

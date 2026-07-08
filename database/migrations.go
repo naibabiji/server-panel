@@ -269,4 +269,25 @@ var migrations = []string{
 	`INSERT OR IGNORE INTO providers (name) VALUES ('RackNerd')`,
 	`INSERT OR IGNORE INTO providers (name) VALUES ('HostHatch')`,
 	`INSERT OR IGNORE INTO schema_version (version) VALUES ('1.0.0')`,
+
+	// host_metrics: performance samples for the machine the panel process
+	// itself runs on (not a managed server, so no server_id/FK).
+	`CREATE TABLE IF NOT EXISTS host_metrics (
+		id              INTEGER PRIMARY KEY AUTOINCREMENT,
+		cpu_percent     REAL,
+		memory_percent  REAL,
+		memory_used     INTEGER,
+		memory_total    INTEGER,
+		disk_percent    REAL,
+		disk_used       INTEGER,
+		disk_total      INTEGER,
+		net_rx_bytes    INTEGER,
+		net_tx_bytes    INTEGER,
+		load_avg_1      REAL,
+		load_avg_5      REAL,
+		load_avg_15     REAL,
+		uptime_seconds  INTEGER,
+		recorded_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_host_metrics_time ON host_metrics(recorded_at)`,
 }

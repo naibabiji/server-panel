@@ -15,6 +15,43 @@
         <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">离线</div><div class="text-2xl font-semibold mt-1 text-red-400" x-text="stats.offline_count">0</div></div>
         <div class="p-5"><div class="text-sm text-gray-400">即将到期</div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count">0</div></div>
     </div>
+    <section class="border border-[#2a3038] bg-[#171b21] mb-6">
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] flex items-center justify-between gap-3 flex-wrap">
+            <div>
+                <div class="text-sm font-semibold text-gray-100">面板服务器性能</div>
+                <div class="text-xs text-gray-500 mt-1" x-text="hostSummary()"></div>
+            </div>
+            <select @change="changeHostRange($event.target.value)" class="input-field w-28 text-sm">
+                <option value="24h">24小时</option>
+                <option value="7d">7天</option>
+                <option value="15d">15天</option>
+                <option value="30d">30天</option>
+            </select>
+        </div>
+        <div class="p-5">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                <div class="card">
+                    <div class="text-xs text-gray-400">CPU</div>
+                    <div class="text-xl font-bold mt-1 text-purple-400" x-text="(hostLatest.cpu_percent||0).toFixed(1)+'%'"></div>
+                </div>
+                <div class="card">
+                    <div class="text-xs text-gray-400">内存</div>
+                    <div class="text-xl font-bold mt-1 text-green-400" x-text="(hostLatest.memory_percent||0).toFixed(1)+'%'"></div>
+                </div>
+                <div class="card">
+                    <div class="text-xs text-gray-400">磁盘</div>
+                    <div class="text-xl font-bold mt-1 text-yellow-400" x-text="(hostLatest.disk_percent||0).toFixed(1)+'%'"></div>
+                </div>
+                <div class="card">
+                    <div class="text-xs text-gray-400">负载 (1m)</div>
+                    <div class="text-xl font-bold mt-1 text-gray-200" x-text="(hostLatest.load_avg_1||0).toFixed(2)"></div>
+                </div>
+            </div>
+            <div class="card mb-4" style="height:220px;position:relative;"><canvas id="cpuChart"></canvas></div>
+            <div class="card mb-4" style="height:220px;position:relative;"><canvas id="memChart"></canvas></div>
+            <div class="card" style="height:220px;position:relative;"><canvas id="loadChart"></canvas></div>
+        </div>
+    </section>
     <div class="border border-[#2a3038] bg-[#171b21] mb-6" x-show="httpProbeIssues.length">
         <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-red-300">HTTP 探测异常</div>
         <div class="p-5">
@@ -89,8 +126,12 @@ function dashboardPage() {
         alerts: [],
         panelUpdate: { hasUpdate: false, latestVersion: '' },
         sysUpdateCount: 0,
+        hostLatest: {},
+        hostRange: '24h',
         async init() {
             await Promise.all([
+                this.loadHostLatest(),
+                this.loadHostCharts(),
                 (async () => { try {
                     const d = await api('/api/dashboard/stats');
                     this.stats = d.data;
@@ -139,7 +180,26 @@ function dashboardPage() {
             if (/certificate|tls|x509/i.test(msg)) return 'TLS/证书错误';
             if (/^HTTP \d+/.test(msg)) return msg;
             return msg.length > 40 ? msg.slice(0, 40) + '…' : msg;
-        }
+        },
+        hostSummary() {
+            const parts = [];
+            if (this.hostLatest.hostname) parts.push(this.hostLatest.hostname);
+            if (this.hostLatest.cpu_cores) parts.push(this.hostLatest.cpu_cores + ' 核');
+            if (this.hostLatest.uptime_seconds) parts.push('运行 ' + formatUptime(this.hostLatest.uptime_seconds));
+            return parts.join(' · ') || '暂无数据';
+        },
+        async loadHostLatest() {
+            try { const d = await api('/api/dashboard/host-metrics/latest'); this.hostLatest = d.data || {}; } catch(e) {}
+        },
+        async loadHostCharts(range) {
+            const r = range || this.hostRange;
+            this.hostRange = r;
+            try {
+                const d = await api('/api/dashboard/host-metrics?range='+r);
+                updateCharts(d.data || []);
+            } catch(e) { console.error(e); }
+        },
+        changeHostRange(range) { this.loadHostCharts(range); }
     }
 }
 </script>

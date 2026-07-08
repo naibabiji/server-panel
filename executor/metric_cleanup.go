@@ -33,6 +33,14 @@ func StartMetricCleanup(interval time.Duration) {
 			} else if rows, _ := result.RowsAffected(); rows > 0 {
 				log.Printf("Metric cleanup: deleted %d old records (retention: %d days)", rows, retentionDays)
 			}
+
+			hostResult, err := db.Exec("DELETE FROM host_metrics WHERE recorded_at < datetime('now', ? || ' days')",
+				strconv.Itoa(-retentionDays))
+			if err != nil {
+				log.Printf("Host metric cleanup failed: %v", err)
+			} else if rows, _ := hostResult.RowsAffected(); rows > 0 {
+				log.Printf("Host metric cleanup: deleted %d old records (retention: %d days)", rows, retentionDays)
+			}
 		}
 	}()
 }
