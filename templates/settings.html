@@ -18,7 +18,23 @@
             <a href="#dictionary" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">字典</a>
         </nav>
 
-        <div class="min-w-0">
+        <div class="min-w-0" x-show="loading" x-cloak>
+            <template x-for="n in 4" :key="n">
+                <div class="border border-[#2a3038] bg-[#171b21] mb-5">
+                    <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
+                        <div class="skeleton-block h-4 w-32 mb-2"></div>
+                        <div class="skeleton-block h-3 w-64"></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
+                        <div class="skeleton-block h-9"></div>
+                        <div class="skeleton-block h-9"></div>
+                        <div class="skeleton-block h-9"></div>
+                        <div class="skeleton-block h-9"></div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <div class="min-w-0" x-show="!loading">
             <section id="basic" class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">基础设置</div>
@@ -413,6 +429,7 @@
 <script>
 function settingsPage() {
     return {
+        loading: true,
         panelTitle: '', smtp: {}, access: { tls_port: 0, random_suffix: '' }, tls: { tls_mode:'self_signed', domain:'', tls_cert_path:'', tls_key_path:'', acme_email:'' }, tlsUpload: { cert_pem:'', key_pem:'' }, osList: '', siteTypeList: '',
         acct: { web_username:'', web_password:'', web_password2:'', basic_username:'', basic_password:'', old_password:'' },
         vpSetup: false, vpUnlocked: false,
@@ -458,6 +475,7 @@ function settingsPage() {
                 this.checkUpdate(true).catch(() => {}),
                 this.checkSysUpdate().catch(() => {}),
             ]);
+            this.loading = false;
         },
         async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
         async saveAccess() {

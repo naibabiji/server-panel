@@ -67,4 +67,22 @@
   .modal-content {
     @apply bg-[#171b21] rounded-none border border-[#2a3038] p-6 max-w-lg w-full mx-4 max-h-[80vh] overflow-y-auto;
   }
+  /* Loading-state placeholder for pages that fetch their data after mount
+     (see templates/settings.html) - shown in place of a section's real
+     content until its API calls resolve, so the wait reads as "loading"
+     instead of "the form reset to nothing". */
+  .skeleton-block {
+    @apply rounded-none;
+    /* Base tone (#202833, distinct from the card's own #171b21 background)
+       keeps the placeholder's shape visibly a rectangle at rest; only the
+       lighter band sweeps across as the highlight. */
+    background-color: #202833;
+    background-image: linear-gradient(100deg, transparent 30%, #323c49 50%, transparent 70%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  to { background-position: -200% 0; }
 }
