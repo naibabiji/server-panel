@@ -229,9 +229,10 @@ function serverDetail() {
             return 'text-gray-200';
         },
         sshLoginText() {
-            const user = this.s.ssh_username || '--';
+            const user = this.s.ssh_username || 'root';
             const port = this.s.ssh_port || 22;
-            return user + ':' + port;
+            const host = this.s.ip_address || '';
+            return host ? (user + '@' + host + ':' + port) : (user + ':' + port);
         },
         customerURL() {
             if (!this.s.customer_id) return '#';
