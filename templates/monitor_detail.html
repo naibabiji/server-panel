@@ -36,11 +36,9 @@
         </div>
     </div>
 
-    <div class="card mb-4"><canvas id="cpuChart" height="80"></canvas></div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div class="card"><canvas id="memChart" height="80"></canvas></div>
-        <div class="card"><canvas id="loadChart" height="80"></canvas></div>
-    </div>
+    <div class="card mb-4" style="height:260px;position:relative;"><canvas id="cpuChart"></canvas></div>
+    <div class="card mb-4" style="height:260px;position:relative;"><canvas id="memChart"></canvas></div>
+    <div class="card" style="height:260px;position:relative;"><canvas id="loadChart"></canvas></div>
 </div>
 <script>
 let charts = {};
@@ -55,16 +53,13 @@ function hexToRGBA(hex, alpha) {
     return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-// 计算比较"贴合数据"的 y 轴上限：留 25% 余量后取整到规整刻度，
-// 避免固定量程把平稳数据压扁在图表底部一小条里。
-function niceAxisMax(values, opts) {
-    opts = opts || {};
+// Load 不是百分比，仍然按数据范围给一个规整上限。
+function niceLoadAxisMax(values) {
     const nums = (values || []).filter(v => typeof v === 'number' && isFinite(v));
     const max = nums.length ? Math.max(...nums) : 0;
-    const floor = opts.percent ? 10 : 1;
+    const floor = 1;
     let target = Math.max(max * 1.25, floor);
-    if (opts.percent) target = Math.min(target, 100);
-    const step = opts.percent ? 5 : (target > 10 ? 1 : 0.5);
+    const step = target > 10 ? 1 : 0.5;
     return Math.ceil(target / step) * step;
 }
 
@@ -114,7 +109,8 @@ function updateCharts(points) {
         const data = points.map(p => p.cpu);
         charts.cpu.data.labels = labels;
         charts.cpu.data.datasets[0].data = data;
-        charts.cpu.options.scales.y.suggestedMax = niceAxisMax(data, { percent: true });
+        charts.cpu.options.scales.y.min = 0;
+        charts.cpu.options.scales.y.max = 100;
         charts.cpu.update();
     }
 
@@ -123,7 +119,8 @@ function updateCharts(points) {
         const data = points.map(p => p.mem);
         charts.mem.data.labels = labels;
         charts.mem.data.datasets[0].data = data;
-        charts.mem.options.scales.y.suggestedMax = niceAxisMax(data, { percent: true });
+        charts.mem.options.scales.y.min = 0;
+        charts.mem.options.scales.y.max = 100;
         charts.mem.update();
     }
 
@@ -132,7 +129,7 @@ function updateCharts(points) {
         const data = points.map(p => p.load1);
         charts.load.data.labels = labels;
         charts.load.data.datasets[0].data = data;
-        charts.load.options.scales.y.suggestedMax = niceAxisMax(data);
+        charts.load.options.scales.y.suggestedMax = niceLoadAxisMax(data);
         charts.load.update();
     }
 }

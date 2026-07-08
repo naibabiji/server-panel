@@ -78,7 +78,7 @@ async function unlockViewPasswordPrompt() {
         return '';
     }
 
-    const pw = prompt('请输入查看密码:');
+    const pw = await passwordPromptModal('请输入查看密码');
     if (!pw) return '';
     const d = await api('/api/view-password/unlock', {method:'POST', body:{password:pw}});
     return d.data.view_token || '';
@@ -132,6 +132,91 @@ function showToast(message, type = 'info') {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 300);
     }, 5000);
+}
+
+function inputModal(options = {}) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'background:#111827;border:1px solid #374151;border-radius:8px;box-shadow:0 24px 60px rgba(0,0,0,0.45);max-width:28rem;width:100%;padding:20px;';
+
+        const title = document.createElement('div');
+        title.style.cssText = 'color:#f9fafb;font-size:16px;font-weight:600;margin-bottom:6px;';
+        title.textContent = options.title || '请输入';
+        dialog.appendChild(title);
+
+        if (options.message) {
+            const message = document.createElement('p');
+            message.style.cssText = 'color:#9ca3af;font-size:13px;line-height:1.5;margin:0 0 14px;';
+            message.textContent = options.message;
+            dialog.appendChild(message);
+        }
+
+        const label = document.createElement('label');
+        label.style.cssText = 'display:block;color:#d1d5db;font-size:13px;margin-bottom:6px;';
+        label.textContent = options.label || title.textContent;
+        dialog.appendChild(label);
+
+        const input = document.createElement('input');
+        input.type = options.type || 'text';
+        input.value = options.defaultValue || '';
+        input.placeholder = options.placeholder || '';
+        if (options.autocomplete) input.autocomplete = options.autocomplete;
+        input.style.cssText = 'width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #374151;border-radius:8px;color:#f9fafb;padding:10px 12px;font-size:14px;outline:none;';
+        input.onfocus = () => { input.style.borderColor = '#8b5cf6'; input.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.18)'; };
+        input.onblur = () => { input.style.borderColor = '#374151'; input.style.boxShadow = 'none'; };
+        dialog.appendChild(input);
+
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;justify-content:flex-end;gap:10px;margin-top:18px;';
+
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.style.cssText = 'background:#374151;color:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px;';
+        cancel.textContent = options.cancelText || '取消';
+
+        const confirm = document.createElement('button');
+        confirm.type = 'button';
+        confirm.style.cssText = 'background:#7c3aed;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px;';
+        confirm.textContent = options.confirmText || '确认';
+
+        actions.appendChild(cancel);
+        actions.appendChild(confirm);
+        dialog.appendChild(actions);
+        overlay.appendChild(dialog);
+
+        const close = (value) => {
+            overlay.remove();
+            document.removeEventListener('keydown', onKeydown);
+            resolve(value);
+        };
+        const submit = () => close(input.value);
+        const onKeydown = (e) => {
+            if (e.key === 'Escape') close(null);
+            if (e.key === 'Enter') submit();
+        };
+
+        cancel.onclick = () => close(null);
+        confirm.onclick = submit;
+        overlay.onclick = (e) => { if (e.target === overlay) close(null); };
+        document.addEventListener('keydown', onKeydown);
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => input.focus());
+    });
+}
+
+function passwordPromptModal(label, options = {}) {
+    return inputModal({
+        title: options.title || '密码验证',
+        label,
+        message: options.message || '',
+        type: 'password',
+        autocomplete: options.autocomplete || 'current-password',
+        placeholder: options.placeholder || '',
+        confirmText: options.confirmText || '确认',
+    });
 }
 
 function confirmModal(message) {

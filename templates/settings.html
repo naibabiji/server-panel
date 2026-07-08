@@ -12,10 +12,10 @@
         <nav class="lg:sticky lg:top-20 self-start bg-[#10151c] border border-[#202833] p-2">
             <a href="#basic" class="block px-3 py-2 text-sm text-white bg-[#211a31] border-l-2 border-purple-500">基础设置</a>
             <a href="#update" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">更新</a>
+            <a href="#backup" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">备份</a>
             <a href="#security" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">安全</a>
             <a href="#notification" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">通知</a>
             <a href="#dictionary" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">字典</a>
-            <a href="#danger" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">危险操作</a>
         </nav>
 
         <div class="min-w-0">
@@ -177,24 +177,91 @@
                         <div class="text-sm text-gray-500 leading-6">最近的更新/系统操作记录。</div>
                     </div>
                     <div>
-                        <div class="border border-[#202833] max-h-80 overflow-y-auto">
-                            <table class="w-full text-xs">
-                                <tbody>
-                                    <template x-for="log in opLogs.items" :key="log.id">
-                                        <tr class="border-b border-[#202833]">
-                                            <td class="px-2 py-1 text-gray-400 whitespace-nowrap" x-text="log.created_at"></td>
-                                            <td class="px-2 py-1 text-gray-300" x-text="log.operation"></td>
-                                            <td class="px-2 py-1" :class="log.status === 'failed' ? 'text-red-400' : (log.status === 'success' ? 'text-green-400' : 'text-gray-500')" x-text="log.status"></td>
-                                            <td class="px-2 py-1 text-gray-500" x-text="log.message"></td>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-                            <div class="text-xs text-gray-500 p-3" x-show="!opLogs.items || opLogs.items.length === 0">暂无记录</div>
+                        <button @click="openOpLogs()" class="btn-secondary text-sm">查看操作日志</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="backup" class="border border-[#2a3038] bg-[#171b21] mb-5">
+                <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
+                    <div class="text-base font-semibold text-gray-100">备份</div>
+                    <div class="text-sm text-gray-500 mt-1">生成面板 SQLite 数据库快照，可选发送到管理员邮箱。</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">自动备份</div>
+                        <div class="text-sm text-gray-500 leading-6">默认关闭。开启后按固定频率生成本地备份，保留最近若干份。</div>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2 text-sm text-gray-300 mb-3">
+                            <input type="checkbox" x-model="backup.auto_enabled">
+                            启用自动备份
+                        </label>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label class="label">备份频率</label><select x-model="backup.frequency" class="input-field"><option value="weekly">每周</option><option value="daily">每天</option></select></div>
+                            <div><label class="label">本地保留份数</label><input type="number" x-model="backup.keep_count" class="input-field" min="1" max="365"></div>
+                            <div><label class="label">邮件附件上限（MB）</label><input type="number" x-model="backup.max_email_mb" class="input-field" min="1" max="100"></div>
+                            <div><label class="label">管理员邮箱</label><div class="input-field text-gray-300" x-text="backup.admin_email || '未设置'"></div></div>
+                        </div>
+                        <label class="flex items-center gap-2 text-sm text-gray-300 mt-3">
+                            <input type="checkbox" x-model="backup.email_enabled">
+                            备份后发送到管理员邮箱
+                        </label>
+                        <div class="text-xs text-gray-500 mt-3 space-y-1">
+                            <div x-show="backup.last_run_at">上次备份：<span x-text="formatBackupTime(backup.last_run_at)"></span></div>
+                            <div x-show="backup.last_status">上次状态：<span :class="backup.last_status === 'failed' ? 'text-red-400' : (backup.last_status === 'warning' ? 'text-yellow-400' : 'text-gray-400')" x-text="backup.last_status"></span></div>
+                            <div x-show="backup.last_error" class="text-yellow-400">提示：<span x-text="backup.last_error"></span></div>
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-3">
+                            <button @click="saveBackup()" class="btn-primary text-sm">保存备份设置</button>
+                            <button @click="runBackup()" class="btn-secondary text-sm" :disabled="backupRun.running">立即备份</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5" x-show="backupRun.running || backupRun.message">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">本次结果</div>
+                        <div class="text-sm text-gray-500 leading-6">手动备份执行状态。</div>
+                    </div>
+                    <div class="border border-[#202833] bg-[#11151a] p-3">
+                        <div class="text-sm" :class="backupRun.status === 'warning' ? 'text-yellow-400' : (backupRun.status === 'success' ? 'text-green-400' : 'text-gray-300')" x-text="backupRun.running ? '正在生成备份...' : backupRun.message"></div>
+                        <div class="text-xs text-gray-500 mt-2 space-y-1" x-show="backupRun.filename">
+                            <div>文件：<span x-text="backupRun.filename"></span></div>
+                            <div>大小：<span x-text="backupRun.size_human"></span></div>
+                            <div>邮件：<span x-text="backupRun.email_sent ? '已发送' : (backupRun.email_skipped_reason || '未发送')"></span></div>
                         </div>
                     </div>
                 </div>
             </section>
+
+            <div x-show="opLogModalOpen" class="modal-overlay" x-cloak>
+                <div class="modal-content max-w-5xl">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                            <div class="text-base font-semibold text-gray-100">操作日志</div>
+                            <div class="text-xs text-gray-500 mt-1" x-text="'共 ' + (opLogs.total || 0) + ' 条，显示最近 ' + (opLogs.items || []).length + ' 条'"></div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="loadOpLogs()" class="btn-secondary text-sm">刷新</button>
+                            <button @click="opLogModalOpen=false" class="btn-secondary text-sm">关闭</button>
+                        </div>
+                    </div>
+                    <div class="space-y-3 max-h-[65vh] overflow-y-auto">
+                        <template x-for="log in opLogs.items" :key="log.id">
+                            <div class="border border-[#202833] bg-[#11151a] p-3">
+                                <div class="flex flex-wrap items-center gap-2 mb-2">
+                                    <span class="text-xs text-gray-500" x-text="log.created_at"></span>
+                                    <span class="badge-info text-xs" x-text="log.operation"></span>
+                                    <span :class="log.status === 'failed' ? 'badge-danger' : (log.status === 'success' ? 'badge-success' : 'badge-info')" x-text="log.status"></span>
+                                    <span class="text-xs text-gray-500" x-show="log.target" x-text="log.target"></span>
+                                </div>
+                                <div class="text-sm text-gray-300 whitespace-pre-wrap break-all" x-text="log.message || '--'"></div>
+                            </div>
+                        </template>
+                        <div class="text-sm text-gray-500 py-8 text-center" x-show="!opLogs.items || opLogs.items.length === 0">暂无记录</div>
+                    </div>
+                </div>
+            </div>
 
             <section id="security" class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
@@ -283,19 +350,6 @@
                 </div>
             </section>
 
-            <section id="danger" class="border border-red-900/60 bg-[#171b21] mb-5">
-                <div class="px-5 py-4 border-b border-red-900/40 bg-red-950/10">
-                    <div class="text-base font-semibold text-gray-100">危险操作</div>
-                    <div class="text-sm text-gray-500 mt-1">这些操作会影响已保存的敏感凭据或当前登录状态。</div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 bg-red-950/5">
-                    <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">重置查看密码</div>
-                        <div class="text-sm text-gray-500 leading-6">重置会清空已保存的服务器和网站敏感凭据，不能恢复。</div>
-                    </div>
-                    <div><button @click="resetVP()" class="btn-danger text-sm" x-show="vpSetup">重置查看密码</button></div>
-                </div>
-            </section>
         </div>
     </div>
 </div>
@@ -308,8 +362,11 @@ function settingsPage() {
         update: { current_version:'', hasUpdate:false, latestVersion:'', releaseNotes:'', checking:false },
         updateRun: { running:false, message:'', percent:0, downloadedBytes:0, totalBytes:0, completed:false, error:'' },
         autoUpdate: { enabled:false, mode:'patch_only', window:'03:00-05:00', release_delay_minutes:'15', signature_timeout_minutes:'120', last_check_at:'', last_status:'', last_error:'', last_success_at:'', last_success_version:'' },
+        backup: { auto_enabled:false, frequency:'weekly', email_enabled:false, keep_count:'10', max_email_mb:'20', last_run_at:'', last_status:'', last_error:'', admin_email:'' },
+        backupRun: { running:false, message:'', status:'', filename:'', size_human:'', email_sent:false, email_skipped_reason:'' },
         sysUpdate: { packages:[], count:0, checking:false, updating:false, output:'' },
         opLogs: { items:[], total:0, page:1, page_size:20 },
+        opLogModalOpen: false,
         async init() {
             // 各区块数据源互不依赖，并行加载，避免逐个排队等待
             await Promise.all([
@@ -336,9 +393,9 @@ function settingsPage() {
                         last_success_version: d.data.panel_auto_update_last_success_version || ''
                     };
                 } catch(e) {} })(),
+                this.loadBackup().catch(() => {}),
                 this.checkUpdate().catch(() => {}),
                 this.checkSysUpdate().catch(() => {}),
-                this.loadOpLogs().catch(() => {}),
             ]);
         },
         async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
@@ -493,6 +550,59 @@ function settingsPage() {
             };
             try { await api('/api/update/auto-settings', {method:'PUT', body}); showToast('自动更新设置已保存','success'); } catch(e) { showToast(e.message,'error'); }
         },
+        async loadBackup() {
+            const d = await api('/api/settings/backup');
+            this.backup = {
+                auto_enabled: d.data.backup_auto_enabled === 'true',
+                frequency: d.data.backup_frequency || 'weekly',
+                email_enabled: d.data.backup_email_enabled === 'true',
+                keep_count: d.data.backup_keep_count || '10',
+                max_email_mb: d.data.backup_max_email_mb || '20',
+                last_run_at: d.data.backup_last_run_at || '',
+                last_status: d.data.backup_last_status || '',
+                last_error: d.data.backup_last_error || '',
+                admin_email: d.data.admin_email || ''
+            };
+        },
+        async saveBackup() {
+            const keepCount = parseInt(this.backup.keep_count) || 10;
+            const maxEmailMB = parseInt(this.backup.max_email_mb) || 20;
+            const body = {
+                backup_auto_enabled: this.backup.auto_enabled ? 'true' : 'false',
+                backup_frequency: this.backup.frequency || 'weekly',
+                backup_email_enabled: this.backup.email_enabled ? 'true' : 'false',
+                backup_keep_count: String(keepCount),
+                backup_max_email_mb: String(maxEmailMB)
+            };
+            try {
+                const d = await api('/api/settings/backup', {method:'PUT', body});
+                showToast((d.data && d.data.message) || '备份设置已保存','success');
+                await this.loadBackup();
+            } catch(e) { showToast(e.message,'error'); }
+        },
+        async runBackup() {
+            const ok = await confirmModal('立即生成数据库备份吗？');
+            if (!ok) return;
+            this.backupRun = { running:true, message:'', status:'', filename:'', size_human:'', email_sent:false, email_skipped_reason:'' };
+            try {
+                const d = await api('/api/settings/backup/run', {method:'POST', body:{email_enabled: !!this.backup.email_enabled}});
+                this.backupRun = Object.assign({running:false}, d.data || {});
+                const toastType = this.backupRun.status === 'warning' ? 'warning' : 'success';
+                showToast(this.backupRun.message || '数据库备份已生成', toastType);
+                await this.loadBackup();
+            } catch(e) {
+                this.backupRun.running = false;
+                this.backupRun.message = e.message;
+                this.backupRun.status = 'failed';
+                showToast(e.message,'error');
+            }
+        },
+        formatBackupTime(value) {
+            if (!value) return '';
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return value;
+            return d.toLocaleString();
+        },
         async checkSysUpdate() {
             this.sysUpdate.checking = true;
             try {
@@ -516,6 +626,10 @@ function settingsPage() {
         },
         async loadOpLogs() {
             try { const d = await api('/api/update/logs?page=1&page_size=20'); this.opLogs = d.data; } catch(e) {}
+        },
+        async openOpLogs() {
+            this.opLogModalOpen = true;
+            await this.loadOpLogs();
         },
         async saveOSList() {
             const items = this.osList.split('\n').map(s => s.trim()).filter(s => s);
@@ -553,19 +667,19 @@ function settingsPage() {
             } catch(e) { showToast(e.message,'error'); }
         },
         async setupVP() {
-            const pw = prompt('请设置查看密码（建议使用较长且不重复的密码）:');
+            const pw = await passwordPromptModal('查看密码', {title:'设置查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'new-password'});
             if (!pw) return;
-            const pw2 = prompt('请再次输入查看密码:');
+            const pw2 = await passwordPromptModal('再次输入查看密码', {title:'确认查看密码', autocomplete:'new-password'});
             if (!pw2) return;
             if (pw !== pw2) { showToast('两次输入的查看密码不一致','error'); return; }
             try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2}}); this.vpSetup = true; this.vpUnlocked = false; showToast('查看密码已设置','success'); } catch(e) { showToast(e.message,'error'); }
         },
         async changeVP() {
-            const oldPw = prompt('请输入当前查看密码:');
+            const oldPw = await passwordPromptModal('当前查看密码', {title:'修改查看密码'});
             if (!oldPw) return;
-            const newPw = prompt('请输入新的查看密码（建议使用较长且不重复的密码）:');
+            const newPw = await passwordPromptModal('新的查看密码', {title:'设置新查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'new-password'});
             if (!newPw) return;
-            const newPw2 = prompt('请再次输入新的查看密码:');
+            const newPw2 = await passwordPromptModal('再次输入新的查看密码', {title:'确认新查看密码', autocomplete:'new-password'});
             if (!newPw2) return;
             if (newPw !== newPw2) { showToast('两次输入的新查看密码不一致','error'); return; }
             try {
@@ -577,17 +691,22 @@ function settingsPage() {
         async resetVP() {
             const ok = await confirmModal('重置查看密码会清空所有已保存的服务器/网站敏感凭据，且不可恢复。确认继续？');
             if (!ok) return;
-            const confirm = prompt('请输入 DELETE_SAVED_PASSWORDS 确认删除所有已保存密码:') || '';
+            const confirm = await inputModal({
+                title: '确认重置查看密码',
+                label: '输入 DELETE_SAVED_PASSWORDS',
+                message: '该操作会删除所有已保存的服务器/网站敏感凭据。',
+                confirmText: '继续'
+            }) || '';
             if (confirm !== 'DELETE_SAVED_PASSWORDS') { showToast('确认短语不匹配，已取消','error'); return; }
-            const pw = prompt('请设置新的查看密码（建议使用较长且不重复的密码）:');
+            const pw = await passwordPromptModal('新的查看密码', {title:'重置查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'new-password'});
             if (!pw) return;
-            const pw2 = prompt('请再次输入新的查看密码:');
+            const pw2 = await passwordPromptModal('再次输入新的查看密码', {title:'确认新查看密码', autocomplete:'new-password'});
             if (!pw2) return;
             if (pw !== pw2) { showToast('两次输入的新查看密码不一致','error'); return; }
             try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2, force:true, confirm}}); this.vpSetup = true; this.vpUnlocked = false; showToast('查看密码已重置，已保存密码已清空','success'); } catch(e) { showToast(e.message,'error'); }
         },
         async unlockVP() {
-            const pw = prompt('请输入查看密码:');
+            const pw = await passwordPromptModal('查看密码');
             if (!pw) return;
             try { await api('/api/view-password/unlock', {method:'POST', body:{password:pw}}); this.vpUnlocked = false; showToast('查看密码验证通过','success'); } catch(e) { showToast(e.message,'error'); }
         },

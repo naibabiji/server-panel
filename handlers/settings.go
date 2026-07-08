@@ -188,6 +188,103 @@ func (h *SettingsHandler) UpdateSMTPConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
 }
 
+var backupSettingKeys = []string{
+	"backup_auto_enabled",
+	"backup_frequency",
+	"backup_email_enabled",
+	"backup_keep_count",
+	"backup_max_email_mb",
+	"backup_last_run_at",
+	"backup_last_status",
+	"backup_last_error",
+}
+
+var backupEditableKeys = map[string]bool{
+	"backup_auto_enabled":  true,
+	"backup_frequency":     true,
+	"backup_email_enabled": true,
+	"backup_keep_count":    true,
+	"backup_max_email_mb":  true,
+}
+
+func (h *SettingsHandler) GetBackupSettings(c *gin.Context) {
+	result := make(map[string]string, len(backupSettingKeys)+1)
+	for _, k := range backupSettingKeys {
+		var v string
+		h.db().QueryRow("SELECT svalue FROM settings WHERE skey = ?", k).Scan(&v)
+		result[k] = v
+	}
+	var adminEmail string
+	h.db().QueryRow("SELECT svalue FROM settings WHERE skey = 'admin_email'").Scan(&adminEmail)
+	result["admin_email"] = adminEmail
+	c.JSON(http.StatusOK, models.SuccessResponse(result))
+}
+
+func (h *SettingsHandler) UpdateBackupSettings(c *gin.Context) {
+	var req map[string]string
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		return
+	}
+
+	for k, v := range req {
+		if !backupEditableKeys[k] {
+			c.JSON(http.StatusBadRequest, models.ErrorResponse("不允许的配置项: "+k))
+			return
+		}
+		switch k {
+		case "backup_auto_enabled", "backup_email_enabled":
+			if v != "true" && v != "false" {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse(k+" 只能为 true 或 false"))
+				return
+			}
+		case "backup_frequency":
+			if v != "daily" && v != "weekly" {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse("备份频率仅支持 daily 或 weekly"))
+				return
+			}
+		case "backup_keep_count":
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 || n > 365 {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse("本地保留份数必须在 1-365 之间"))
+				return
+			}
+		case "backup_max_email_mb":
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 1 || n > 100 {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse("邮件附件上限必须在 1-100 MB 之间"))
+				return
+			}
+		}
+		h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES (?, ?)", k, v)
+	}
+
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "备份设置已保存"}))
+}
+
+func (h *SettingsHandler) RunDatabaseBackup(c *gin.Context) {
+	var req struct {
+		EmailEnabled *bool `json:"email_enabled"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	emailEnabled := false
+	if req.EmailEnabled != nil {
+		emailEnabled = *req.EmailEnabled
+	} else {
+		var value string
+		h.db().QueryRow("SELECT svalue FROM settings WHERE skey = 'backup_email_enabled'").Scan(&value)
+		emailEnabled = value == "true"
+	}
+
+	result, err := executor.RunDatabaseBackup("manual", emailEnabled)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("备份失败: "+err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, models.SuccessResponse(result))
+}
+
 // 账户安全（统一管理面板登录 + BasicAuth）
 func (h *SettingsHandler) sessionUser(c *gin.Context) string {
 	if u, ok := c.Get("session_username"); ok {

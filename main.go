@@ -118,6 +118,7 @@ func main() {
 	executor.StartHTTPProber(5 * time.Minute)
 	executor.StartAgentOfflineChecker(60 * time.Second)
 	executor.StartAlertChecker(60 * time.Second)
+	executor.StartDatabaseBackupScheduler(1 * time.Hour)
 	executor.StartAutoRenewalChecker(24 * time.Hour)
 	executor.InitNFTables(cfg.Panel.TLSPort)
 	executor.StartBanCleanup(1 * time.Minute)
