@@ -89,8 +89,9 @@ function websiteForm() {
             const last = parts[parts.length-1];
             if (last === 'edit') this.id = parts[parts.length-2];
             else if (last !== 'new') this.id = last;
-            if (this.id) this.isEdit = true;
-            // 并行加载下拉数据源，确保编辑回显时选项已存在，下拉才能正确选中
+            if (this.id) { this.isEdit = true; this.loading = true; }
+            // 并行加载下拉数据源，确保编辑回显时选项已存在，下拉才能正确选中。
+            // loading 必须在这一步之前置 true，理由同 server_form.html。
             await Promise.all([
                 (async () => { try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/customers?page_size=100'); this.customers = d.data.items || []; } catch(e) {} })(),
@@ -98,7 +99,6 @@ function websiteForm() {
             ]);
             if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
             if (this.id) {
-                this.loading = true;
                 await this.load();
                 this.loading = false;
             }
