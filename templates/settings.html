@@ -135,10 +135,10 @@
                             <div><label class="label">签名等待超时（分钟）</label><input type="number" x-model="autoUpdate.signature_timeout_minutes" @change="saveAutoUpdate()" class="input-field"></div>
                         </div>
                         <div class="text-xs text-gray-500 mt-3 space-y-1">
-                            <div x-show="autoUpdate.last_check_at">上次检查：<span x-text="autoUpdate.last_check_at"></span></div>
+                            <div x-show="autoUpdate.last_check_at">上次检查：<span x-text="fmtTime(autoUpdate.last_check_at)"></span></div>
                             <div x-show="autoUpdate.last_status">上次状态：<span :class="autoUpdate.last_status === 'failed' ? 'text-red-400' : 'text-gray-400'" x-text="autoUpdate.last_status"></span></div>
                             <div x-show="autoUpdate.last_error" class="text-red-400">上次错误：<span x-text="autoUpdate.last_error"></span></div>
-                            <div x-show="autoUpdate.last_success_version">上次成功版本：<span x-text="autoUpdate.last_success_version"></span>（<span x-text="autoUpdate.last_success_at"></span>）</div>
+                            <div x-show="autoUpdate.last_success_version">上次成功版本：<span x-text="autoUpdate.last_success_version"></span>（<span x-text="fmtTime(autoUpdate.last_success_at)"></span>）</div>
                         </div>
                     </div>
                 </div>
