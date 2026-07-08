@@ -127,7 +127,22 @@ func checkDomain(domain string, timeoutSec int) (bool, string) {
 		},
 	}
 
-	resp, err := client.Get(target)
+	req, err := http.NewRequest(http.MethodGet, target, nil)
+	if err != nil {
+		return false, err.Error()
+	}
+	// Go's default "Go-http-client/1.1" User-Agent (and the absence of any
+	// other browser-like headers) is a well-known bot signature that many
+	// WAFs/CDNs (Cloudflare, Sucuri, security plugins, etc.) challenge or
+	// deliberately slow-walk, even though a real browser sails through
+	// instantly - that mismatch is what surfaces here as a probe timeout
+	// ("context deadline exceeded ... awaiting headers") on a site that's
+	// actually reachable. Looking like an ordinary browser avoids that.
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return false, err.Error()
 	}
