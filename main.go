@@ -282,7 +282,15 @@ func runRestoreBackup(cfg *config.Config, archivePath string) error {
 	}
 
 	if err := database.RestoreDatabaseFile(dbPath, liveDBPath); err != nil {
-		return fmt.Errorf("写入数据库失败（密钥可能已被恢复或移除，如需回滚请检查 %s 目录下的 .pre-restore 文件）: %w", filepath.Dir(liveSecretKeyPath), err)
+		// The live db is untouched on this failure (RestoreDatabaseFile only
+		// swaps in the new file via atomic rename after everything else
+		// succeeds), but the key above may already have been changed. Roll
+		// it back so we don't leave "old db + new/missing key" behind -
+		// restore is all-or-nothing, not best-effort.
+		if rbErr := restoreLiveSecretKey(liveSecretKeyPath, preRestoreSuffix, secretKeyPath, liveSecretKeyExisted); rbErr != nil {
+			return fmt.Errorf("写入数据库失败，且回滚密钥文件也失败，请手动检查 %s 与 %s（数据库错误: %v；回滚错误: %v）", liveSecretKeyPath, liveSecretKeyPath+preRestoreSuffix, err, rbErr)
+		}
+		return fmt.Errorf("写入数据库失败，已将密钥文件回滚到恢复前状态: %w", err)
 	}
 	fmt.Printf("数据库已恢复到 %s\n", liveDBPath)
 
@@ -296,6 +304,32 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.WriteFile(dst, data, 0600)
+}
+
+// restoreLiveSecretKey undoes whatever runRestoreBackup's secret-key step
+// did to liveSecretKeyPath, using the .pre-restore copy taken beforehand.
+// Called when the subsequent database swap fails, so the live key doesn't
+// end up paired with the database that was there before the restore
+// attempt.
+func restoreLiveSecretKey(liveSecretKeyPath, preRestoreSuffix, archiveSecretKeyPath string, liveSecretKeyExisted bool) error {
+	switch {
+	case archiveSecretKeyPath != "" && liveSecretKeyExisted:
+		// We overwrote an existing live key; put the original back.
+		return copyFile(liveSecretKeyPath+preRestoreSuffix, liveSecretKeyPath)
+	case archiveSecretKeyPath != "" && !liveSecretKeyExisted:
+		// We wrote a key where none existed before; remove it.
+		if err := os.Remove(liveSecretKeyPath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		return nil
+	case archiveSecretKeyPath == "" && liveSecretKeyExisted:
+		// We removed the live key; put it back.
+		return copyFile(liveSecretKeyPath+preRestoreSuffix, liveSecretKeyPath)
+	default:
+		// archiveSecretKeyPath == "" && !liveSecretKeyExisted: nothing was
+		// touched, nothing to roll back.
+		return nil
+	}
 }
 
 func runUnbanAll() {

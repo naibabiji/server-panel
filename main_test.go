@@ -113,3 +113,58 @@ func TestRunRestoreBackupWritesArchiveKeyToLivePath(t *testing.T) {
 		t.Errorf("restored secret.key content = %q, want %q", data, "archive-key-value")
 	}
 }
+
+// TestRunRestoreBackupRollsBackKeyWhenDatabaseWriteFails forces the final
+// database.RestoreDatabaseFile step to fail (by making its target directory
+// read-only) after the secret-key step has already succeeded, and checks
+// that the live secret.key is rolled back to its pre-restore content rather
+// than left paired with the database that was never actually replaced.
+func TestRunRestoreBackupRollsBackKeyWhenDatabaseWriteFails(t *testing.T) {
+	srcDir := t.TempDir()
+	dbPath := filepath.Join(srcDir, "server-panel.db")
+	newMinimalBackupDB(t, dbPath)
+
+	secretKeyPath := filepath.Join(srcDir, "secret.key")
+	if err := os.WriteFile(secretKeyPath, []byte("archive-key-value"), 0600); err != nil {
+		t.Fatalf("write source secret.key: %v", err)
+	}
+
+	archiveDir := t.TempDir()
+	archivePath, err := database.CreateFullBackupArchive(dbPath, secretKeyPath, archiveDir)
+	if err != nil {
+		t.Fatalf("CreateFullBackupArchive: %v", err)
+	}
+
+	targetDir := t.TempDir()
+	liveSecretKeyPath := filepath.Join(targetDir, "secret.key")
+	if err := os.WriteFile(liveSecretKeyPath, []byte("stale-target-key"), 0600); err != nil {
+		t.Fatalf("seed target secret.key: %v", err)
+	}
+
+	// secret.key lives directly in targetDir (writable); the database lives
+	// in a separate, pre-created, read-only subdirectory so only the final
+	// RestoreDatabaseFile write fails - the earlier secret-key step must
+	// still succeed for this to actually test the rollback.
+	dbDir := filepath.Join(targetDir, "dbdir")
+	if err := os.Mkdir(dbDir, 0500); err != nil {
+		t.Fatalf("mkdir read-only dbdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dbDir, 0700) })
+
+	cfg := &config.Config{
+		Panel:  config.PanelConfig{DataDir: targetDir},
+		SQLite: config.SQLiteConfig{Path: filepath.Join(dbDir, "server-panel.db")},
+	}
+
+	if err := runRestoreBackup(cfg, archivePath); err == nil {
+		t.Fatal("expected runRestoreBackup to fail when the database directory is read-only")
+	}
+
+	data, err := os.ReadFile(liveSecretKeyPath)
+	if err != nil {
+		t.Fatalf("read live secret.key after failed restore: %v", err)
+	}
+	if string(data) != "stale-target-key" {
+		t.Errorf("secret.key after failed database write = %q, want rollback to original %q", data, "stale-target-key")
+	}
+}
