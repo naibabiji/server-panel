@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/insta
 指定版本安装：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/install.sh | VERSION=v1.4.1 bash
+curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/install.sh | VERSION=v1.4.2 bash
 ```
 
 已有安装时，默认会保留配置、数据库、证书和登录信息，只覆盖升级二进制。
