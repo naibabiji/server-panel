@@ -13,6 +13,7 @@
                 <option value="15d">15天</option>
                 <option value="30d">30天</option>
             </select>
+            <a :href="'../servers/'+server.id" class="btn-secondary text-sm" x-show="server.id">服务器详情</a>
             <a href="../monitor" class="btn-secondary text-sm">返回</a>
         </div>
     </div>

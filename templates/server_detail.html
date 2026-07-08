@@ -139,11 +139,14 @@
     <section class="border border-[#2a3038] bg-[#171b21]">
         <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] flex items-center justify-between gap-3">
             <div class="text-base font-semibold text-gray-100">Agent 探针</div>
-            <button @click="hasAgent() ? showUninstallCommand() : showInstallCommand()" class="btn-secondary text-sm" :disabled="savingAgent">
-                <span x-show="!savingAgent" x-text="hasAgent() ? '卸载 Agent 探针' : '安装 Agent 探针'"></span>
-                <span x-show="savingAgent">生成中...</span>
-            </button>
-            <button x-show="agentUninstallMode" @click="confirmUninstall()" class="btn-danger text-sm" :disabled="savingAgent">确认已卸载</button>
+            <div class="flex items-center gap-2">
+                <a :href="monitorURL()" class="btn-secondary text-sm" x-show="hasAgent()">查看性能监控</a>
+                <button @click="hasAgent() ? showUninstallCommand() : showInstallCommand()" class="btn-secondary text-sm" :disabled="savingAgent">
+                    <span x-show="!savingAgent" x-text="hasAgent() ? '卸载 Agent 探针' : '安装 Agent 探针'"></span>
+                    <span x-show="savingAgent">生成中...</span>
+                </button>
+                <button x-show="agentUninstallMode" @click="confirmUninstall()" class="btn-danger text-sm" :disabled="savingAgent">确认已卸载</button>
+            </div>
         </div>
         <div class="p-5">
         <div class="text-sm text-gray-400 mb-2">状态：<span x-text="hasAgent() ? '已安装或已上报' : '未安装'"></span></div>
@@ -237,6 +240,9 @@ function serverDetail() {
         customerURL() {
             if (!this.s.customer_id) return '#';
             return (document.body.dataset.panelPrefix || '') + '/customers/' + this.s.customer_id;
+        },
+        monitorURL() {
+            return (document.body.dataset.panelPrefix || '') + '/monitor/' + this.s.id;
         },
         providerURL() {
             if (!this.s.provider_id) return '#';
