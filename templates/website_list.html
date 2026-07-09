@@ -7,8 +7,8 @@
     </div>
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div class="flex gap-2">
-            <input type="text" x-model="search" @input="fetch()" placeholder="搜索名称/域名..." class="input-field w-48">
-            <select x-model="filterServer" @change="fetch()" class="input-field w-40">
+            <input type="text" x-model="search" @input="resetAndFetch()" placeholder="搜索名称/域名..." class="input-field w-48">
+            <select x-model="filterServer" @change="resetAndFetch()" class="input-field w-40">
                 <option value="">全部服务器</option>
                 <template x-for="s in servers" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
             </select>
@@ -40,17 +40,36 @@
             </tbody>
         </table>
         <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无网站</div>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#202833] px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
+            <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
+            <div class="flex items-center gap-2">
+                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
+                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                <span class="px-2" x-text="page + ' / ' + totalPages"></span>
+                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
+                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+            </div>
+        </div>
     </div>
 </div>
 <script>
 function websiteList() {
     return {
+        ...paginationState(),
         items: [], servers: [], loading: true, search: '', filterServer: '',
         async fetch() {
             this.loading = true;
             try {
-                const d = await api('/api/websites?search='+encodeURIComponent(this.search)+'&server_id='+this.filterServer+'&page_size=100');
+                const params = new URLSearchParams({
+                    search: this.search,
+                    server_id: this.filterServer,
+                    page: this.page,
+                    page_size: this.pageSize,
+                });
+                const d = await api('/api/websites?' + params.toString());
                 this.items = d.data.items || [];
+                this.setPagination(d.data);
+                await this.ensurePageHasItems(this.items);
             } catch(e) {}
             this.loading = false;
         },

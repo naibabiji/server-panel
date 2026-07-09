@@ -16,7 +16,9 @@ type AlertHandler struct {
 }
 
 func (h *AlertHandler) db() *sql.DB {
-	if h.DB != nil { return h.DB }
+	if h.DB != nil {
+		return h.DB
+	}
 	return database.GetDB()
 }
 
@@ -96,19 +98,32 @@ func (h *AlertHandler) DeleteRule(c *gin.Context) {
 
 func (h *AlertHandler) GetLog(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "30"))
 	alertType := c.Query("type")
 	serverID := c.Query("server_id")
 	resolved := c.Query("resolved")
 
-	if page < 1 { page = 1 }
-	if pageSize < 1 || pageSize > 100 { pageSize = 20 }
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 30
+	}
 
 	where := "WHERE 1=1"
 	args := []interface{}{}
-	if alertType != "" { where += " AND alert_type = ?"; args = append(args, alertType) }
-	if serverID != "" { where += " AND server_id = ?"; args = append(args, serverID) }
-	if resolved != "" { where += " AND resolved = ?"; args = append(args, resolved) }
+	if alertType != "" {
+		where += " AND alert_type = ?"
+		args = append(args, alertType)
+	}
+	if serverID != "" {
+		where += " AND server_id = ?"
+		args = append(args, serverID)
+	}
+	if resolved != "" {
+		where += " AND resolved = ?"
+		args = append(args, resolved)
+	}
 
 	var total int
 	h.db().QueryRow("SELECT COUNT(*) FROM alert_log "+where, args...).Scan(&total)

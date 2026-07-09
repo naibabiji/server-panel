@@ -193,12 +193,12 @@ func isValidClock(value string) bool {
 // audit table (panel updates today; other subsystems may write to it later).
 func (h *UpdateHandler) GetOperationLogs(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "30"))
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
+		pageSize = 30
 	}
 
 	var total int

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,7 +26,7 @@ func (h *WebsiteHandler) db() *sql.DB {
 
 func (h *WebsiteHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "30"))
 	search := c.Query("search")
 	serverID := c.Query("server_id")
 	customerID := c.Query("customer_id")
@@ -35,7 +36,7 @@ func (h *WebsiteHandler) List(c *gin.Context) {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
+		pageSize = 30
 	}
 
 	where := "WHERE 1=1"
@@ -117,9 +118,6 @@ func (h *WebsiteHandler) Get(c *gin.Context) {
 }
 
 func (h *WebsiteHandler) Create(c *gin.Context) {
-	if !requireViewPasswordSetup(c) {
-		return
-	}
 	var w models.Website
 	if err := c.ShouldBindJSON(&w); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
@@ -132,7 +130,7 @@ func (h *WebsiteHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusConflict, models.ErrorResponse("该域名已添加过网站"))
 		return
 	}
-	panelPasswordEnc, ok := encryptOptionalPassword(c, w.PanelPassword)
+	panelPasswordEnc, ok := encryptOptionalPassword(c, h.db(), w.PanelPassword)
 	if !ok {
 		return
 	}
@@ -164,7 +162,7 @@ func (h *WebsiteHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusConflict, models.ErrorResponse("该域名已添加过网站"))
 		return
 	}
-	panelPasswordEnc, ok := encryptOptionalPassword(c, w.PanelPassword)
+	panelPasswordEnc, ok := encryptOptionalPassword(c, h.db(), w.PanelPassword)
 	if !ok {
 		return
 	}
@@ -194,7 +192,13 @@ func (h *WebsiteHandler) Update(c *gin.Context) {
 
 func (h *WebsiteHandler) GetPanelPassword(c *gin.Context) {
 	id := c.Param("id")
-	if !isViewPasswordSetup() {
+	setup, err := isViewPasswordSetup(h.db())
+	if err != nil {
+		log.Printf("read view password setup status failed: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		return
+	}
+	if !setup {
 		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先设置查看密码"))
 		return
 	}

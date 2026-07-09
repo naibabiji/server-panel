@@ -333,6 +333,16 @@
                         </template>
                         <div class="text-sm text-gray-500 py-8 text-center" x-show="!opLogs.items || opLogs.items.length === 0">暂无记录</div>
                     </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#202833] pt-3 mt-3 text-sm text-gray-400" x-show="opLogs.total > opLogs.page_size">
+                        <div x-text="'第 ' + opLogStart + '-' + opLogEnd + ' 条，共 ' + (opLogs.total || 0) + ' 条'"></div>
+                        <div class="flex items-center gap-2">
+                            <button @click="loadOpLogs(1)" :disabled="opLogs.page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
+                            <button @click="loadOpLogs(opLogs.page - 1)" :disabled="opLogs.page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                            <span class="px-2" x-text="opLogs.page + ' / ' + opLogTotalPages"></span>
+                            <button @click="loadOpLogs(opLogs.page + 1)" :disabled="opLogs.page >= opLogTotalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
+                            <button @click="loadOpLogs(opLogTotalPages)" :disabled="opLogs.page >= opLogTotalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -443,8 +453,18 @@ function settingsPage() {
         restoreUpload: { file:null, uploading:false },
         restoreRun: { running:false, message:'' },
         sysUpdate: { packages:[], count:0, checking:false, updating:false, output:'' },
-        opLogs: { items:[], total:0, page:1, page_size:20 },
+        opLogs: { items:[], total:0, page:1, page_size:30 },
         opLogModalOpen: false,
+        get opLogTotalPages() {
+            return Math.max(1, Math.ceil((this.opLogs.total || 0) / (this.opLogs.page_size || 30)));
+        },
+        get opLogStart() {
+            if (!this.opLogs.total) return 0;
+            return ((this.opLogs.page || 1) - 1) * (this.opLogs.page_size || 30) + 1;
+        },
+        get opLogEnd() {
+            return Math.min(this.opLogs.total || 0, (this.opLogs.page || 1) * (this.opLogs.page_size || 30));
+        },
         async init() {
             // 各区块数据源互不依赖，并行加载，避免逐个排队等待
             await Promise.all([
@@ -769,8 +789,15 @@ function settingsPage() {
             } catch(e) { showToast(e.message,'error'); }
             this.sysUpdate.updating = false;
         },
-        async loadOpLogs() {
-            try { const d = await api('/api/update/logs?page=1&page_size=20'); this.opLogs = d.data; } catch(e) {}
+        async loadOpLogs(page = this.opLogs.page || 1) {
+            page = Math.max(1, Math.min(parseInt(page, 10) || 1, this.opLogTotalPages));
+            try {
+                const d = await api('/api/update/logs?page=' + encodeURIComponent(page) + '&page_size=' + encodeURIComponent(this.opLogs.page_size || 30));
+                this.opLogs = d.data;
+                if (this.opLogs.page > 1 && this.opLogs.total > 0 && (!this.opLogs.items || this.opLogs.items.length === 0)) {
+                    await this.loadOpLogs(this.opLogs.page - 1);
+                }
+            } catch(e) {}
         },
         async openOpLogs() {
             this.opLogModalOpen = true;

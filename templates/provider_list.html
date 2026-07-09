@@ -5,7 +5,7 @@
         <h2 class="text-lg font-semibold text-purple-200">服务商</h2>
         <a href="providers/new" class="btn-primary text-sm">添加服务商</a>
     </div>
-    <div class="mb-4"><input type="text" x-model="search" @input="fetch()" placeholder="搜索服务商..." class="input-field w-48"></div>
+    <div class="mb-4"><input type="text" x-model="search" @input="resetAndFetch()" placeholder="搜索服务商..." class="input-field w-48"></div>
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">
             <thead><tr>
@@ -28,15 +28,36 @@
             </tbody>
         </table>
         <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无服务商</div>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#202833] px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
+            <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
+            <div class="flex items-center gap-2">
+                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
+                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                <span class="px-2" x-text="page + ' / ' + totalPages"></span>
+                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
+                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+            </div>
+        </div>
     </div>
 </div>
 <script>
 function providerList() {
     return {
+        ...paginationState(),
         items: [], loading: true, search: '',
         async fetch() {
             this.loading = true;
-            try { const d = await api('/api/providers?search='+encodeURIComponent(this.search)); this.items = d.data.items || []; } catch(e) {}
+            try {
+                const params = new URLSearchParams({
+                    search: this.search,
+                    page: this.page,
+                    page_size: this.pageSize,
+                });
+                const d = await api('/api/providers?' + params.toString());
+                this.items = d.data.items || [];
+                this.setPagination(d.data);
+                await this.ensurePageHasItems(this.items);
+            } catch(e) {}
             this.loading = false;
         },
         externalURL(url) {

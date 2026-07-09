@@ -122,6 +122,58 @@ function fmtTime(t) {
          + `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 }
 
+function paginationState(pageSize = 30) {
+    return {
+        page: 1,
+        pageSize,
+        total: 0,
+        get totalPages() {
+            return Math.max(1, Math.ceil((this.total || 0) / this.pageSize));
+        },
+        get pageStart() {
+            if (!this.total) return 0;
+            return (this.page - 1) * this.pageSize + 1;
+        },
+        get pageEnd() {
+            return Math.min(this.total || 0, this.page * this.pageSize);
+        },
+        pageParams() {
+            return 'page=' + encodeURIComponent(this.page) + '&page_size=' + encodeURIComponent(this.pageSize);
+        },
+        setPagination(data) {
+            this.total = data.total || 0;
+            this.page = data.page || this.page;
+            this.pageSize = data.page_size || this.pageSize;
+        },
+        async resetAndFetch() {
+            this.page = 1;
+            await this.fetch();
+        },
+        async prevPage() {
+            if (this.page <= 1) return;
+            this.page--;
+            await this.fetch();
+        },
+        async nextPage() {
+            if (this.page >= this.totalPages) return;
+            this.page++;
+            await this.fetch();
+        },
+        async goPage(page) {
+            const n = parseInt(page, 10);
+            if (!n || n < 1 || n > this.totalPages || n === this.page) return;
+            this.page = n;
+            await this.fetch();
+        },
+        async ensurePageHasItems(items) {
+            if (this.page > 1 && this.total > 0 && (!items || items.length === 0)) {
+                this.page = Math.min(this.page - 1, this.totalPages);
+                await this.fetch();
+            }
+        }
+    };
+}
+
 function formatUptime(seconds) {
     const d = Math.floor(seconds / 86400);
     const h = Math.floor((seconds % 86400) / 3600);

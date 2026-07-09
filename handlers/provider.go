@@ -24,14 +24,14 @@ func (h *ProviderHandler) db() *sql.DB {
 
 func (h *ProviderHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "30"))
 	search := c.Query("search")
 
 	if page < 1 {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
-		pageSize = 50
+		pageSize = 30
 	}
 
 	where := "WHERE 1=1"

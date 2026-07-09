@@ -20,14 +20,34 @@
             </tbody>
         </table>
         <div class="text-center text-gray-500 py-8" x-show="logs.length==0">暂无告警记录</div>
+        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-700/50 px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
+            <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
+            <div class="flex items-center gap-2">
+                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
+                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                <span class="px-2" x-text="page + ' / ' + totalPages"></span>
+                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
+                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+            </div>
+        </div>
     </div>
 </div>
 <script>
 function alertLogPage() {
     return {
+        ...paginationState(),
         logs: [],
         async fetch() {
-            try { const d = await api('/api/alerts/log?page_size=50'); this.logs = d.data.items || []; } catch(e) {}
+            try {
+                const params = new URLSearchParams({
+                    page: this.page,
+                    page_size: this.pageSize,
+                });
+                const d = await api('/api/alerts/log?' + params.toString());
+                this.logs = d.data.items || [];
+                this.setPagination(d.data);
+                await this.ensurePageHasItems(this.logs);
+            } catch(e) {}
         }
     }
 }

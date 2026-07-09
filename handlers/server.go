@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"log"
 	"net/http"
 	"strconv"
@@ -23,7 +24,7 @@ type ServerHandler struct {
 
 func (h *ServerHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "30"))
 	search := c.Query("search")
 	status := c.Query("status")
 	customerID := c.Query("customer_id")
@@ -34,7 +35,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 		page = 1
 	}
 	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
+		pageSize = 30
 	}
 
 	where := "WHERE 1=1"
@@ -165,9 +166,6 @@ func (h *ServerHandler) Get(c *gin.Context) {
 }
 
 func (h *ServerHandler) Create(c *gin.Context) {
-	if !requireViewPasswordSetup(c) {
-		return
-	}
 	var s models.Server
 	if err := c.ShouldBindJSON(&s); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
@@ -178,11 +176,11 @@ func (h *ServerHandler) Create(c *gin.Context) {
 		return
 	}
 
-	sshPasswordEnc, ok := encryptOptionalPassword(c, s.SSHPassword)
+	sshPasswordEnc, ok := encryptOptionalPassword(c, h.DB, s.SSHPassword)
 	if !ok {
 		return
 	}
-	panelPasswordEnc, ok := encryptOptionalPassword(c, s.PanelPassword)
+	panelPasswordEnc, ok := encryptOptionalPassword(c, h.DB, s.PanelPassword)
 	if !ok {
 		return
 	}
@@ -270,7 +268,13 @@ func (h *ServerHandler) GetSecret(c *gin.Context) {
 	id := c.Param("id")
 	field := c.Param("field")
 
-	if !isViewPasswordSetup() {
+	setup, err := isViewPasswordSetup(h.DB)
+	if err != nil {
+		log.Printf("read view password setup status failed: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		return
+	}
+	if !setup {
 		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先设置查看密码"))
 		return
 	}
@@ -342,11 +346,11 @@ func (h *ServerHandler) Update(c *gin.Context) {
 		return
 	}
 
-	sshPasswordEnc, ok := encryptOptionalPassword(c, s.SSHPassword)
+	sshPasswordEnc, ok := encryptOptionalPassword(c, h.DB, s.SSHPassword)
 	if !ok {
 		return
 	}
-	panelPasswordEnc, ok := encryptOptionalPassword(c, s.PanelPassword)
+	panelPasswordEnc, ok := encryptOptionalPassword(c, h.DB, s.PanelPassword)
 	if !ok {
 		return
 	}
@@ -441,20 +445,26 @@ func generateAgentKey() (string, string, error) {
 	return agentKeyStr, hex.EncodeToString(agentKeyHash[:]), nil
 }
 
-func encryptOptionalPassword(c *gin.Context, plaintext string) (string, bool) {
-	return encryptOptionalSecret(c, plaintext, "请先设置查看密码，再保存 SSH/面板密码")
+func encryptOptionalPassword(c *gin.Context, db *sql.DB, plaintext string) (string, bool) {
+	return encryptOptionalSecret(c, db, plaintext, "请先设置查看密码，再保存 SSH/面板密码")
 }
 
-func encryptOptionalSecret(c *gin.Context, plaintext string, setupMessage string) (string, bool) {
+func encryptOptionalSecret(c *gin.Context, db *sql.DB, plaintext string, setupMessage string) (string, bool) {
 	if plaintext == "" {
 		return "", true
 	}
 
-	if !isViewPasswordSetup() {
+	setup, err := isViewPasswordSetup(db)
+	if err != nil {
+		log.Printf("read view password setup status failed: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		return "", false
+	}
+	if !setup {
 		c.JSON(http.StatusForbidden, models.ErrorResponse(setupMessage))
 		return "", false
 	}
-	key, err := GetSecretEncryptionKey(database.GetDB())
+	key, err := GetSecretEncryptionKey(db)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取加密密钥失败"))
 		return "", false
@@ -483,20 +493,17 @@ func encryptSecretIfUnlocked(c *gin.Context, plaintext string) string {
 	return enc
 }
 
-func isViewPasswordSetup() bool {
-	db := database.GetDB()
+func isViewPasswordSetup(db *sql.DB) (bool, error) {
 	if db == nil {
-		return false
+		return false, errors.New("database is not initialized")
 	}
 	var hash string
-	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
-	return hash != ""
-}
-
-func requireViewPasswordSetup(c *gin.Context) bool {
-	if isViewPasswordSetup() {
-		return true
+	err := db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
 	}
-	c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先到系统设置中设置查看密码。密码不支持找回，连续输错 5 次会自动清空已保存的服务器/网站敏感凭据。"))
-	return false
+	return hash != "", nil
 }
