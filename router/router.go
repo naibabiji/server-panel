@@ -321,6 +321,13 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 
 func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 命中缓存且未过期时直接放行，不再每请求查库。缓存只在 setup==true
+		// 时写入（写时即为真），且 setup 只会 false→true（无删除入口），因此
+		// 缓存为真时不可能比 DB 更"新变假"；缓存未命中/过期才回源并刷新。
+		if cachedViewPasswordSetup() {
+			c.Next()
+			return
+		}
 		setup, err := isViewPasswordSetup(db)
 		if err != nil {
 			log.Printf("read view password setup status failed: %v", err)
@@ -339,6 +346,9 @@ func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 			c.Next()
 			return
 		}
+		// 主动失效：回源发现 setup==false 时清掉可能残留的旧缓存，
+		// 避免恢复等场景下 DB 已变但缓存仍为真的窗口。
+		clearViewPasswordSetupCache()
 
 		path := c.Request.URL.Path
 		relativePath := strings.TrimPrefix(path, prefix)
@@ -348,6 +358,7 @@ func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 			relativePath == "/api/auth/logout" ||
 			relativePath == "/api/auth/check" ||
 			relativePath == "/api/auth/csrf-token" ||
+			(c.Request.Method == http.MethodGet && relativePath == "/api/update/auto-settings") ||
 			(c.Request.Method == http.MethodGet && strings.HasPrefix(relativePath, "/api/settings")) {
 			c.Next()
 			return

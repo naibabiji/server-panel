@@ -238,10 +238,20 @@ func checkPortAvailable(port int) error {
 func (h *SettingsHandler) GetSMTPConfig(c *gin.Context) {
 	cfg := make(map[string]string)
 	keys := []string{"smtp_host", "smtp_port", "smtp_encryption", "smtp_user", "smtp_pass", "admin_email"}
-	for _, k := range keys {
-		var v string
-		h.db().QueryRow("SELECT svalue FROM settings WHERE skey = ?", k).Scan(&v)
-		cfg[k] = v
+	args := make([]interface{}, len(keys))
+	for i, k := range keys {
+		args[i] = k
+	}
+	placeholders := strings.Repeat("?,", len(keys))
+	rows, err := h.db().Query("SELECT skey, svalue FROM settings WHERE skey IN ("+placeholders[:len(placeholders)-1]+")", args...)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var k, v string
+			if rows.Scan(&k, &v) == nil {
+				cfg[k] = v
+			}
+		}
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(cfg))
 }
@@ -288,14 +298,24 @@ var backupEditableKeys = map[string]bool{
 
 func (h *SettingsHandler) GetBackupSettings(c *gin.Context) {
 	result := make(map[string]string, len(backupSettingKeys)+1)
-	for _, k := range backupSettingKeys {
-		var v string
-		h.db().QueryRow("SELECT svalue FROM settings WHERE skey = ?", k).Scan(&v)
-		result[k] = v
+	keys := make([]string, 0, len(backupSettingKeys)+1)
+	keys = append(keys, backupSettingKeys...)
+	keys = append(keys, "admin_email")
+	args := make([]interface{}, len(keys))
+	for i, k := range keys {
+		args[i] = k
 	}
-	var adminEmail string
-	h.db().QueryRow("SELECT svalue FROM settings WHERE skey = 'admin_email'").Scan(&adminEmail)
-	result["admin_email"] = adminEmail
+	placeholders := strings.Repeat("?,", len(keys))
+	rows, err := h.db().Query("SELECT skey, svalue FROM settings WHERE skey IN ("+placeholders[:len(placeholders)-1]+")", args...)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var k, v string
+			if rows.Scan(&k, &v) == nil {
+				result[k] = v
+			}
+		}
+	}
 	c.JSON(http.StatusOK, models.SuccessResponse(result))
 }
 

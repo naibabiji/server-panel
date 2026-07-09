@@ -155,10 +155,20 @@ var autoUpdateEditableKeys = map[string]bool{
 
 func (h *UpdateHandler) GetAutoUpdateSettings(c *gin.Context) {
 	result := make(map[string]string, len(autoUpdateSettingKeys))
-	for _, k := range autoUpdateSettingKeys {
-		var v string
-		h.db().QueryRow("SELECT svalue FROM settings WHERE skey = ?", k).Scan(&v)
-		result[k] = v
+	args := make([]interface{}, len(autoUpdateSettingKeys))
+	for i, k := range autoUpdateSettingKeys {
+		args[i] = k
+	}
+	placeholders := strings.Repeat("?,", len(autoUpdateSettingKeys))
+	rows, err := h.db().Query("SELECT skey, svalue FROM settings WHERE skey IN ("+placeholders[:len(placeholders)-1]+")", args...)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var k, v string
+			if rows.Scan(&k, &v) == nil {
+				result[k] = v
+			}
+		}
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(result))
 }

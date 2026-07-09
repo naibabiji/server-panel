@@ -8,6 +8,16 @@
         </div>
     </div>
 
+    <!-- 查看密码未设置时的常驻入口：不依赖 !loading，骨架屏期间也能看到并点击，
+         避免首登用户被永久卡在加载态无法配置查看密码。 -->
+    <div x-show="!vpSetup" x-cloak class="mb-5 border border-amber-500/40 bg-amber-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+            <div class="text-sm font-semibold text-amber-200">需要设置查看密码</div>
+            <div class="text-xs text-gray-400 mt-1">用于查看已保存的 SSH 密码、服务器面板密码和网站面板密码。未设置前部分功能受限。</div>
+        </div>
+        <button @click="setupVP()" class="btn-primary text-sm whitespace-nowrap">设置查看密码</button>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
         <nav class="lg:sticky lg:top-20 self-start bg-[#10151c] border border-[#202833] p-2">
             <a href="#basic" class="block px-3 py-2 text-sm text-white bg-[#211a31] border-l-2 border-purple-500">基础设置</a>
@@ -34,7 +44,7 @@
                 </div>
             </template>
         </div>
-        <div class="min-w-0" x-show="!loading">
+        <div class="min-w-0" x-show="!loading" x-cloak>
             <section id="basic" class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">基础设置</div>
@@ -499,8 +509,10 @@ function settingsPage() {
             return Math.min(this.opLogs.total || 0, (this.opLogs.page || 1) * (this.opLogs.page_size || 30));
         },
         async init() {
-            // 各区块数据源互不依赖，并行加载，避免逐个排队等待
-            await Promise.all([
+            // 首屏必需数据并行加载；用 allSettled 而非 all，避免单个请求异常
+            // （如查看密码未设置时 /api/update/auto-settings 返回 428）拖死整体，
+            // 导致 loading 永远不为 false、骨架屏永久卡住。
+            await Promise.allSettled([
                 (async () => { try { const d = await api('/api/settings'); this.panelTitle = d.data.panel_title || ''; } catch(e) {} })(),
                 (async () => { try {
                     const d = await api('/api/settings/panel-access');
@@ -520,24 +532,12 @@ function settingsPage() {
                 (async () => { try { const d = await api('/api/view-password/status'); this.vpSetup = d.data.is_setup; this.vpUnlocked = d.data.is_unlocked; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypeList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
-                (async () => { try {
-                    const d = await api('/api/update/auto-settings');
-                    this.autoUpdate = {
-                        enabled: d.data.panel_auto_update_enabled === 'true',
-                        mode: d.data.panel_auto_update_mode || 'patch_only',
-                        window: d.data.panel_auto_update_window || '03:00-05:00',
-                        release_delay_minutes: d.data.panel_auto_update_release_delay_minutes || '15',
-                        signature_timeout_minutes: d.data.panel_auto_update_signature_timeout_minutes || '120',
-                        last_check_at: d.data.panel_auto_update_last_check_at || '',
-                        last_status: d.data.panel_auto_update_last_status || '',
-                        last_error: d.data.panel_auto_update_last_error || '',
-                        last_success_at: d.data.panel_auto_update_last_success_at || '',
-                        last_success_version: d.data.panel_auto_update_last_success_version || ''
-                    };
-                } catch(e) {} })(),
-                this.loadBackup().catch(() => {}),
             ]);
             this.loading = false;
+            // 非首屏必需、且查看密码未设置时会返回 428 的接口：在退出骨架屏后再异步加载，
+            // 失败不影响页面渲染。首登用户可先完成"设置查看密码"。
+            this.loadAutoUpdate().catch(() => {});
+            this.loadBackup().catch(() => {});
             // 慢速系统检测接口（GitHub 版本检查 / apt 更新检查）不阻塞首屏渲染
             this.checkUpdate(true).catch(() => {});
             this.checkSysUpdate().catch(() => {});
@@ -722,6 +722,21 @@ function settingsPage() {
                 panel_auto_update_signature_timeout_minutes: String(parseInt(this.autoUpdate.signature_timeout_minutes) || 120)
             };
             try { await api('/api/update/auto-settings', {method:'PUT', body}); showToast('自动更新设置已保存','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async loadAutoUpdate() {
+            const d = await api('/api/update/auto-settings');
+            this.autoUpdate = {
+                enabled: d.data.panel_auto_update_enabled === 'true',
+                mode: d.data.panel_auto_update_mode || 'patch_only',
+                window: d.data.panel_auto_update_window || '03:00-05:00',
+                release_delay_minutes: d.data.panel_auto_update_release_delay_minutes || '15',
+                signature_timeout_minutes: d.data.panel_auto_update_signature_timeout_minutes || '120',
+                last_check_at: d.data.panel_auto_update_last_check_at || '',
+                last_status: d.data.panel_auto_update_last_status || '',
+                last_error: d.data.panel_auto_update_last_error || '',
+                last_success_at: d.data.panel_auto_update_last_success_at || '',
+                last_success_version: d.data.panel_auto_update_last_success_version || ''
+            };
         },
         async loadBackup() {
             const d = await api('/api/settings/backup');

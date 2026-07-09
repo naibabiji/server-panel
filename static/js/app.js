@@ -1,3 +1,7 @@
+// 防止 401/428 并发请求时重复触发跳转：第一个命中时置位，跳转后页面卸载，
+// 后续并发的同状态码分支只抛 silent 错误，不再重复改 location.href。
+let _authRedirecting = false;
+
 function api(path, options = {}) {
     const prefix = document.body.dataset.panelPrefix || '';
     const apiPath = path.startsWith('/api/') ? path : '/api' + path;
@@ -16,24 +20,36 @@ function api(path, options = {}) {
     return fetch(url, { ...options, headers })
         .then(async (resp) => {
             if (resp.status === 401 && !path.startsWith('/api/auth/login')) {
-                // Session expired/invalid: the page is navigating away to
-                // /login right now, so never resolve or reject - that way
-                // no caller's own catch(e){showToast(e.message,'error')}
-                // gets a chance to flash an error first (previously this
-                // threw a hardcoded English "Unauthorized", which every
-                // caller's catch block would display verbatim in the
-                // instant before the redirect actually took effect).
-                window.location.href = prefix + '/login';
-                return new Promise(() => {});
+                // 会话过期：跳转 /login。这里必须 throw（而非返回永不 settle 的
+                // Promise），否则 Promise.all 会被一个挂起的 Promise 永久拖死。
+                // silent 标记让 .catch 不再弹 toast（跳转本身已是反馈）。
+                if (!_authRedirecting) {
+                    _authRedirecting = true;
+                    window.location.href = prefix + '/login';
+                    // 真跳转时页面会卸载，定时器不会执行；若因某种原因未卸载，
+                    // 定时器复位 flag，避免后续真正的 428/401 被误判为已在跳转。
+                    setTimeout(() => { _authRedirecting = false; }, 0);
+                }
+                const e = new Error('会话已过期，正在跳转登录');
+                e.silent = true;
+                throw e;
             }
             if (resp.status === 503) {
                 throw new Error('Service busy, please retry later');
             }
             if (resp.status === 428) {
-                // Same reasoning as the 401 case above: navigating away, so
-                // don't let a caller's catch block flash a toast first.
-                window.location.href = prefix + '/settings?view_password_required=1#security';
-                return new Promise(() => {});
+                // 查看密码未设置：跳转设置页。同样必须 throw 让 Promise 能 settle，
+                // 不能用 new Promise(() => {}) 挂起（否则首登用户会被骨架屏永久卡死）。
+                if (!_authRedirecting) {
+                    _authRedirecting = true;
+                    window.location.href = prefix + '/settings?view_password_required=1#security';
+                    // 已在 /settings 时这是同页 no-op 跳转（不会卸载），定时器复位 flag，
+                    // 避免后续 401 因 flag 卡住而跳不到 /login。
+                    setTimeout(() => { _authRedirecting = false; }, 0);
+                }
+                const e = new Error('请先设置查看密码');
+                e.silent = true;
+                throw e;
             }
             const contentType = resp.headers.get('content-type') || '';
             if (!contentType.includes('application/json')) {
@@ -55,7 +71,7 @@ function api(path, options = {}) {
         })
         .catch(err => {
             console.error('Fetch failed:', err.message, 'URL:', url);
-            showToast(err.message, 'error');
+            if (!err.silent) showToast(err.message, 'error');
             throw err;
         });
 }
