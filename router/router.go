@@ -52,7 +52,17 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		Enabled:       cfg.Security.BasicAuthEnabled,
 	}
 	go func() {
-		ticker := time.NewTicker(time.Duration(cfg.Security.AttemptWindowMinutes) * time.Minute)
+		// AttemptWindowMinutes 配置异常（<=0）时给一个下限，避免 time.NewTicker(0) panic。
+		interval := time.Duration(cfg.Security.AttemptWindowMinutes) * time.Minute
+		if interval <= 0 {
+			interval = 5 * time.Minute
+		}
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("login attempt cleanup goroutine recovered: %v", r)
+			}
+		}()
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
 			loginTracker.CleanupOldAttempts()
