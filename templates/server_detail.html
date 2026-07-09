@@ -166,6 +166,7 @@
             <div class="text-base font-semibold text-gray-100">Agent 探针</div>
             <div class="flex items-center gap-2">
                 <a :href="monitorURL()" class="btn-secondary text-sm" x-show="hasAgent()">查看性能监控</a>
+                <button x-show="!hasAgent()" @click="openAgentProxyModal()" class="btn-secondary text-sm" :disabled="savingAgent">使用反代安装</button>
                 <button @click="hasAgent() ? showUninstallCommand() : showInstallCommand()" class="btn-secondary text-sm" :disabled="savingAgent">
                     <span x-show="!savingAgent" x-text="hasAgent() ? '卸载 Agent 探针' : '安装 Agent 探针'"></span>
                     <span x-show="savingAgent">生成中...</span>
@@ -176,11 +177,6 @@
         <div class="p-5">
         <div class="text-sm text-gray-400 mb-2">状态：<span x-text="hasAgent() ? '已安装或已上报' : '未安装'"></span></div>
         <div class="text-sm text-gray-400 mb-3" x-show="s.last_seen_at">最后上报：<span x-text="s.last_seen_at"></span></div>
-        <div class="max-w-xl mb-4" x-show="!hasAgent()">
-            <label class="label">GitHub 反代地址（可选）</label>
-            <input type="text" x-model="agentGithubProxyURL" class="input-field" placeholder="例如：https://gh-proxy.com/">
-            <div class="text-xs text-gray-500 mt-2">仅用于本次生成的安装脚本，留空则使用 GitHub 原地址。</div>
-        </div>
         <div class="text-sm text-gray-400 mb-3" x-show="agentCommand">整段复制后，粘贴到这台被管理服务器的 root SSH 终端里回车执行。</div>
         <template x-if="agentCommand">
             <div class="p-3 bg-[#11151a] border border-[#2a3038] rounded">
@@ -194,11 +190,27 @@
         <div class="text-sm text-gray-500 mt-2" x-show="agentCommandNote" x-text="agentCommandNote"></div>
         </div>
     </section>
+
+    <div class="modal-overlay" x-show="agentProxyModalOpen" x-cloak @click.self="agentProxyModalOpen=false">
+        <div class="modal-content max-w-lg">
+            <div class="text-base font-semibold text-gray-100 mb-4">使用 GitHub 反代安装</div>
+            <label class="label">GitHub 反代地址</label>
+            <input type="text" x-model="agentGithubProxyDraft" class="input-field w-full" placeholder="例如：https://gh-proxy.com/">
+            <div class="text-xs text-gray-500 mt-2">仅用于本次生成的安装脚本，不会保存到设置，也不会影响其他服务器。</div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button @click="agentProxyModalOpen=false" class="btn-secondary text-sm">取消</button>
+                <button @click="showInstallCommand(agentGithubProxyDraft)" class="btn-primary text-sm" :disabled="savingAgent">
+                    <span x-show="!savingAgent">生成安装命令</span>
+                    <span x-show="savingAgent">生成中...</span>
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 <script>
 function serverDetail() {
     return {
-        s: {}, loading: true, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false, agentGithubProxyURL: '',
+        s: {}, loading: true, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false, agentProxyModalOpen: false, agentGithubProxyDraft: '',
         secrets: {'ssh-password':'', 'panel-password':''},
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
@@ -304,10 +316,9 @@ function serverDetail() {
         shellQuote(value) {
             return "'" + String(value || '').replace(/'/g, "'\\''") + "'";
         },
-        buildInstallCommand(agentKey) {
+        buildInstallCommand(agentKey, githubProxyURL = '') {
             const centerURL = this.panelCenterURL();
             const tlsSkipVerify = '{{.TLSMode}}' === 'self_signed';
-            const githubProxyURL = (this.agentGithubProxyURL || '').trim();
             return `#!/bin/sh
 set -e
 # 清理可能残留的旧 Agent，避免重复安装冲突
@@ -446,9 +457,13 @@ echo "Server Panel Agent 已卸载"`;
                 showToast('复制失败，请手动选择内容','error');
             }
         },
-        async showInstallCommand() {
+        openAgentProxyModal() {
+            this.agentGithubProxyDraft = '';
+            this.agentProxyModalOpen = true;
+        },
+        async showInstallCommand(githubProxyURL = '') {
             this.agentUninstallMode = false;
-            const githubProxyURL = (this.agentGithubProxyURL || '').trim();
+            githubProxyURL = (githubProxyURL || '').trim();
             if (githubProxyURL && !/^https?:\/\//i.test(githubProxyURL)) {
                 showToast('GitHub 反代地址必须以 http:// 或 https:// 开头', 'error');
                 return;
@@ -457,8 +472,9 @@ echo "Server Panel Agent 已卸载"`;
             try {
                 const d = await api('/api/servers/'+this.s.id+'/agent-key/regenerate', {method:'POST'});
                 this.agentCommandTitle = '复制到被安装服务器执行';
-                this.agentCommand = this.buildInstallCommand(d.data.agent_key);
+                this.agentCommand = this.buildInstallCommand(d.data.agent_key, githubProxyURL);
                 this.agentCommandNote = '执行后 Agent 会开始上报指标，服务器会自动出现在性能监控页面。安装命令会先清理可能残留的旧 Agent，可安全重复执行；但每次生成都会作废旧 Key。';
+                this.agentProxyModalOpen = false;
                 showToast('Agent 安装命令已生成','success');
             } catch(e) { showToast(e.message,'error'); }
             this.savingAgent = false;
