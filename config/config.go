@@ -170,14 +170,6 @@ func LoadConfig(path string) (*Config, error) {
 	if !securityKeyPresent(data) && !cfg.Security.BasicAuthEnabled {
 		cfg.Security.BasicAuthEnabled = true
 	}
-	if cfg.Panel.TrustedProxies == nil {
-		// Trust a same-host reverse proxy by default: the kernel drops
-		// inbound packets that claim a loopback source address on a
-		// non-loopback interface, so honoring X-Forwarded-For from
-		// 127.0.0.1/::1 doesn't let a remote attacker spoof ClientIP().
-		// Set "trusted_proxies": [] explicitly to opt out.
-		cfg.Panel.TrustedProxies = []string{"127.0.0.1", "::1"}
-	}
 	if cfg.Systemd.ServiceName == "" {
 		cfg.Systemd.ServiceName = "server-panel"
 	}

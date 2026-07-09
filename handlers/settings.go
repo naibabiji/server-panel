@@ -24,6 +24,7 @@ import (
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/database"
 	"github.com/naibabiji/server-panel/executor"
+	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -526,6 +527,7 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 		}
 		if req.BasicAuthEnabled != nil {
 			cfg.Security.BasicAuthEnabled = *req.BasicAuthEnabled
+			middleware.SetBasicAuthEnabled(*req.BasicAuthEnabled)
 		}
 		configChanged = true
 		if err := config.SaveConfig(cfg); err != nil {

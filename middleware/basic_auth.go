@@ -2,11 +2,26 @@ package middleware
 
 import (
 	"net/http"
+	"sync/atomic"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/config"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// basicAuthEnabled 控制 BasicAuth 是否启用，使用 atomic.Bool 避免与设置保存
+// 时的并发读写产生数据竞争（每个请求都会读取该值）。
+var basicAuthEnabled atomic.Bool
+
+func init() {
+	// 默认开启，避免误关安全防护。
+	basicAuthEnabled.Store(true)
+}
+
+// SetBasicAuthEnabled 更新 BasicAuth 启用状态（配置加载 / 设置保存时调用）。
+func SetBasicAuthEnabled(v bool) {
+	basicAuthEnabled.Store(v)
+}
 
 type BasicAuthChecker struct {
 	RecordAttempt func(ip string, attemptType string)
@@ -26,13 +41,8 @@ func BasicAuth(checker *BasicAuthChecker) gin.HandlerFunc {
 			return
 		}
 
-		// BasicAuth 是否启用由运行时配置决定（设置界面可动态开关，保存后立即生效）。
-		// 配置缺失时默认开启，避免误关安全防护。
-		enabled := true
-		if cfg := config.AppConfig; cfg != nil {
-			enabled = cfg.Security.BasicAuthEnabled
-		}
-		if !enabled {
+		// BasicAuth 是否启用由运行时状态决定（设置界面可动态开关，保存后立即生效）。
+		if !basicAuthEnabled.Load() {
 			c.Next()
 			return
 		}

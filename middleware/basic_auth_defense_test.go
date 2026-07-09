@@ -28,6 +28,8 @@ func TestBasicAuthDefenseBansAfterFailedAttempts(t *testing.T) {
 		Security:  config.SecurityConfig{BasicAuthEnabled: true},
 	}
 	t.Cleanup(func() { config.AppConfig = oldCfg })
+	SetBasicAuthEnabled(true)
+	t.Cleanup(func() { SetBasicAuthEnabled(true) })
 
 	r := gin.New()
 	r.Use(BasicAuth(&BasicAuthChecker{
@@ -94,6 +96,8 @@ func TestBasicAuthAllowsValidCredentials(t *testing.T) {
 		Security:  config.SecurityConfig{BasicAuthEnabled: true},
 	}
 	t.Cleanup(func() { config.AppConfig = oldCfg })
+	SetBasicAuthEnabled(true)
+	t.Cleanup(func() { SetBasicAuthEnabled(true) })
 
 	r := gin.New()
 	r.Use(BasicAuth(&BasicAuthChecker{
@@ -125,6 +129,8 @@ func TestBasicAuthDisabledPassesThrough(t *testing.T) {
 		Security:  config.SecurityConfig{BasicAuthEnabled: false},
 	}
 	t.Cleanup(func() { config.AppConfig = oldCfg })
+	SetBasicAuthEnabled(false)
+	t.Cleanup(func() { SetBasicAuthEnabled(true) })
 
 	r := gin.New()
 	r.Use(BasicAuth(&BasicAuthChecker{

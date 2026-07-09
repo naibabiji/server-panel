@@ -474,6 +474,7 @@ function settingsPage() {
         loading: true,
         panelTitle: '', smtp: {}, access: { tls_port: 0, random_suffix: '', trust_cloudflare: false, trust_reverse_proxy: false, trusted_proxies: [], trusted_proxies_text: '' }, tls: { tls_mode:'self_signed', domain:'', tls_cert_path:'', tls_key_path:'', acme_email:'' }, tlsUpload: { cert_pem:'', key_pem:'' }, osList: '', siteTypeList: '',
         acct: { web_username:'', web_password:'', web_password2:'', basic_username:'', basic_password:'', old_password:'', basic_auth_enabled:true },
+        originalBasicAuthEnabled: true,
         vpSetup: false, vpUnlocked: false,
         update: { current_version:'', hasUpdate:false, latestVersion:'', releaseNotes:'', checking:false },
         updateRun: { running:false, message:'', percent:0, downloadedBytes:0, totalBytes:0, completed:false, error:'' },
@@ -515,7 +516,7 @@ function settingsPage() {
                 } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/tls'); this.tls = Object.assign(this.tls, d.data || {}); } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; this.acct.basic_auth_enabled = d.data.basic_auth_enabled !== false; } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; this.acct.basic_auth_enabled = d.data.basic_auth_enabled !== false; this.originalBasicAuthEnabled = this.acct.basic_auth_enabled; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/view-password/status'); this.vpSetup = d.data.is_setup; this.vpUnlocked = d.data.is_unlocked; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypeList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
@@ -902,7 +903,8 @@ function settingsPage() {
             if (this.acct.basic_password) body.basic_password = this.acct.basic_password;
             if (this.acct.old_password) body.old_password = this.acct.old_password;
             body.basic_auth_enabled = this.acct.basic_auth_enabled === true;
-            if (!body.web_username && !body.web_password && !body.basic_username && !body.basic_password && body.basic_auth_enabled) {
+            const basicAuthChanged = this.acct.basic_auth_enabled !== this.originalBasicAuthEnabled;
+            if (!body.web_username && !body.web_password && !body.basic_username && !body.basic_password && !basicAuthChanged) {
                 showToast('没有需要修改的内容','warning'); return;
             }
             try {

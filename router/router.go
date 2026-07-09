@@ -50,6 +50,8 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		RecordAttempt: loginTracker.RecordAttempt,
 		IsBanned:      loginTracker.IsBanned,
 	}
+	// 用配置中的开关初始化 BasicAuth 启用状态（config 对旧配置已默认开启）。
+	middleware.SetBasicAuthEnabled(cfg.Security.BasicAuthEnabled)
 	go func() {
 		// AttemptWindowMinutes 配置异常（<=0）时给一个下限，避免 time.NewTicker(0) panic。
 		interval := time.Duration(cfg.Security.AttemptWindowMinutes) * time.Minute
