@@ -89,16 +89,22 @@ func (h *SettingsHandler) GetPanelAccess(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
-		"tls_port":      cfg.Panel.TLSPort,
-		"random_suffix": cfg.Panel.RandomSuffix,
-		"restart_note":  "修改后台端口或随机路径后会自动重启服务生效",
+		"tls_port":            cfg.Panel.TLSPort,
+		"random_suffix":       cfg.Panel.RandomSuffix,
+		"trusted_proxies":     cfg.Panel.TrustedProxies,
+		"trust_reverse_proxy": len(cfg.Panel.TrustedProxies) > 0,
+		"trust_cloudflare":    cfg.Panel.TrustCloudflare,
+		"restart_note":        "修改后台端口、随机路径、Cloudflare 或反向代理设置后会自动重启服务生效",
 	}))
 }
 
 func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 	var req struct {
-		TLSPort      int    `json:"tls_port"`
-		RandomSuffix string `json:"random_suffix"`
+		TLSPort           int       `json:"tls_port"`
+		RandomSuffix      string    `json:"random_suffix"`
+		TrustedProxies    *[]string `json:"trusted_proxies"`
+		TrustReverseProxy *bool     `json:"trust_reverse_proxy"`
+		TrustCloudflare   *bool     `json:"trust_cloudflare"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
@@ -127,9 +133,43 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 		}
 	}
 
-	changed := req.TLSPort != cfg.Panel.TLSPort || req.RandomSuffix != cfg.Panel.RandomSuffix
+	trustedProxies := cfg.Panel.TrustedProxies
+	if req.TrustReverseProxy != nil || req.TrustedProxies != nil {
+		useReverseProxy := len(cfg.Panel.TrustedProxies) > 0
+		if req.TrustReverseProxy != nil {
+			useReverseProxy = *req.TrustReverseProxy
+		} else if req.TrustedProxies != nil {
+			useReverseProxy = len(*req.TrustedProxies) > 0
+		}
+
+		trustedProxies = []string{}
+		if useReverseProxy {
+			input := []string{"127.0.0.1", "::1"}
+			if req.TrustedProxies != nil && len(*req.TrustedProxies) > 0 {
+				input = *req.TrustedProxies
+			}
+			var err error
+			trustedProxies, err = normalizeTrustedProxies(input)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
+				return
+			}
+		}
+	}
+
+	trustCloudflare := cfg.Panel.TrustCloudflare
+	if req.TrustCloudflare != nil {
+		trustCloudflare = *req.TrustCloudflare
+	}
+
+	changed := req.TLSPort != cfg.Panel.TLSPort ||
+		req.RandomSuffix != cfg.Panel.RandomSuffix ||
+		trustCloudflare != cfg.Panel.TrustCloudflare ||
+		!equalStringSlices(trustedProxies, cfg.Panel.TrustedProxies)
 	cfg.Panel.TLSPort = req.TLSPort
 	cfg.Panel.RandomSuffix = req.RandomSuffix
+	cfg.Panel.TrustedProxies = trustedProxies
+	cfg.Panel.TrustCloudflare = trustCloudflare
 	if err := config.SaveConfig(cfg); err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存配置失败"))
 		return
@@ -143,10 +183,47 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 		message = "面板访问设置已保存，服务将在几秒内自动重启生效"
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
-		"message":       message,
-		"tls_port":      cfg.Panel.TLSPort,
-		"random_suffix": cfg.Panel.RandomSuffix,
+		"message":             message,
+		"tls_port":            cfg.Panel.TLSPort,
+		"random_suffix":       cfg.Panel.RandomSuffix,
+		"trusted_proxies":     cfg.Panel.TrustedProxies,
+		"trust_reverse_proxy": len(cfg.Panel.TrustedProxies) > 0,
+		"trust_cloudflare":    cfg.Panel.TrustCloudflare,
 	}))
+}
+
+func normalizeTrustedProxies(values []string) ([]string, error) {
+	out := make([]string, 0, len(values))
+	seen := make(map[string]bool, len(values))
+	for _, raw := range values {
+		value := strings.TrimSpace(raw)
+		if value == "" {
+			continue
+		}
+		if net.ParseIP(value) == nil {
+			if _, _, err := net.ParseCIDR(value); err != nil {
+				return nil, fmt.Errorf("可信代理 IP/CIDR 无效: %s", value)
+			}
+		}
+		if seen[value] {
+			continue
+		}
+		seen[value] = true
+		out = append(out, value)
+	}
+	return out, nil
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func checkPortAvailable(port int) error {

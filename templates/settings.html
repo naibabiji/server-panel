@@ -62,6 +62,27 @@
                             <div><label class="label">随机路径</label><input type="text" x-model="access.random_suffix" class="input-field" placeholder="AbC123"></div>
                         </div>
                         <div class="text-xs text-gray-500 mt-3" x-show="access.random_suffix">登录路径：<span class="text-purple-300">/<span x-text="access.random_suffix"></span>/login</span></div>
+                        <div class="mt-4 border-t border-[#202833] pt-4">
+                            <label class="flex items-start gap-3 cursor-pointer">
+                                <input type="checkbox" x-model="access.trust_cloudflare" class="mt-1 h-4 w-4 rounded border-[#2a3441] bg-[#0b0f14] text-purple-500 focus:ring-purple-500">
+                                <span>
+                                    <span class="block text-sm font-semibold text-gray-200">启用 Cloudflare 真实 IP 识别</span>
+                                    <span class="block text-xs text-gray-500 leading-6">面板接入 Cloudflare 代理时开启。开启后会识别 Cloudflare 来源，并使用 CF-Connecting-IP 作为真实访客 IP。</span>
+                                </span>
+                            </label>
+                            <label class="flex items-start gap-3 cursor-pointer mt-3">
+                                <input type="checkbox" x-model="access.trust_reverse_proxy" @change="ensureProxyDefaults()" class="mt-1 h-4 w-4 rounded border-[#2a3441] bg-[#0b0f14] text-purple-500 focus:ring-purple-500">
+                                <span>
+                                    <span class="block text-sm font-semibold text-gray-200">启用反向代理真实 IP 识别</span>
+                                    <span class="block text-xs text-gray-500 leading-6">面板放在 Nginx、Caddy 或其他反向代理后面时开启。关闭后不会信任 X-Forwarded-For。</span>
+                                </span>
+                            </label>
+                            <div class="mt-3">
+                                <label class="label">可信反向代理 IP</label>
+                                <textarea x-model="access.trusted_proxies_text" rows="3" class="input-field w-full" :disabled="!access.trust_reverse_proxy" :class="!access.trust_reverse_proxy ? 'opacity-50 cursor-not-allowed' : ''" placeholder="127.0.0.1&#10;::1"></textarea>
+                                <div class="text-xs text-gray-500 leading-6 mt-2">每行一个 IP 或 CIDR。同机 Nginx/Caddy 通常保留 127.0.0.1 和 ::1；反向代理在另一台机器时填写那台机器的 IP。</div>
+                            </div>
+                        </div>
                         <div class="flex gap-2 mt-3"><button @click="saveAccess()" class="btn-primary text-sm">保存访问设置</button></div>
                     </div>
                 </div>
@@ -440,7 +461,7 @@
 function settingsPage() {
     return {
         loading: true,
-        panelTitle: '', smtp: {}, access: { tls_port: 0, random_suffix: '' }, tls: { tls_mode:'self_signed', domain:'', tls_cert_path:'', tls_key_path:'', acme_email:'' }, tlsUpload: { cert_pem:'', key_pem:'' }, osList: '', siteTypeList: '',
+        panelTitle: '', smtp: {}, access: { tls_port: 0, random_suffix: '', trust_cloudflare: false, trust_reverse_proxy: false, trusted_proxies: [], trusted_proxies_text: '' }, tls: { tls_mode:'self_signed', domain:'', tls_cert_path:'', tls_key_path:'', acme_email:'' }, tlsUpload: { cert_pem:'', key_pem:'' }, osList: '', siteTypeList: '',
         acct: { web_username:'', web_password:'', web_password2:'', basic_username:'', basic_password:'', old_password:'' },
         vpSetup: false, vpUnlocked: false,
         update: { current_version:'', hasUpdate:false, latestVersion:'', releaseNotes:'', checking:false },
@@ -469,7 +490,18 @@ function settingsPage() {
             // 各区块数据源互不依赖，并行加载，避免逐个排队等待
             await Promise.all([
                 (async () => { try { const d = await api('/api/settings'); this.panelTitle = d.data.panel_title || ''; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/panel-access'); this.access = d.data; this._loadedAccess = {tls_port: d.data.tls_port, random_suffix: d.data.random_suffix}; } catch(e) {} })(),
+                (async () => { try {
+                    const d = await api('/api/settings/panel-access');
+                    const proxies = d.data.trusted_proxies || [];
+                    this.access = Object.assign(this.access, d.data || {}, { trusted_proxies_text: proxies.join('\n') });
+                    this._loadedAccess = {
+                        tls_port: d.data.tls_port,
+                        random_suffix: d.data.random_suffix,
+                        trust_cloudflare: !!d.data.trust_cloudflare,
+                        trust_reverse_proxy: !!d.data.trust_reverse_proxy,
+                        trusted_proxies_text: proxies.join('\n')
+                    };
+                } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/tls'); this.tls = Object.assign(this.tls, d.data || {}); } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; } catch(e) {} })(),
@@ -499,14 +531,35 @@ function settingsPage() {
         },
         async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
         async saveAccess() {
+            const trustedProxies = (this.access.trusted_proxies_text || '')
+                .split(/\r?\n|,/)
+                .map(v => v.trim())
+                .filter(Boolean);
             const body = {
                 tls_port: parseInt(this.access.tls_port) || 0,
-                random_suffix: (this.access.random_suffix || '').trim()
+                random_suffix: (this.access.random_suffix || '').trim(),
+                trust_cloudflare: !!this.access.trust_cloudflare,
+                trust_reverse_proxy: !!this.access.trust_reverse_proxy,
+                trusted_proxies: this.access.trust_reverse_proxy ? trustedProxies : []
             };
             const before = this._loadedAccess || {};
-            const changed = before.tls_port !== body.tls_port || before.random_suffix !== body.random_suffix;
+            const currentProxiesText = trustedProxies.join('\n');
+            const changed = before.tls_port !== body.tls_port ||
+                before.random_suffix !== body.random_suffix ||
+                before.trust_cloudflare !== body.trust_cloudflare ||
+                before.trust_reverse_proxy !== body.trust_reverse_proxy ||
+                before.trusted_proxies_text !== currentProxiesText;
             try {
                 const d = await api('/api/settings/panel-access', {method:'PUT', body});
+                const savedProxies = d.data.trusted_proxies || trustedProxies;
+                this.access = Object.assign(this.access, d.data || {}, { trusted_proxies_text: savedProxies.join('\n') });
+                this._loadedAccess = {
+                    tls_port: d.data.tls_port,
+                    random_suffix: d.data.random_suffix,
+                    trust_cloudflare: !!d.data.trust_cloudflare,
+                    trust_reverse_proxy: !!d.data.trust_reverse_proxy,
+                    trusted_proxies_text: savedProxies.join('\n')
+                };
                 showToast(d.data.message || '保存成功','success');
                 if (changed) {
                     const port = body.tls_port && body.tls_port !== 443 ? (':' + body.tls_port) : '';
@@ -514,6 +567,11 @@ function settingsPage() {
                     setTimeout(() => { window.location.href = target; }, 4000);
                 }
             } catch(e) { showToast(e.message,'error'); }
+        },
+        ensureProxyDefaults() {
+            if (this.access.trust_reverse_proxy && !(this.access.trusted_proxies_text || '').trim()) {
+                this.access.trusted_proxies_text = '127.0.0.1\n::1';
+            }
         },
         accessPreview() {
             if (!this.tls.domain) return '（先填写面板域名）';
