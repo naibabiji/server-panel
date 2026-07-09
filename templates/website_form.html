@@ -97,7 +97,6 @@ function websiteForm() {
                 (async () => { try { const d = await api('/api/customers?page_size=100'); this.customers = d.data.items || []; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypes = JSON.parse(d.data.svalue || '[]'); } catch(e) {} })(),
             ]);
-            if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
             if (this.id) {
                 await this.load();
                 this.loading = false;

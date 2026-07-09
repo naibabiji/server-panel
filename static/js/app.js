@@ -65,19 +65,6 @@ function redirectToViewPasswordSettings() {
     window.location.href = prefix + '/settings?view_password_required=1#security';
 }
 
-async function requireViewPasswordBeforeCreate() {
-    try {
-        const d = await api('/api/view-password/status');
-        if (!d.data.is_setup) {
-            redirectToViewPasswordSettings();
-            return false;
-        }
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
 async function unlockViewPasswordPrompt() {
     const status = await api('/api/view-password/status');
     if (!status.data.is_setup) {

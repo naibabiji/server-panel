@@ -2,6 +2,7 @@ package router
 
 import (
 	"database/sql"
+	"errors"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -290,7 +291,15 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 
 func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if isViewPasswordSetup(db) {
+		setup, err := isViewPasswordSetup(db)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"message": "读取查看密码状态失败",
+			})
+			return
+		}
+		if setup {
 			c.Next()
 			return
 		}
@@ -321,10 +330,19 @@ func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 	}
 }
 
-func isViewPasswordSetup(db *sql.DB) bool {
+func isViewPasswordSetup(db *sql.DB) (bool, error) {
+	if db == nil {
+		return false, errors.New("database is not initialized")
+	}
 	var hash string
-	_ = db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
-	return hash != ""
+	err := db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return hash != "", nil
 }
 
 func pageData(cfg *config.Config, active string, contentTpl string, c *gin.Context) gin.H {

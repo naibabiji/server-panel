@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"database/sql"
+	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -15,8 +17,16 @@ type ViewPasswordHandler struct{}
 
 func (h *ViewPasswordHandler) GetStatus(c *gin.Context) {
 	db := database.GetDB()
+	if db == nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		return
+	}
 	var hash string
-	db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
+	if err := db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		log.Printf("read view password status failed: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		return
+	}
 
 	isSetup := hash != ""
 

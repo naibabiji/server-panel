@@ -215,7 +215,6 @@ function serverForm() {
                 (async () => { try { const d = await api('/api/providers?page_size=100'); this.providers = d.data.items || []; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]'); } catch(e) {} })(),
             ]);
-            if (!this.id && !(await requireViewPasswordBeforeCreate())) return;
             if (this.id) {
                 await this.load();
                 this.loading = false;
