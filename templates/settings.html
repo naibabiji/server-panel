@@ -160,6 +160,18 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                     <div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">Agent 下载</div>
+                        <div class="text-sm text-gray-500 leading-6">用于生成 Agent 探针安装命令。国内服务器无法访问 GitHub 时，可填写 GitHub 反代地址。</div>
+                    </div>
+                    <div>
+                        <label class="label">GitHub 反代地址</label>
+                        <input type="text" x-model="agent.github_proxy_url" class="input-field" placeholder="例如：https://gh-proxy.com/">
+                        <div class="text-xs text-gray-500 mt-2">留空时使用 GitHub 原地址；填写后会自动拼接原始 GitHub 下载链接。</div>
+                        <div class="flex gap-2 mt-3"><button @click="saveAgentSettings()" class="btn-primary text-sm">保存 Agent 下载设置</button></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
                         <div class="text-sm font-semibold text-gray-100 mb-1">系统更新</div>
                         <div class="text-sm text-gray-500 leading-6">检查 apt 可升级的系统包。一键更新会直接在服务器上执行 apt update && apt upgrade -y。</div>
                     </div>
@@ -444,6 +456,7 @@ function settingsPage() {
         acct: { web_username:'', web_password:'', web_password2:'', basic_username:'', basic_password:'', old_password:'' },
         vpSetup: false, vpUnlocked: false,
         update: { current_version:'', hasUpdate:false, latestVersion:'', releaseNotes:'', checking:false },
+        agent: { github_proxy_url:'' },
         updateRun: { running:false, message:'', percent:0, downloadedBytes:0, totalBytes:0, completed:false, error:'' },
         autoUpdate: { enabled:false, mode:'patch_only', window:'03:00-05:00', release_delay_minutes:'15', signature_timeout_minutes:'120', last_check_at:'', last_status:'', last_error:'', last_success_at:'', last_success_version:'' },
         backup: { auto_enabled:false, frequency:'weekly', email_enabled:false, keep_count:'10', max_email_mb:'20', last_run_at:'', last_status:'', last_error:'', admin_email:'' },
@@ -476,6 +489,7 @@ function settingsPage() {
                 (async () => { try { const d = await api('/api/view-password/status'); this.vpSetup = d.data.is_setup; this.vpUnlocked = d.data.is_unlocked; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypeList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/agent-github-proxy-url'); this.agent.github_proxy_url = d.data.svalue || ''; } catch(e) {} })(),
                 (async () => { try {
                     const d = await api('/api/update/auto-settings');
                     this.autoUpdate = {
@@ -651,6 +665,9 @@ function settingsPage() {
                 panel_auto_update_signature_timeout_minutes: String(parseInt(this.autoUpdate.signature_timeout_minutes) || 120)
             };
             try { await api('/api/update/auto-settings', {method:'PUT', body}); showToast('自动更新设置已保存','success'); } catch(e) { showToast(e.message,'error'); }
+        },
+        async saveAgentSettings() {
+            try { await api('/api/settings/agent-github-proxy-url', {method:'PUT', body:{svalue: (this.agent.github_proxy_url || '').trim()}}); showToast('Agent 下载设置已保存','success'); } catch(e) { showToast(e.message,'error'); }
         },
         async loadBackup() {
             const d = await api('/api/settings/backup');

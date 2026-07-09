@@ -193,11 +193,18 @@
 <script>
 function serverDetail() {
     return {
-        s: {}, loading: true, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false,
+        s: {}, loading: true, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false, agentGithubProxyURL: '',
         secrets: {'ssh-password':'', 'panel-password':''},
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
-            try { const d = await api('/api/servers/'+id); this.s = d.data; this.loading = false; await this.fetchWebsites(); }
+            try {
+                await Promise.all([
+                    (async () => { const d = await api('/api/servers/'+id); this.s = d.data; })(),
+                    (async () => { try { const d = await api('/api/settings/agent-github-proxy-url'); this.agentGithubProxyURL = d.data.svalue || ''; } catch(e) {} })(),
+                ]);
+                this.loading = false;
+                await this.fetchWebsites();
+            }
             catch(e) { this.loading = false; this.websitesLoading = false; showToast(e.message,'error'); }
         },
         async fetchWebsites() {
@@ -297,6 +304,7 @@ function serverDetail() {
         buildInstallCommand(agentKey) {
             const centerURL = this.panelCenterURL();
             const tlsSkipVerify = '{{.TLSMode}}' === 'self_signed';
+            const githubProxyURL = (this.agentGithubProxyURL || '').trim();
             return `#!/bin/sh
 set -e
 # 清理可能残留的旧 Agent，避免重复安装冲突
@@ -306,6 +314,7 @@ systemctl daemon-reload 2>/dev/null || true
 AGENT_VERSION="latest"
 CENTER_URL=${this.shellQuote(centerURL)}
 AGENT_API_KEY=${this.shellQuote(agentKey)}
+GITHUB_PROXY_URL=${this.shellQuote(githubProxyURL)}
 INTERVAL_SECONDS="60"
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -313,8 +322,15 @@ case "$ARCH" in
   aarch64|arm64) ARCH="arm64" ;;
   *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
-AGENT_URL="https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/server-panel-agent-linux-\${ARCH}"
-CHECKSUM_URL="https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/checksums-\${ARCH}.txt"
+github_url() {
+  if [ -n "$GITHUB_PROXY_URL" ]; then
+    printf '%s/%s' "$(printf '%s' "$GITHUB_PROXY_URL" | sed 's#/*$##')" "$1"
+  else
+    printf '%s' "$1"
+  fi
+}
+AGENT_URL="$(github_url "https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/server-panel-agent-linux-\${ARCH}")"
+CHECKSUM_URL="$(github_url "https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/checksums-\${ARCH}.txt")"
 
 id -u server-panel-agent >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin server-panel-agent
 
