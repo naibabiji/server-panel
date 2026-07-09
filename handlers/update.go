@@ -21,11 +21,16 @@ type UpdateHandler struct {
 
 var panelReleaseCache = struct {
 	sync.Mutex
-	release  *executor.GithubRelease
-	expireAt time.Time
+	release     *executor.GithubRelease
+	expireAt    time.Time
+	lastErr     error
+	errExpireAt time.Time
 }{}
 
 const panelReleaseCacheTTL = 5 * time.Minute
+// 访问 GitHub 失败（离线/网络不通）时，把错误也缓存一小段时间，
+// 避免每次缓存过期都重新发起最长为 5 秒的阻塞请求。
+const panelReleaseErrTTL = 60 * time.Second
 
 func (h *UpdateHandler) db() *sql.DB {
 	if h.DB != nil {
@@ -71,16 +76,27 @@ func cachedLatestPanelRelease() (*executor.GithubRelease, error) {
 		panelReleaseCache.Unlock()
 		return release, nil
 	}
+	// 命中失败缓存：直接复用上次的错误，避免重复发起网络请求
+	if panelReleaseCache.lastErr != nil && now.Before(panelReleaseCache.errExpireAt) {
+		err := panelReleaseCache.lastErr
+		panelReleaseCache.Unlock()
+		return nil, err
+	}
 	panelReleaseCache.Unlock()
 
 	release, err := executor.FetchLatestPanelRelease()
 	if err != nil {
+		panelReleaseCache.Lock()
+		panelReleaseCache.lastErr = err
+		panelReleaseCache.errExpireAt = time.Now().Add(panelReleaseErrTTL)
+		panelReleaseCache.Unlock()
 		return nil, err
 	}
 
 	panelReleaseCache.Lock()
 	panelReleaseCache.release = release
 	panelReleaseCache.expireAt = now.Add(panelReleaseCacheTTL)
+	panelReleaseCache.lastErr = nil
 	panelReleaseCache.Unlock()
 	return release, nil
 }

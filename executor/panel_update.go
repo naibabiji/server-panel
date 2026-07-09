@@ -38,7 +38,7 @@ type GithubRelease struct {
 // server-panel release.
 func FetchLatestPanelRelease() (*GithubRelease, error) {
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", panelRepoOwner, panelRepoName)
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 5 * time.Second}
 	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
 	if err != nil {
 		return nil, err

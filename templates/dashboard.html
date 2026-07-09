@@ -172,16 +172,18 @@ function dashboardPage() {
                     const d = await api('/api/dashboard/recent-alerts?limit=10');
                     this.alerts = d.data || [];
                 } catch(e) {} })(),
-                (async () => { try {
-                    const d = await api('/api/update/check');
-                    this.panelUpdate = { hasUpdate: d.data.has_update, latestVersion: d.data.latest_version };
-                } catch(e) {} })(),
-                (async () => { try {
-                    const d = await api('/api/system/updates');
-                    this.sysUpdateCount = d.data.count || 0;
-                } catch(e) {} })(),
             ]);
             this.loading = false;
+            // 下面两个是慢速系统检测接口（GitHub 版本检查 / apt 更新检查），
+            // 故意放在 loading 之后，避免阻塞首屏核心数据渲染。
+            (async () => { try {
+                const d = await api('/api/update/check');
+                this.panelUpdate = { hasUpdate: d.data.has_update, latestVersion: d.data.latest_version };
+            } catch(e) {} })();
+            (async () => { try {
+                const d = await api('/api/system/updates');
+                this.sysUpdateCount = d.data.count || 0;
+            } catch(e) {} })();
         },
         panelURL(path) {
             return (document.body.dataset.panelPrefix || '') + path;

@@ -22,16 +22,21 @@ type systemPackage struct {
 }
 
 type sysPkgCacheState struct {
-	mu       sync.Mutex
-	expireAt time.Time
-	pkgs     []systemPackage
-	valid    bool
+	mu          sync.Mutex
+	expireAt    time.Time
+	pkgs        []systemPackage
+	valid       bool
+	lastErr     error
+	errExpireAt time.Time
 }
 
 var sysPkgCache sysPkgCacheState
 var sysUpdateMu sync.Mutex
 
 const sysPkgCacheTTL = 5 * time.Minute
+// apt 检查失败（非 Debian 主机/无权限）时缓存错误一小段时间，
+// 避免每次缓存过期都重新执行 shell 命令。
+const sysPkgErrTTL = 60 * time.Second
 const sysUpdateOutputLimit = 1024 * 1024
 
 type SystemUpdateHandler struct{}
@@ -50,10 +55,21 @@ func (h *SystemUpdateHandler) Check(c *gin.Context) {
 		}))
 		return
 	}
+	// 命中失败缓存：直接复用上次的错误，避免重复执行 shell 命令
+	if sysPkgCache.lastErr != nil && time.Now().Before(sysPkgCache.errExpireAt) {
+		err := sysPkgCache.lastErr
+		sysPkgCache.mu.Unlock()
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("检查系统更新失败: "+err.Error()))
+		return
+	}
 	sysPkgCache.mu.Unlock()
 
 	pkgs, err := getUpgradablePackages()
 	if err != nil {
+		sysPkgCache.mu.Lock()
+		sysPkgCache.lastErr = err
+		sysPkgCache.errExpireAt = time.Now().Add(sysPkgErrTTL)
+		sysPkgCache.mu.Unlock()
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("检查系统更新失败: "+err.Error()))
 		return
 	}
@@ -62,6 +78,7 @@ func (h *SystemUpdateHandler) Check(c *gin.Context) {
 	sysPkgCache.pkgs = pkgs
 	sysPkgCache.expireAt = time.Now().Add(sysPkgCacheTTL)
 	sysPkgCache.valid = true
+	sysPkgCache.lastErr = nil
 	sysPkgCache.mu.Unlock()
 
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{

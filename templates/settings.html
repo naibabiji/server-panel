@@ -524,10 +524,11 @@ function settingsPage() {
                     };
                 } catch(e) {} })(),
                 this.loadBackup().catch(() => {}),
-                this.checkUpdate(true).catch(() => {}),
-                this.checkSysUpdate().catch(() => {}),
             ]);
             this.loading = false;
+            // 慢速系统检测接口（GitHub 版本检查 / apt 更新检查）不阻塞首屏渲染
+            this.checkUpdate(true).catch(() => {});
+            this.checkSysUpdate().catch(() => {});
         },
         async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
         async saveAccess() {
