@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/handlers"
@@ -76,6 +77,15 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 	suffix := cfg.Panel.RandomSuffix
 	prefix := "/" + suffix
 
+	// gzip 压缩 HTML/JSON/CSS/JS。排除：
+	//  - 备份下载（.tar.gz 已压缩，且 c.FileAttachment 需支持 Range 断点续传，
+	//    gzip 对分片单独压缩会破坏 Content-Range 语义，灾备恢复时才发现损坏）
+	//  - /healthz（健康检查无 body，无需压缩）
+	r.Use(gzip.Gzip(gzip.DefaultCompression, gzip.WithExcludedPaths([]string{
+		prefix + "/api/settings/backup/download",
+		"/healthz",
+	})))
+
 	// Public status page (no auth)
 	statusH := &handlers.StatusPageHandler{DB: db}
 	r.GET("/status/:token", func(c *gin.Context) {
@@ -108,6 +118,7 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		pg.GET("/login", func(c *gin.Context) {
 			c.HTML(http.StatusOK, "login.html", gin.H{
 				"PanelTitle":   cfg.Panel.PanelTitle,
+				"PanelVersion":  cfg.Panel.Version,
 				"RandomSuffix": suffix,
 				"AssetPrefix":  prefix + "/assets",
 			})
@@ -311,6 +322,15 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 	}
 
 	staticSubFS, _ := fs.Sub(staticFS, "static")
+	// 静态资源长缓存（1 年 + immutable）。资源 URL 带 ?v=PanelVersion 做 cache-busting：
+	// 版本号一变（每次发版）浏览器即视为新文件重新下载，避免更新后旧 JS 跑新后端。
+	// 此 r.Use 注册在 StaticFS 之前、其余路由之后，故仅 /assets 走到它。
+	r.Use(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, prefix+"/assets/") {
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		c.Next()
+	})
 	r.StaticFS(prefix+"/assets", http.FS(staticSubFS))
 
 	tmpl := template.Must(template.New("").ParseFS(templatesFS, "templates/*.html"))

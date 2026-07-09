@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="">
     <title>{{.PanelTitle}} - 登录</title>
-    <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css">
-    <script defer src="{{.AssetPrefix}}/js/alpine.min.js"></script>
-    <script src="{{.AssetPrefix}}/js/app.js"></script>
+    <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css?v={{.PanelVersion}}">
+    <script defer src="{{.AssetPrefix}}/js/alpine.min.js?v={{.PanelVersion}}"></script>
+    <script src="{{.AssetPrefix}}/js/app.js?v={{.PanelVersion}}"></script>
     <style>
         :root { --primary: #7c3aed; --primary-hover: #6d28d9; --bg: #0f0f11; --card: #1a1a1f; --text: #e4e4e7; --sub: #a1a1aa; }
         body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }

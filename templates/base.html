@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{.CSRFToken}}">
     <title>{{.Title}}</title>
-    <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css">
+    <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css?v={{.PanelVersion}}">
     <style>[x-cloak]{display:none!important}</style>
-    <script defer src="{{.AssetPrefix}}/js/alpine.min.js"></script>
-    <script src="{{.AssetPrefix}}/js/app.js"></script>
-    <script defer src="{{.AssetPrefix}}/js/chart.min.js"></script>
+    <script defer src="{{.AssetPrefix}}/js/alpine.min.js?v={{.PanelVersion}}"></script>
+    <script src="{{.AssetPrefix}}/js/app.js?v={{.PanelVersion}}"></script>
+    <script defer src="{{.AssetPrefix}}/js/chart.min.js?v={{.PanelVersion}}"></script>
 </head>
 <body class="bg-[#0d1117] text-gray-200" data-panel-prefix="/{{.RandomSuffix}}">
 <div x-data="layout()" @resize.window="onResize()" class="flex h-screen overflow-hidden">

@@ -2,6 +2,68 @@
 // 后续并发的同状态码分支只抛 silent 错误，不再重复改 location.href。
 let _authRedirecting = false;
 
+// --- 浏览器侧 API 缓存（sessionStorage）---
+// 覆盖字典（极少变，长 TTL）和列表（含 agent 上报的实时状态字段，短 TTL 兜底）。
+// mutation 由 api() 统一失效，避免读到陈旧数据。
+const API_CACHE_PREFIX = 'spApiCache:';
+const API_CACHE_TTL = 5 * 60 * 1000;        // 默认 5 分钟（字典等极少变的数据）
+const API_CACHE_TTL_LIST = 30 * 1000;       // 列表 30 秒（含 is_online/last_seen 等实时字段）
+
+function apiCacheKey(path) { return API_CACHE_PREFIX + path; }
+
+function apiCacheGet(path, ttl) {
+    try {
+        const raw = sessionStorage.getItem(apiCacheKey(path));
+        if (!raw) return null;
+        const entry = JSON.parse(raw);
+        if (Date.now() - entry.t > ttl) { sessionStorage.removeItem(apiCacheKey(path)); return null; }
+        return entry.data;
+    } catch (e) { return null; }
+}
+
+function apiCacheSet(path, data) {
+    try { sessionStorage.setItem(apiCacheKey(path), JSON.stringify({ t: Date.now(), data })); } catch (e) {}
+}
+
+// 清掉某个前缀下的所有缓存项：匹配 path 本身、path/...、path?...
+function apiCacheDropPrefix(pathPrefix) {
+    try {
+        const toRemove = [];
+        for (let i = 0; i < sessionStorage.length; i++) {
+            const k = sessionStorage.key(i);
+            if (!k || k.indexOf(API_CACHE_PREFIX) !== 0) continue;
+            const p = k.slice(API_CACHE_PREFIX.length);
+            if (p === pathPrefix || p.indexOf(pathPrefix + '/') === 0 || p.indexOf(pathPrefix + '?') === 0) {
+                toRemove.push(k);
+            }
+        }
+        toRemove.forEach(k => sessionStorage.removeItem(k));
+    } catch (e) {}
+}
+
+// mutation 成功后按资源前缀失效相关 GET 缓存。
+// 服务器变更会顺带失效网站列表（website 列表 JOIN servers 取 server_name）。
+function apiCacheInvalidate(path) {
+    if (path === '/api/settings/os-list') apiCacheDropPrefix('/api/settings/os-list');
+    else if (path === '/api/settings/site-type-list') apiCacheDropPrefix('/api/settings/site-type-list');
+    else if (path.indexOf('/api/servers') === 0) { apiCacheDropPrefix('/api/servers'); apiCacheDropPrefix('/api/websites'); }
+    else if (path.indexOf('/api/websites') === 0) apiCacheDropPrefix('/api/websites');
+}
+
+// opt-in 的 GET 缓存封装：命中缓存直接返回，否则走 api() 并写入缓存。
+// 非 GET 不要用这个——直接用 api()，api() 会在成功后自动失效相关缓存。
+// cacheOpts.ttl：自定义有效期（列表用短 TTL，避免实时状态字段陈旧）。
+async function cachedApi(path, options = {}, cacheOpts = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+    if (method !== 'GET') return api(path, options);
+    const ttl = cacheOpts.ttl != null ? cacheOpts.ttl : API_CACHE_TTL;
+    const cached = apiCacheGet(path, ttl);
+    if (cached) return cached;
+    const data = await api(path, options);
+    apiCacheSet(path, data);
+    return data;
+}
+
 function api(path, options = {}) {
     const prefix = document.body.dataset.panelPrefix || '';
     const apiPath = path.startsWith('/api/') ? path : '/api' + path;
@@ -67,6 +129,9 @@ function api(path, options = {}) {
                 if (data.conflicts) err.conflicts = data.conflicts;
                 throw err;
             }
+            // mutation 成功后失效相关 GET 缓存（字典/列表），避免读到陈旧数据。
+            const _method = (options.method || 'GET').toUpperCase();
+            if (_method !== 'GET') apiCacheInvalidate(path);
             return data;
         })
         .catch(err => {

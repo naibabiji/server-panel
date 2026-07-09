@@ -18,24 +18,8 @@
             <a href="#dictionary" class="block px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-[#171e27] border-l-2 border-transparent">字典</a>
         </nav>
 
-        <div class="min-w-0" x-show="loading" x-cloak>
-            <template x-for="n in 4" :key="n">
-                <div class="border border-[#2a3038] bg-[#171b21] mb-5">
-                    <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
-                        <div class="skeleton-block h-4 w-32 mb-2"></div>
-                        <div class="skeleton-block h-3 w-64"></div>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-5">
-                        <div class="skeleton-block h-9"></div>
-                        <div class="skeleton-block h-9"></div>
-                        <div class="skeleton-block h-9"></div>
-                        <div class="skeleton-block h-9"></div>
-                    </div>
-                </div>
-            </template>
-        </div>
-        <div class="min-w-0" x-show="!loading" x-cloak>
-            <section id="basic" class="border border-[#2a3038] bg-[#171b21] mb-5">
+        <div class="min-w-0">
+            <section id="basic" x-show="loaded.basic" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">基础设置</div>
                     <div class="text-sm text-gray-500 mt-1">这些配置决定后台在浏览器中如何显示和访问。</div>
@@ -123,7 +107,7 @@
                 </div>
             </section>
 
-            <section id="update" class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="update" x-show="loaded.update" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">更新</div>
                     <div class="text-sm text-gray-500 mt-1">面板版本检查/更新、自动更新策略，以及系统包更新。</div>
@@ -219,7 +203,7 @@
                 </div>
             </section>
 
-            <section id="backup" class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="backup" x-show="loaded.backup" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">备份</div>
                     <div class="text-sm text-gray-500 mt-1">生成数据库和密钥的打包备份（.tar.gz），可选发送到管理员邮箱。密钥用于解密已保存的服务器/网站密码，不包含在内的话恢复后这些密码将无法解密。</div>
@@ -367,7 +351,7 @@
                 </div>
             </div>
 
-            <section id="security" class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="security" x-show="loaded.security" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">安全</div>
                     <div class="text-sm text-gray-500 mt-1">BasicAuth、面板登录和查看密码都在这里管理。</div>
@@ -420,7 +404,7 @@
                 </div>
             </section>
 
-            <section id="notification" class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="notification" x-show="loaded.notification" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">通知</div>
                     <div class="text-sm text-gray-500 mt-1">配置告警邮件发送方式。</div>
@@ -444,7 +428,7 @@
                 </div>
             </section>
 
-            <section id="dictionary" class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="dictionary" x-show="loaded.dictionary" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">字典</div>
                     <div class="text-sm text-gray-500 mt-1">这些列表会出现在添加或编辑服务器、网站的表单中。</div>
@@ -471,7 +455,7 @@
 <script>
 function settingsPage() {
     return {
-        loading: true,
+        loaded: { basic:false, update:false, backup:false, security:false, notification:false, dictionary:false },
         panelTitle: '', smtp: {}, access: { tls_port: 0, random_suffix: '', trust_cloudflare: false, trust_reverse_proxy: false, trusted_proxies: [], trusted_proxies_text: '' }, tls: { tls_mode:'self_signed', domain:'', tls_cert_path:'', tls_key_path:'', acme_email:'' }, tlsUpload: { cert_pem:'', key_pem:'' }, osList: '', siteTypeList: '',
         acct: { web_username:'', web_password:'', web_password2:'', basic_username:'', basic_password:'', old_password:'', basic_auth_enabled:true },
         originalBasicAuthEnabled: true,
@@ -499,13 +483,26 @@ function settingsPage() {
             return Math.min(this.opLogs.total || 0, (this.opLogs.page || 1) * (this.opLogs.page_size || 30));
         },
         async init() {
-            // 首屏必需数据并行加载；用 allSettled 而非 all，避免单个请求异常
-            // （如查看密码未设置时 /api/update/auto-settings 返回 428）拖死整体，
-            // 导致 loading 永远不为 false、骨架屏永久卡住。
-            await Promise.allSettled([
-                (async () => { try { const d = await api('/api/settings'); this.panelTitle = d.data.panel_title || ''; } catch(e) {} })(),
-                (async () => { try {
-                    const d = await api('/api/settings/panel-access');
+            // 分区加载：每个区块独立拉自己的数据、独立显示，互不阻塞。
+            // 某个区块失败不影响其它区块；loaded.X 在 finally 里置位，保证即使
+            // 失败也会显示该区块（用默认空值 + 保存按钮仍可用）。
+            this.loadBasic().catch(() => {});
+            this.loadUpdateSection().catch(() => {});
+            this.loadBackupSection().catch(() => {});
+            this.loadSecurity().catch(() => {});
+            this.loadNotification().catch(() => {});
+            this.loadDictionary().catch(() => {});
+        },
+        async loadBasic() {
+            try {
+                const [t, a, tls] = await Promise.allSettled([
+                    api('/api/settings'),
+                    api('/api/settings/panel-access'),
+                    api('/api/settings/tls'),
+                ]);
+                if (t.status === 'fulfilled') this.panelTitle = t.value.data.panel_title || '';
+                if (a.status === 'fulfilled') {
+                    const d = a.value;
                     const proxies = d.data.trusted_proxies || [];
                     this.access = Object.assign(this.access, d.data || {}, { trusted_proxies_text: proxies.join('\n') });
                     this._loadedAccess = {
@@ -515,22 +512,47 @@ function settingsPage() {
                         trust_reverse_proxy: !!d.data.trust_reverse_proxy,
                         trusted_proxies_text: proxies.join('\n')
                     };
-                } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/tls'); this.tls = Object.assign(this.tls, d.data || {}); } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; this.acct.basic_auth_enabled = d.data.basic_auth_enabled !== false; this.originalBasicAuthEnabled = this.acct.basic_auth_enabled; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/view-password/status'); this.vpSetup = d.data.is_setup; this.vpUnlocked = d.data.is_unlocked; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypeList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
-            ]);
-            this.loading = false;
-            // 非首屏必需、且查看密码未设置时会返回 428 的接口：在退出骨架屏后再异步加载，
-            // 失败不影响页面渲染。首登用户可先完成"设置查看密码"。
-            this.loadAutoUpdate().catch(() => {});
-            this.loadBackup().catch(() => {});
-            // 慢速系统检测接口（GitHub 版本检查 / apt 更新检查）不阻塞首屏渲染
+                }
+                if (tls.status === 'fulfilled') this.tls = Object.assign(this.tls, tls.value.data || {});
+            } catch(e) {} finally { this.loaded.basic = true; }
+        },
+        async loadUpdateSection() {
+            try { await this.loadAutoUpdate(); } catch(e) {} finally { this.loaded.update = true; }
+            // 慢速接口（GitHub 版本检查 / apt 更新检查）后台跑，不阻塞区块显示
             this.checkUpdate(true).catch(() => {});
             this.checkSysUpdate().catch(() => {});
+        },
+        async loadBackupSection() {
+            try { await this.loadBackup(); } catch(e) {} finally { this.loaded.backup = true; }
+        },
+        async loadSecurity() {
+            try {
+                const [vp, acct] = await Promise.allSettled([
+                    api('/api/view-password/status'),
+                    api('/api/settings/account'),
+                ]);
+                if (vp.status === 'fulfilled') { this.vpSetup = vp.value.data.is_setup; this.vpUnlocked = vp.value.data.is_unlocked; }
+                if (acct.status === 'fulfilled') {
+                    const d = acct.value;
+                    this.acct.web_username = d.data.web_username || '';
+                    this.acct.basic_username = d.data.basic_username || '';
+                    this.acct.basic_auth_enabled = d.data.basic_auth_enabled !== false;
+                    this.originalBasicAuthEnabled = this.acct.basic_auth_enabled;
+                }
+            } catch(e) {} finally { this.loaded.security = true; }
+        },
+        async loadNotification() {
+            try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {} finally { this.loaded.notification = true; }
+        },
+        async loadDictionary() {
+            try {
+                const [os, st] = await Promise.allSettled([
+                    cachedApi('/api/settings/os-list'),
+                    cachedApi('/api/settings/site-type-list'),
+                ]);
+                if (os.status === 'fulfilled') this.osList = JSON.parse(os.value.data.svalue || '[]').join('\n');
+                if (st.status === 'fulfilled') this.siteTypeList = JSON.parse(st.value.data.svalue || '[]').join('\n');
+            } catch(e) {} finally { this.loaded.dictionary = true; }
         },
         async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
         async saveAccess() {
@@ -629,7 +651,7 @@ function settingsPage() {
                 if (!silent && !this.update.hasUpdate) {
                     showToast('已是最新版本 ' + this.update.current_version, 'success');
                 }
-            } catch(e) { showToast(e.message,'error'); }
+            } catch(e) { if (!e.silent) showToast(e.message,'error'); }
             this.update.checking = false;
         },
         async doUpdate() {
@@ -850,7 +872,7 @@ function settingsPage() {
                 const d = await api('/api/system/updates');
                 this.sysUpdate.packages = d.data.packages || [];
                 this.sysUpdate.count = d.data.count || 0;
-            } catch(e) { showToast(e.message,'error'); }
+            } catch(e) { if (!e.silent) showToast(e.message,'error'); }
             this.sysUpdate.checking = false;
         },
         async doSysUpdate() {

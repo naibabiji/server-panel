@@ -71,7 +71,9 @@ function serverList() {
                     page: this.page,
                     page_size: this.pageSize,
                 });
-                const d = await api('/api/servers?' + params.toString());
+                const url = '/api/servers?' + params.toString();
+                // 带搜索词的请求不缓存（每次敲键都换 key 会堆积），只缓存默认/筛选列表
+                const d = this.search ? await api(url) : await cachedApi(url, {}, { ttl: API_CACHE_TTL_LIST });
                 this.items = d.data.items || [];
                 this.setPagination(d.data);
                 await this.ensurePageHasItems(this.items);
