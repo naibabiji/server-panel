@@ -74,6 +74,39 @@ func TestProviderUpdateAllowsRenamingToOwnName(t *testing.T) {
 	}
 }
 
+func TestProviderClearPrivateNotesRequiresTokenAndClearsValue(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := newProviderTestDB(t)
+	h := &ProviderHandler{DB: db}
+
+	mustExec(t, db, "INSERT INTO settings (skey, svalue) VALUES ('view_password_hash', 'set')")
+	mustExec(t, db, "INSERT INTO providers (id, name, private_notes_enc) VALUES (1, 'DigitalOcean', 'encrypted')")
+
+	const sessionToken = "session-1"
+
+	w := performProviderRequestWithViewToken(h.ClearPrivateNotes, http.MethodDelete, "/api/providers/:id/secrets/private-notes", "/api/providers/1/secrets/private-notes", sessionToken, "")
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("ClearPrivateNotes without token status = %d, want %d, body=%s", w.Code, http.StatusForbidden, w.Body.String())
+	}
+
+	viewToken, err := CreateViewToken(sessionToken, "192.0.2.1")
+	if err != nil {
+		t.Fatalf("CreateViewToken: %v", err)
+	}
+	w = performProviderRequestWithViewToken(h.ClearPrivateNotes, http.MethodDelete, "/api/providers/:id/secrets/private-notes", "/api/providers/1/secrets/private-notes", sessionToken, viewToken)
+	if w.Code != http.StatusOK {
+		t.Fatalf("ClearPrivateNotes status = %d, want %d, body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+
+	var encrypted string
+	if err := db.QueryRow("SELECT private_notes_enc FROM providers WHERE id = 1").Scan(&encrypted); err != nil {
+		t.Fatalf("query private_notes_enc: %v", err)
+	}
+	if encrypted != "" {
+		t.Fatalf("private_notes_enc = %q, want empty", encrypted)
+	}
+}
+
 func mustExec(t *testing.T, db *sql.DB, query string) {
 	t.Helper()
 	if _, err := db.Exec(query); err != nil {
@@ -102,6 +135,13 @@ func newProviderTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("create providers table: %v", err)
 	}
+	_, err = db.Exec(`CREATE TABLE settings (
+		skey   TEXT PRIMARY KEY,
+		svalue TEXT NOT NULL DEFAULT ''
+	)`)
+	if err != nil {
+		t.Fatalf("create settings table: %v", err)
+	}
 	return db
 }
 
@@ -111,6 +151,27 @@ func performProviderRequest(handler gin.HandlerFunc, method string, route string
 
 	req := httptest.NewRequest(method, target, body)
 	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	return w
+}
+
+func performProviderRequestWithViewToken(handler gin.HandlerFunc, method string, route string, target string, sessionToken string, viewToken string) *httptest.ResponseRecorder {
+	router := gin.New()
+	router.Handle(method, route, func(c *gin.Context) {
+		if sessionToken != "" {
+			c.Set("session_token", sessionToken)
+		}
+		handler(c)
+	})
+
+	req := httptest.NewRequest(method, target, strings.NewReader(""))
+	req.RemoteAddr = "192.0.2.1:1234"
+	req.Header.Set("Content-Type", "application/json")
+	if viewToken != "" {
+		req.Header.Set("X-View-Token", viewToken)
+	}
 
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)

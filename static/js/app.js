@@ -113,16 +113,14 @@ function paginationState(pageSize = 30) {
     return {
         page: 1,
         pageSize,
+        totalPages: 1,
+        pageStart: 0,
+        pageEnd: 0,
         total: 0,
-        get totalPages() {
-            return Math.max(1, Math.ceil((this.total || 0) / this.pageSize));
-        },
-        get pageStart() {
-            if (!this.total) return 0;
-            return (this.page - 1) * this.pageSize + 1;
-        },
-        get pageEnd() {
-            return Math.min(this.total || 0, this.page * this.pageSize);
+        recalcPagination() {
+            this.totalPages = Math.max(1, Math.ceil((this.total || 0) / this.pageSize));
+            this.pageStart = this.total ? (this.page - 1) * this.pageSize + 1 : 0;
+            this.pageEnd = Math.min(this.total || 0, this.page * this.pageSize);
         },
         pageParams() {
             return 'page=' + encodeURIComponent(this.page) + '&page_size=' + encodeURIComponent(this.pageSize);
@@ -131,6 +129,7 @@ function paginationState(pageSize = 30) {
             this.total = data.total || 0;
             this.page = data.page || this.page;
             this.pageSize = data.page_size || this.pageSize;
+            this.recalcPagination();
         },
         async resetAndFetch() {
             this.page = 1;

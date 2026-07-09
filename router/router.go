@@ -149,10 +149,11 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.POST("/api/providers", provH.Create)
 			protected.GET("/api/providers/:id", provH.Get)
 			protected.GET("/api/providers/:id/secrets/private-notes", provH.GetPrivateNotes)
+			protected.DELETE("/api/providers/:id/secrets/private-notes", provH.ClearPrivateNotes)
 			protected.PUT("/api/providers/:id", provH.Update)
 			protected.DELETE("/api/providers/:id", provH.Delete)
 
-			settingsH := &handlers.SettingsHandler{DB: db}
+			settingsH := &handlers.SettingsHandler{DB: db, AfterRestoreScheduled: clearViewPasswordSetupCache}
 			protected.GET("/api/settings/os-list", settingsH.GetOSList)
 			protected.GET("/api/settings/site-type-list", settingsH.GetSiteTypeList)
 			protected.GET("/api/settings/agent-github-proxy-url", settingsH.GetAgentGithubProxyURL)
@@ -371,6 +372,13 @@ func cacheViewPasswordSetup() {
 	defer viewPasswordSetupCache.Unlock()
 	viewPasswordSetupCache.ok = true
 	viewPasswordSetupCache.expiresAt = time.Now().Add(10 * time.Minute)
+}
+
+func clearViewPasswordSetupCache() {
+	viewPasswordSetupCache.Lock()
+	defer viewPasswordSetupCache.Unlock()
+	viewPasswordSetupCache.ok = false
+	viewPasswordSetupCache.expiresAt = time.Time{}
 }
 
 func cachedViewPasswordSetup() bool {

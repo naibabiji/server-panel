@@ -38,7 +38,10 @@
         <div class="p-5 border-t border-[#202833]" x-show="provider.has_private_notes">
             <div class="flex items-center justify-between gap-3 mb-2">
                 <div class="text-sm text-gray-400">加密备注</div>
-                <button @click="showPrivateNotes()" class="btn-secondary text-xs" x-show="!privateNotes">查看</button>
+                <div class="flex gap-2">
+                    <button @click="showPrivateNotes()" class="btn-secondary text-xs" x-show="!privateNotes">查看</button>
+                    <button @click="clearPrivateNotes()" class="btn-secondary text-xs text-red-300 hover:text-red-200">清空</button>
+                </div>
             </div>
             <p class="text-sm text-green-200 whitespace-pre-wrap" x-show="privateNotes" x-text="privateNotes"></p>
         </div>
@@ -103,6 +106,17 @@ function providerDetail() {
                 const d = await api('/api/providers/' + this.provider.id + '/secrets/private-notes', {headers:{'X-View-Token': viewToken}});
                 this.privateNotes = d.data.value || '';
                 if (!this.privateNotes) showToast('未保存加密备注','warning');
+            } catch(e) {}
+        },
+        async clearPrivateNotes() {
+            if (!await confirmModal('确认清空此服务商的加密备注？')) return;
+            try {
+                const viewToken = await unlockViewPasswordPrompt();
+                if (!viewToken) return;
+                await api('/api/providers/' + this.provider.id + '/secrets/private-notes', {method:'DELETE', headers:{'X-View-Token': viewToken}});
+                this.privateNotes = '';
+                this.provider.has_private_notes = false;
+                showToast('加密备注已清空', 'success');
             } catch(e) {}
         }
     }

@@ -211,6 +211,40 @@ func (h *ProviderHandler) GetPrivateNotes(c *gin.Context) {
 	}))
 }
 
+func (h *ProviderHandler) ClearPrivateNotes(c *gin.Context) {
+	id := c.Param("id")
+	setup, err := isViewPasswordSetup(h.db())
+	if err != nil {
+		log.Printf("read view password setup status failed: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		return
+	}
+	if !setup {
+		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先设置查看密码"))
+		return
+	}
+	sessionToken, ok := getSessionToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("会话已过期，请重新登录"))
+		return
+	}
+	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse("请重新输入查看密码"))
+		return
+	}
+
+	result, err := h.db().Exec("UPDATE providers SET private_notes_enc='', updated_at=CURRENT_TIMESTAMP WHERE id = ?", id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("清空加密备注失败"))
+		return
+	}
+	if rows, _ := result.RowsAffected(); rows == 0 {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("服务商不存在"))
+		return
+	}
+	c.JSON(http.StatusOK, models.SuccessResponse(nil))
+}
+
 func (h *ProviderHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	result, err := h.db().Exec("DELETE FROM providers WHERE id = ?", id)

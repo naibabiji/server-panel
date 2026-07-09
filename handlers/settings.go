@@ -29,7 +29,8 @@ import (
 )
 
 type SettingsHandler struct {
-	DB *sql.DB
+	DB                    *sql.DB
+	AfterRestoreScheduled func()
 }
 
 var panelSuffixPattern = regexp.MustCompile(`^[A-Za-z0-9]{4,}$`)
@@ -320,6 +321,9 @@ func (h *SettingsHandler) RestoreBackup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("恢复失败: "+err.Error()))
 		return
 	}
+	if h.AfterRestoreScheduled != nil {
+		h.AfterRestoreScheduled()
+	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 		"message": "校验通过，面板将在数秒内自动重启并完成恢复，请勿关闭本页面",
 	}))
@@ -344,6 +348,9 @@ func (h *SettingsHandler) RestoreBackupUpload(c *gin.Context) {
 		_ = executor.RemoveBackupFile(filename)
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("恢复失败: "+err.Error()))
 		return
+	}
+	if h.AfterRestoreScheduled != nil {
+		h.AfterRestoreScheduled()
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 		"message": "上传校验通过，面板将在数秒内自动重启并完成恢复，请勿关闭本页面",
@@ -593,7 +600,10 @@ func (h *SettingsHandler) UpdateAgentGithubProxyURL(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("GitHub 反代地址必须以 http:// 或 https:// 开头"))
 		return
 	}
-	h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('agent_github_proxy_url', ?)", value)
+	if _, err := h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('agent_github_proxy_url', ?)", value); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存 Agent 下载设置失败"))
+		return
+	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
 }
 
