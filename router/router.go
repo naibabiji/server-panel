@@ -5,14 +5,23 @@ import (
 	"errors"
 	"html/template"
 	"io/fs"
+	"log"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/handlers"
 	"github.com/naibabiji/server-panel/middleware"
 )
+
+var viewPasswordSetupCache = struct {
+	sync.Mutex
+	ok        bool
+	expiresAt time.Time
+}{}
 
 func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.FS) *gin.Engine {
 	r := gin.New()
@@ -293,13 +302,19 @@ func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		setup, err := isViewPasswordSetup(db)
 		if err != nil {
+			log.Printf("read view password setup status failed: %v", err)
+			if cachedViewPasswordSetup() {
+				c.Next()
+				return
+			}
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 				"success": false,
-				"message": "读取查看密码状态失败",
+				"message": "读取查看密码状态失败，请稍后刷新",
 			})
 			return
 		}
 		if setup {
+			cacheViewPasswordSetup()
 			c.Next()
 			return
 		}
@@ -335,14 +350,31 @@ func isViewPasswordSetup(db *sql.DB) (bool, error) {
 		return false, errors.New("database is not initialized")
 	}
 	var hash string
-	err := db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
-	if err != nil {
+	var err error
+	for i := 0; i < 3; i++ {
+		err = db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
+		if err == nil {
+			return hash != "", nil
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
-		return false, err
+		time.Sleep(time.Duration(100*(i+1)) * time.Millisecond)
 	}
-	return hash != "", nil
+	return false, err
+}
+
+func cacheViewPasswordSetup() {
+	viewPasswordSetupCache.Lock()
+	defer viewPasswordSetupCache.Unlock()
+	viewPasswordSetupCache.ok = true
+	viewPasswordSetupCache.expiresAt = time.Now().Add(10 * time.Minute)
+}
+
+func cachedViewPasswordSetup() bool {
+	viewPasswordSetupCache.Lock()
+	defer viewPasswordSetupCache.Unlock()
+	return viewPasswordSetupCache.ok && time.Now().Before(viewPasswordSetupCache.expiresAt)
 }
 
 func pageData(cfg *config.Config, active string, contentTpl string, c *gin.Context) gin.H {

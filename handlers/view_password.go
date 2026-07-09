@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
@@ -22,7 +23,15 @@ func (h *ViewPasswordHandler) GetStatus(c *gin.Context) {
 		return
 	}
 	var hash string
-	if err := db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	var err error
+	for i := 0; i < 3; i++ {
+		err = db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
+		if err == nil || errors.Is(err, sql.ErrNoRows) {
+			break
+		}
+		time.Sleep(time.Duration(100*(i+1)) * time.Millisecond)
+	}
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		log.Printf("read view password status failed: %v", err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
 		return

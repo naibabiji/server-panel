@@ -498,12 +498,16 @@ func isViewPasswordSetup(db *sql.DB) (bool, error) {
 		return false, errors.New("database is not initialized")
 	}
 	var hash string
-	err := db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
-	if err != nil {
+	var err error
+	for i := 0; i < 3; i++ {
+		err = db.QueryRow("SELECT svalue FROM settings WHERE skey = 'view_password_hash'").Scan(&hash)
+		if err == nil {
+			return hash != "", nil
+		}
 		if errors.Is(err, sql.ErrNoRows) {
 			return false, nil
 		}
-		return false, err
+		time.Sleep(time.Duration(100*(i+1)) * time.Millisecond)
 	}
-	return hash != "", nil
+	return false, err
 }
