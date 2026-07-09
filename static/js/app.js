@@ -7,7 +7,7 @@ let _authRedirecting = false;
 // mutation 由 api() 统一失效，避免读到陈旧数据。
 const API_CACHE_PREFIX = 'spApiCache:';
 const API_CACHE_TTL = 5 * 60 * 1000;        // 默认 5 分钟（字典等极少变的数据）
-const API_CACHE_TTL_LIST = 30 * 1000;       // 列表 30 秒（含 is_online/last_seen 等实时字段）
+const API_CACHE_TTL_LIST = 60 * 1000;       // 列表 60 秒（含 is_online/last_seen 等实时字段，60s 内可能略滞后于 agent 上报）
 
 function apiCacheKey(path) { return API_CACHE_PREFIX + path; }
 
@@ -303,13 +303,14 @@ function inputModal(options = {}) {
         input.onfocus = () => { input.style.borderColor = '#8b5cf6'; input.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.18)'; };
         input.onblur = () => { input.style.borderColor = '#374151'; input.style.boxShadow = 'none'; };
 
-        // 密码字段：保留 type=password 的掩码防肩窥，同时结构性退出浏览器密码管理器
-        // ——无 <form>/无配对用户名、readonly-until-focus 阻止聚焦自动填充、
-        // new-password 阻止已存密码填充、第三方管理器 ignore 属性——让浏览器不记录、
-        // 不自动填充、不提示保存。另附显隐开关便于核对输入。
+        // 密码字段：用 text + CSS 掩码(-webkit-text-security:disc)替代 type=password。
+        // type=password 即使加 autocomplete=new-password，Chrome 等仍会弹"已存密码"
+        // 自动填充提示；改成 text 后浏览器根本不识别为密码字段 → 不弹、不存、不填。
+        // 无 <form>/无配对用户名，并对第三方密码管理器加 ignore 属性。附显隐开关便于核对。
         if (input.type === 'password') {
-            input.setAttribute('readonly', '');
-            input.addEventListener('focus', () => input.removeAttribute('readonly'), { once: true });
+            input.type = 'text';
+            input.style.webkitTextSecurity = 'disc';
+            input.autocomplete = 'off';
             input.setAttribute('data-lpignore', 'true');
             input.setAttribute('data-1p-ignore', '');
             input.setAttribute('data-form-type', 'other');
@@ -323,8 +324,8 @@ function inputModal(options = {}) {
             toggle.textContent = '显示';
             toggle.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#9ca3af;cursor:pointer;font-size:12px;padding:2px 4px;';
             toggle.onclick = () => {
-                const showing = input.type === 'text';
-                input.type = showing ? 'password' : 'text';
+                const showing = input.style.webkitTextSecurity === '';
+                input.style.webkitTextSecurity = showing ? 'disc' : '';
                 toggle.textContent = showing ? '显示' : '隐藏';
                 input.focus();
             };
@@ -378,8 +379,8 @@ function passwordPromptModal(label, options = {}) {
         title: options.title || '密码验证',
         label,
         message: options.message || '',
-        // type=password 保留掩码防肩窥；靠无 <form>/无用户名 + readonly-until-focus
-        // + new-password + 第三方管理器 ignore 属性，让浏览器不记录此主口令。
+        // type=password 由 inputModal 内部转为 text + CSS 掩码，让浏览器不识别为
+        // 密码字段，从而不弹自动填充/保存提示（详见 inputModal 密码分支）。
         type: 'password',
         autocomplete: options.autocomplete || 'new-password',
         placeholder: options.placeholder || '',
