@@ -225,7 +225,6 @@ var migrations = []string{
 	`INSERT OR IGNORE INTO settings (skey, svalue) VALUES ('view_password_hash', '')`,
 	`INSERT OR IGNORE INTO settings (skey, svalue) VALUES ('os_list', '["Debian 12","Debian 13","Ubuntu 22.04","Ubuntu 24.04","CentOS Stream 9","Rocky Linux 8","Rocky Linux 9","AlmaLinux 8","AlmaLinux 9","Arch Linux","其他"]')`,
 	`INSERT OR IGNORE INTO settings (skey, svalue) VALUES ('site_type_list', '["WordPress","其他CMS","静态网站","自定义"]')`,
-	`INSERT OR IGNORE INTO settings (skey, svalue) VALUES ('agent_github_proxy_url', '')`,
 	`INSERT OR IGNORE INTO settings (skey, svalue) VALUES ('panel_title', 'Server Panel')`,
 	`INSERT OR IGNORE INTO settings (skey, svalue) VALUES ('panel_auto_update_enabled', 'false')`,
 	`INSERT OR IGNORE INTO settings (skey, svalue) VALUES ('panel_auto_update_mode', 'patch_only')`,

@@ -50,10 +50,6 @@ func (h *SettingsHandler) GetSiteTypeList(c *gin.Context) {
 	h.getSetting(c, "site_type_list")
 }
 
-func (h *SettingsHandler) GetAgentGithubProxyURL(c *gin.Context) {
-	h.getSetting(c, "agent_github_proxy_url")
-}
-
 func (h *SettingsHandler) getSetting(c *gin.Context, key string) {
 	var value string
 	err := h.db().QueryRow("SELECT svalue FROM settings WHERE skey = ?", key).Scan(&value)
@@ -585,26 +581,6 @@ func (h *SettingsHandler) UpdateOSList(c *gin.Context) {
 
 func (h *SettingsHandler) UpdateSiteTypeList(c *gin.Context) {
 	h.updateListSetting(c, "site_type_list")
-}
-
-func (h *SettingsHandler) UpdateAgentGithubProxyURL(c *gin.Context) {
-	var req struct {
-		SValue string `json:"svalue"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
-		return
-	}
-	value := strings.TrimSpace(req.SValue)
-	if value != "" && !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("GitHub 反代地址必须以 http:// 或 https:// 开头"))
-		return
-	}
-	if _, err := h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('agent_github_proxy_url', ?)", value); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存 Agent 下载设置失败"))
-		return
-	}
-	c.JSON(http.StatusOK, models.SuccessResponse(nil))
 }
 
 func (h *SettingsHandler) updateListSetting(c *gin.Context, key string) {

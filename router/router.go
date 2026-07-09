@@ -156,7 +156,6 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			settingsH := &handlers.SettingsHandler{DB: db, AfterRestoreScheduled: clearViewPasswordSetupCache}
 			protected.GET("/api/settings/os-list", settingsH.GetOSList)
 			protected.GET("/api/settings/site-type-list", settingsH.GetSiteTypeList)
-			protected.GET("/api/settings/agent-github-proxy-url", settingsH.GetAgentGithubProxyURL)
 			protected.GET("/api/settings", settingsH.GetPanelTitle)
 			protected.PUT("/api/settings", settingsH.UpdatePanelTitle)
 			protected.GET("/api/settings/panel-access", settingsH.GetPanelAccess)
@@ -179,7 +178,6 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.POST("/api/settings/change-password", settingsH.ChangePassword)
 			protected.PUT("/api/settings/os-list", settingsH.UpdateOSList)
 			protected.PUT("/api/settings/site-type-list", settingsH.UpdateSiteTypeList)
-			protected.PUT("/api/settings/agent-github-proxy-url", settingsH.UpdateAgentGithubProxyURL)
 			protected.GET("/api/settings/cron-status", settingsH.GetCronStatus)
 			protected.GET("/api/settings/tls", settingsH.GetTLSConfig)
 			protected.PUT("/api/settings/tls", settingsH.UpdateTLSConfig)

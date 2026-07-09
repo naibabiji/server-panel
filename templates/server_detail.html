@@ -176,6 +176,11 @@
         <div class="p-5">
         <div class="text-sm text-gray-400 mb-2">状态：<span x-text="hasAgent() ? '已安装或已上报' : '未安装'"></span></div>
         <div class="text-sm text-gray-400 mb-3" x-show="s.last_seen_at">最后上报：<span x-text="s.last_seen_at"></span></div>
+        <div class="max-w-xl mb-4" x-show="!hasAgent()">
+            <label class="label">GitHub 反代地址（可选）</label>
+            <input type="text" x-model="agentGithubProxyURL" class="input-field" placeholder="例如：https://gh-proxy.com/">
+            <div class="text-xs text-gray-500 mt-2">仅用于本次生成的安装脚本，留空则使用 GitHub 原地址。</div>
+        </div>
         <div class="text-sm text-gray-400 mb-3" x-show="agentCommand">整段复制后，粘贴到这台被管理服务器的 root SSH 终端里回车执行。</div>
         <template x-if="agentCommand">
             <div class="p-3 bg-[#11151a] border border-[#2a3038] rounded">
@@ -198,10 +203,8 @@ function serverDetail() {
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
             try {
-                await Promise.all([
-                    (async () => { const d = await api('/api/servers/'+id); this.s = d.data; })(),
-                    (async () => { try { const d = await api('/api/settings/agent-github-proxy-url'); this.agentGithubProxyURL = d.data.svalue || ''; } catch(e) {} })(),
-                ]);
+                const d = await api('/api/servers/'+id);
+                this.s = d.data;
                 this.loading = false;
                 await this.fetchWebsites();
             }
@@ -445,6 +448,11 @@ echo "Server Panel Agent 已卸载"`;
         },
         async showInstallCommand() {
             this.agentUninstallMode = false;
+            const githubProxyURL = (this.agentGithubProxyURL || '').trim();
+            if (githubProxyURL && !/^https?:\/\//i.test(githubProxyURL)) {
+                showToast('GitHub 反代地址必须以 http:// 或 https:// 开头', 'error');
+                return;
+            }
             this.savingAgent = true;
             try {
                 const d = await api('/api/servers/'+this.s.id+'/agent-key/regenerate', {method:'POST'});

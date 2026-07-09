@@ -9,11 +9,12 @@
             <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="sysUpdateCount > 0" x-text="sysUpdateCount + ' 个系统包可更新'"></a>
         </div>
     </div>
-    <div class="grid grid-cols-2 lg:grid-cols-4 border border-[#2a3038] bg-[#171b21] mb-6">
-        <div class="p-5 border-b lg:border-b-0 lg:border-r border-[#202833]"><div class="text-sm text-gray-400">总服务器</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1" x-text="stats.total_servers" x-show="!loading">0</div></div>
-        <div class="p-5 border-b lg:border-b-0 lg:border-r border-[#202833]"><div class="text-sm text-gray-400">在线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-green-400" x-text="stats.online_count" x-show="!loading">0</div></div>
-        <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">离线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-red-400" x-text="stats.offline_count" x-show="!loading">0</div></div>
-        <div class="p-5"><div class="text-sm text-gray-400">即将到期</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count" x-show="!loading">0</div></div>
+    <div class="grid grid-cols-2 lg:grid-cols-5 border border-[#2a3038] bg-[#171b21] mb-6">
+        <div class="p-5 border-b lg:border-b-0 lg:border-r border-[#202833]"><div class="text-sm text-gray-400">服务器总数</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1" x-text="stats.total_servers" x-show="!loading">0</div></div>
+        <div class="p-5 border-b lg:border-b-0 lg:border-r border-[#202833]"><div class="text-sm text-gray-400">网站总数</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-purple-300" x-text="stats.total_websites" x-show="!loading">0</div></div>
+        <div class="p-5 border-b lg:border-b-0 lg:border-r border-[#202833]"><div class="text-sm text-gray-400">Agent 在线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-green-400" x-text="stats.online_count" x-show="!loading">0</div></div>
+        <div class="p-5 border-b lg:border-b-0 lg:border-r border-[#202833]"><div class="text-sm text-gray-400">Agent 离线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-red-400" x-text="stats.offline_count" x-show="!loading">0</div></div>
+        <div class="p-5"><div class="text-sm text-gray-400">30 天内到期</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count" x-show="!loading">0</div></div>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] mb-6" x-show="httpProbeIssues.length">
         <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-red-300">HTTP 探测异常</div>
@@ -139,7 +140,7 @@
 function dashboardPage() {
     return {
         loading: true,
-        stats: { total_servers: 0, online_count: 0, offline_count: 0, expiring_count: 0 },
+        stats: { total_servers: 0, total_websites: 0, online_count: 0, offline_count: 0, expiring_count: 0 },
         expiring: { servers: [], websites: [] },
         httpProbeIssues: [],
         alerts: [],
