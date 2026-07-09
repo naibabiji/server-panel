@@ -10,7 +10,7 @@
         </div>
     </div>
     <div class="overflow-x-auto mb-6">
-        <div class="grid grid-cols-5 min-w-[760px] border border-[#2a3038] bg-[#171b21]">
+        <div class="border border-[#2a3038] bg-[#171b21]" style="display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));min-width:760px;">
             <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">服务器总数</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1" x-text="stats.total_servers" x-show="!loading">0</div></div>
             <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">网站总数</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-purple-300" x-text="stats.total_websites" x-show="!loading">0</div></div>
             <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">Agent 在线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-green-400" x-text="stats.online_count" x-show="!loading">0</div></div>
