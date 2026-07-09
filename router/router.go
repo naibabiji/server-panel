@@ -45,10 +45,19 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		cfg.Security.AttemptWindowMinutes,
 		cfg.Security.BanDurationHours,
 	)
+	// 定期清理超出时间窗口的历史登录失败记录，避免 login_attempts 无限增长。
 	basicAuthChecker := &middleware.BasicAuthChecker{
 		RecordAttempt: loginTracker.RecordAttempt,
 		IsBanned:      loginTracker.IsBanned,
+		Enabled:       cfg.Security.BasicAuthEnabled,
 	}
+	go func() {
+		ticker := time.NewTicker(time.Duration(cfg.Security.AttemptWindowMinutes) * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			loginTracker.CleanupOldAttempts()
+		}
+	}()
 
 	r.GET("/", func(c *gin.Context) { c.Status(http.StatusNotFound) })
 	r.GET("/favicon.ico", func(c *gin.Context) { c.Status(http.StatusNoContent) })

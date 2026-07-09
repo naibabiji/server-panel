@@ -79,3 +79,10 @@ func (t *LoginAttemptTracker) CleanupOldAttempts() {
 	cutoff := timeutil.Display(time.Now().Add(-t.AttemptWindow))
 	_, _ = t.DB.Exec("DELETE FROM login_attempts WHERE created_at < ?", cutoff)
 }
+
+// ClearAttempts removes all recorded login attempts for an IP. It is called
+// after a successful authentication so a streak of prior failures does not
+// linger and trip the ban threshold on the user's very next mistake.
+func (t *LoginAttemptTracker) ClearAttempts(ip string) {
+	_, _ = t.DB.Exec("DELETE FROM login_attempts WHERE ip_address = ?", ip)
+}

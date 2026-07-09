@@ -55,6 +55,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	// 登录成功：清空该 IP 的历史失败计数，避免误封真实用户。
+	if h.AttemptTracker != nil {
+		h.AttemptTracker.ClearAttempts(middleware.ClientIP(c))
+	}
+
 	session := middleware.GlobalSessionStore.Create(username)
 	c.SetCookie("sp_session", session.Token, 1800, "/", "", middleware.IsSecureRequest(c), true)
 
