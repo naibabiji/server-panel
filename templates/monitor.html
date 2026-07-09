@@ -9,12 +9,13 @@
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">服务器</th><th class="table-header">状态</th><th class="table-header">CPU</th><th class="table-header">内存</th><th class="table-header">磁盘</th><th class="table-header">负载</th><th class="table-header">运行时间</th>
+                <th class="table-header">服务器</th><th class="table-header">服务商</th><th class="table-header">状态</th><th class="table-header">CPU</th><th class="table-header">内存</th><th class="table-header">磁盘</th><th class="table-header">负载</th><th class="table-header">运行时间</th>
             </tr></thead>
             <tbody>
             <template x-for="s in servers" :key="s.id">
                 <tr class="border-t border-[#202833] hover:bg-[#1d232b]">
                     <td class="table-cell"><a :href="'monitor/'+s.id" class="text-purple-300 hover:text-purple-200 font-medium" x-text="s.name"></a><div class="text-xs text-gray-500" x-text="s.ip_address"></div></td>
+                    <td class="table-cell text-gray-400" x-text="s.provider_name || '未设置'"></td>
                     <td class="table-cell"><span :class="s.is_online ? 'badge-success' : 'badge-warning'" x-text="s.is_online ? '在线' : '未知'"></span></td>
                     <td class="table-cell" x-text="(s.cpu_percent||0).toFixed(1)+'%'"></td>
                     <td class="table-cell" x-text="(s.memory_percent||0).toFixed(1)+'%'"></td>

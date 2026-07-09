@@ -33,7 +33,14 @@
         </div>
         <div class="p-5 border-t border-[#202833]" x-show="provider.notes">
             <div class="text-sm text-gray-400 mb-2">备注</div>
-            <p class="text-sm text-gray-300" x-text="provider.notes"></p>
+            <p class="text-sm text-gray-300 whitespace-pre-wrap" x-text="provider.notes"></p>
+        </div>
+        <div class="p-5 border-t border-[#202833]" x-show="provider.has_private_notes">
+            <div class="flex items-center justify-between gap-3 mb-2">
+                <div class="text-sm text-gray-400">加密备注</div>
+                <button @click="showPrivateNotes()" class="btn-secondary text-xs" x-show="!privateNotes">查看</button>
+            </div>
+            <p class="text-sm text-green-200 whitespace-pre-wrap" x-show="privateNotes" x-text="privateNotes"></p>
         </div>
     </section>
 
@@ -63,7 +70,7 @@
 <script>
 function providerDetail() {
     return {
-        provider: {}, servers: [], loading: true, providerLoading: true,
+        provider: {}, servers: [], privateNotes: '', loading: true, providerLoading: true,
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
             try { const d = await api('/api/providers/' + id); this.provider = d.data; }
@@ -88,6 +95,15 @@ function providerDetail() {
             if (!url) return '#';
             if (/^https?:\/\//i.test(url)) return url;
             return 'https://' + url;
+        },
+        async showPrivateNotes() {
+            try {
+                const viewToken = await unlockViewPasswordPrompt();
+                if (!viewToken) return;
+                const d = await api('/api/providers/' + this.provider.id + '/secrets/private-notes', {headers:{'X-View-Token': viewToken}});
+                this.privateNotes = d.data.value || '';
+                if (!this.privateNotes) showToast('未保存加密备注','warning');
+            } catch(e) {}
         }
     }
 }

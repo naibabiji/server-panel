@@ -138,6 +138,7 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.GET("/api/providers", provH.List)
 			protected.POST("/api/providers", provH.Create)
 			protected.GET("/api/providers/:id", provH.Get)
+			protected.GET("/api/providers/:id/secrets/private-notes", provH.GetPrivateNotes)
 			protected.PUT("/api/providers/:id", provH.Update)
 			protected.DELETE("/api/providers/:id", provH.Delete)
 

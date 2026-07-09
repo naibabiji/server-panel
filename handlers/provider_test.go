@@ -94,6 +94,7 @@ func newProviderTestDB(t *testing.T) *sql.DB {
 		name              TEXT NOT NULL UNIQUE,
 		website           TEXT NOT NULL DEFAULT '',
 		contact           TEXT NOT NULL DEFAULT '',
+		private_notes_enc TEXT NOT NULL DEFAULT '',
 		notes             TEXT NOT NULL DEFAULT '',
 		created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

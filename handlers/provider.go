@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -46,7 +48,7 @@ func (h *ProviderHandler) List(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 	rows, err := h.db().Query(
-		"SELECT id, name, website, contact, notes, created_at, updated_at FROM providers "+where+" ORDER BY name LIMIT ? OFFSET ?",
+		"SELECT id, name, website, contact, private_notes_enc <> '', notes, created_at, updated_at FROM providers "+where+" ORDER BY name LIMIT ? OFFSET ?",
 		append(args, pageSize, offset)...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
@@ -57,10 +59,12 @@ func (h *ProviderHandler) List(c *gin.Context) {
 	providers := []models.Provider{}
 	for rows.Next() {
 		var p models.Provider
-		if err := rows.Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &p.Notes, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		var hasPrivateNotes int
+		if err := rows.Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &hasPrivateNotes, &p.Notes, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取服务商列表失败"))
 			return
 		}
+		p.HasPrivateNotes = hasPrivateNotes == 1
 		providers = append(providers, p)
 	}
 
@@ -72,13 +76,15 @@ func (h *ProviderHandler) List(c *gin.Context) {
 func (h *ProviderHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	var p models.Provider
+	var hasPrivateNotes int
 	err := h.db().QueryRow(
-		"SELECT id, name, website, contact, notes, created_at, updated_at FROM providers WHERE id = ?", id,
-	).Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &p.Notes, &p.CreatedAt, &p.UpdatedAt)
+		"SELECT id, name, website, contact, private_notes_enc <> '', notes, created_at, updated_at FROM providers WHERE id = ?", id,
+	).Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &hasPrivateNotes, &p.Notes, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusNotFound, models.ErrorResponse("服务商不存在"))
 		return
 	}
+	p.HasPrivateNotes = hasPrivateNotes == 1
 	c.JSON(http.StatusOK, models.SuccessResponse(p))
 }
 
@@ -95,10 +101,14 @@ func (h *ProviderHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusConflict, models.ErrorResponse("服务商已存在（名称不区分大小写）"))
 		return
 	}
+	privateNotesEnc, ok := encryptOptionalSecret(c, h.db(), p.PrivateNotes, "请先设置查看密码，再保存加密备注")
+	if !ok {
+		return
+	}
 
 	result, err := h.db().Exec(
-		"INSERT INTO providers (name, website, contact, notes) VALUES (?,?,?,?)",
-		p.Name, p.Website, p.Contact, p.Notes,
+		"INSERT INTO providers (name, website, contact, private_notes_enc, notes) VALUES (?,?,?,?,?)",
+		p.Name, p.Website, p.Contact, privateNotesEnc, p.Notes,
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建失败，名称可能已存在"))
@@ -123,10 +133,20 @@ func (h *ProviderHandler) Update(c *gin.Context) {
 		return
 	}
 
-	result, err := h.db().Exec(
-		"UPDATE providers SET name=?, website=?, contact=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-		p.Name, p.Website, p.Contact, p.Notes, id,
-	)
+	query := "UPDATE providers SET name=?, website=?, contact=?, notes=?, updated_at=CURRENT_TIMESTAMP"
+	args := []interface{}{p.Name, p.Website, p.Contact, p.Notes}
+	if p.PrivateNotes != "" {
+		privateNotesEnc, ok := encryptOptionalSecret(c, h.db(), p.PrivateNotes, "请先设置查看密码，再保存加密备注")
+		if !ok {
+			return
+		}
+		query += ", private_notes_enc=?"
+		args = append(args, privateNotesEnc)
+	}
+	query += " WHERE id=?"
+	args = append(args, id)
+
+	result, err := h.db().Exec(query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败，名称可能已存在"))
 		return
@@ -136,6 +156,59 @@ func (h *ProviderHandler) Update(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
+}
+
+func (h *ProviderHandler) GetPrivateNotes(c *gin.Context) {
+	id := c.Param("id")
+	setup, err := isViewPasswordSetup(h.db())
+	if err != nil {
+		log.Printf("read view password setup status failed: %v", err)
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		return
+	}
+	if !setup {
+		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先设置查看密码"))
+		return
+	}
+	sessionToken, ok := getSessionToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse("会话已过期，请重新登录"))
+		return
+	}
+	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse("请重新输入查看密码"))
+		return
+	}
+
+	var encrypted string
+	if err := h.db().QueryRow("SELECT private_notes_enc FROM providers WHERE id = ?", id).Scan(&encrypted); err != nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse("服务商不存在"))
+		return
+	}
+	if encrypted == "" {
+		c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
+			"field": "private-notes",
+			"label": "加密备注",
+			"value": "",
+		}))
+		return
+	}
+
+	key, err := GetSecretEncryptionKey(h.db())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取加密密钥失败"))
+		return
+	}
+	value, err := DecryptPassword(encrypted, key)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse("加密备注解密失败，请确认查看密码是否正确"))
+		return
+	}
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
+		"field": "private-notes",
+		"label": "加密备注",
+		"value": value,
+	}))
 }
 
 func (h *ProviderHandler) Delete(c *gin.Context) {

@@ -64,6 +64,13 @@ var upgrades = []Upgrade{
 		},
 		Func: migrateServerSpecsToNumeric,
 	},
+	{
+		Version:     "1.6.0",
+		Description: "Add encrypted private notes for providers",
+		SQL: []string{
+			`ALTER TABLE providers ADD COLUMN private_notes_enc TEXT NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 func LatestVersion() string {

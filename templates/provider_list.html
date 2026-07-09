@@ -17,7 +17,7 @@
                     <td class="table-cell text-white"><a :href="'providers/'+p.id" class="hover:text-purple-200" x-text="p.name"></a></td>
                     <td class="table-cell"><a :href="externalURL(p.website)" target="_blank" rel="noopener noreferrer" class="text-purple-400 hover:text-purple-300 text-sm" x-text="p.website||'--'"></a></td>
                     <td class="table-cell text-gray-400" x-text="p.contact||'--'"></td>
-                    <td class="table-cell text-gray-400 text-sm" x-text="p.notes||'--'"></td>
+                    <td class="table-cell text-gray-400 text-sm whitespace-pre-wrap" x-text="p.notes||'--'"></td>
                     <td class="table-cell">
                         <a :href="'providers/'+p.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">详情</a>
                         <a :href="'providers/'+p.id+'/edit'" class="text-sm text-purple-300 hover:text-purple-200 mr-2">编辑</a>

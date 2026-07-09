@@ -21,10 +21,12 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 
 	rows, err := db.Query(
 		`SELECT s.id, s.name, s.ip_address, s.is_online, s.last_seen_at,
+		 COALESCE(s.provider_id, 0), COALESCE(p.name, ''),
 		 COALESCE(s.agent_version,''), s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at,
 		 m.cpu_percent, m.memory_percent, m.disk_percent, m.load_avg_1, m.uptime_seconds, m.recorded_at,
 		 m.net_rx_bytes, m.net_tx_bytes
 		 FROM servers s
+		 LEFT JOIN providers p ON s.provider_id = p.id
 		 LEFT JOIN (
 		     SELECT server_id, cpu_percent, memory_percent, disk_percent, load_avg_1, uptime_seconds, recorded_at,
 		            net_rx_bytes, net_tx_bytes,
@@ -32,7 +34,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		     FROM metrics
 		 ) m ON s.id = m.server_id AND m.rn = 1
 		 WHERE s.agent_version != '' OR s.last_seen_at IS NOT NULL OR m.recorded_at IS NOT NULL
-		 ORDER BY s.name`)
+		 ORDER BY COALESCE(p.name, '未设置'), s.name`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
 		return
@@ -46,6 +48,8 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		IsOnline         bool    `json:"is_online"`
 		LastSeenAt       string  `json:"last_seen_at"`
 		AgentVersion     string  `json:"agent_version"`
+		ProviderID       int64   `json:"provider_id"`
+		ProviderName     string  `json:"provider_name"`
 		HasAgent         bool    `json:"has_agent"`
 		HTTPProbeEnabled int     `json:"http_probe_enabled"`
 		HTTPProbeHealthy *int    `json:"http_probe_healthy"`
@@ -69,7 +73,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		var uptime sql.NullInt64
 		var netRX, netTX sql.NullInt64
 		err := rows.Scan(&item.ID, &item.Name, &item.IPAddress, &item.IsOnline, &lastSeen,
-			&agentVer, &item.HTTPProbeEnabled, &probeHealthy, &probeLast,
+			&item.ProviderID, &item.ProviderName, &agentVer, &item.HTTPProbeEnabled, &probeHealthy, &probeLast,
 			&cpu, &mem, &disk, &load, &uptime, &recorded,
 			&netRX, &netTX)
 		if err != nil {

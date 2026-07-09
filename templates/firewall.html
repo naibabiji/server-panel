@@ -16,7 +16,7 @@
                 <template x-for="w in whitelist" :key="w.id">
                     <tr class="border-t border-gray-700/50">
                         <td class="table-cell text-white font-mono" x-text="w.ip_address"></td>
-                        <td class="table-cell text-gray-400" x-text="w.notes||'--'"></td>
+                        <td class="table-cell text-gray-400 whitespace-pre-wrap" x-text="w.notes||'--'"></td>
                         <td class="table-cell text-gray-500 text-xs" x-text="fmtTime(w.created_at)"></td>
                         <td class="table-cell"><a href="#" @click.prevent="delWhitelist(w.id)" class="text-sm text-red-400">删除</a></td>
                     </tr>
@@ -66,7 +66,7 @@
             <h3 class="text-lg font-semibold text-purple-300 mb-4">添加白名单 IP</h3>
             <div class="space-y-3">
                 <div><label class="label">IP 地址</label><input type="text" x-model="wlForm.ip_address" class="input-field" placeholder="192.168.1.1"></div>
-                <div><label class="label">备注</label><input type="text" x-model="wlForm.notes" class="input-field"></div>
+                <div><label class="label">备注</label><textarea x-model="wlForm.notes" class="input-field" rows="3"></textarea></div>
             </div>
             <div class="flex gap-3 mt-5">
                 <button @click="addWhitelist()" class="btn-primary">添加</button>
