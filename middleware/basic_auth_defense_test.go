@@ -25,12 +25,12 @@ func TestBasicAuthDefenseBansAfterFailedAttempts(t *testing.T) {
 	oldCfg := config.AppConfig
 	config.AppConfig = &config.Config{
 		BasicAuth: config.BasicAuthConfig{Username: "admin", PasswordHash: string(hash)},
+		Security:  config.SecurityConfig{BasicAuthEnabled: true},
 	}
 	t.Cleanup(func() { config.AppConfig = oldCfg })
 
 	r := gin.New()
 	r.Use(BasicAuth(&BasicAuthChecker{
-		Enabled:       true,
 		RecordAttempt: tracker.RecordAttempt,
 		IsBanned:      tracker.IsBanned,
 	}))
@@ -91,12 +91,12 @@ func TestBasicAuthAllowsValidCredentials(t *testing.T) {
 	oldCfg := config.AppConfig
 	config.AppConfig = &config.Config{
 		BasicAuth: config.BasicAuthConfig{Username: "admin", PasswordHash: string(hash)},
+		Security:  config.SecurityConfig{BasicAuthEnabled: true},
 	}
 	t.Cleanup(func() { config.AppConfig = oldCfg })
 
 	r := gin.New()
 	r.Use(BasicAuth(&BasicAuthChecker{
-		Enabled:       true,
 		RecordAttempt: tracker.RecordAttempt,
 		IsBanned:      tracker.IsBanned,
 	}))
@@ -122,12 +122,12 @@ func TestBasicAuthDisabledPassesThrough(t *testing.T) {
 	oldCfg := config.AppConfig
 	config.AppConfig = &config.Config{
 		BasicAuth: config.BasicAuthConfig{Username: "admin", PasswordHash: "irrelevant"},
+		Security:  config.SecurityConfig{BasicAuthEnabled: false},
 	}
 	t.Cleanup(func() { config.AppConfig = oldCfg })
 
 	r := gin.New()
 	r.Use(BasicAuth(&BasicAuthChecker{
-		Enabled:       false,
 		RecordAttempt: tracker.RecordAttempt,
 		IsBanned:      tracker.IsBanned,
 	}))

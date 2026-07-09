@@ -445,23 +445,27 @@ func (h *SettingsHandler) GetAccount(c *gin.Context) {
 	webUser := h.sessionUser(c)
 
 	basicUser := ""
+	basicEnabled := false
 	if cfg != nil {
 		basicUser = cfg.BasicAuth.Username
+		basicEnabled = cfg.Security.BasicAuthEnabled
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"web_username":   webUser,
-		"basic_username": basicUser,
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
+		"web_username":       webUser,
+		"basic_username":     basicUser,
+		"basic_auth_enabled": basicEnabled,
 	}))
 }
 
 func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 	var req struct {
-		WebUsername   string `json:"web_username"`
-		WebPassword   string `json:"web_password"`
-		OldPassword   string `json:"old_password"`
-		BasicUsername string `json:"basic_username"`
-		BasicPassword string `json:"basic_password"`
+		WebUsername        string `json:"web_username"`
+		WebPassword        string `json:"web_password"`
+		OldPassword        string `json:"old_password"`
+		BasicUsername      string `json:"basic_username"`
+		BasicPassword      string `json:"basic_password"`
+		BasicAuthEnabled   *bool  `json:"basic_auth_enabled"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
@@ -505,9 +509,10 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 		}
 	}
 
-	// BasicAuth 账户
+	// BasicAuth 账户 + 开关
 	cfg := config.AppConfig
-	if cfg != nil && (req.BasicUsername != "" || req.BasicPassword != "") {
+	configChanged := false
+	if cfg != nil && (req.BasicUsername != "" || req.BasicPassword != "" || req.BasicAuthEnabled != nil) {
 		if req.BasicUsername != "" {
 			cfg.BasicAuth.Username = req.BasicUsername
 		}
@@ -519,20 +524,22 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 			}
 			cfg.BasicAuth.PasswordHash = string(hash)
 		}
+		if req.BasicAuthEnabled != nil {
+			cfg.Security.BasicAuthEnabled = *req.BasicAuthEnabled
+		}
+		configChanged = true
 		if err := config.SaveConfig(cfg); err != nil {
 			c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存配置失败"))
 			return
 		}
 	}
 
-	msg := "账户已更新"
-	if needOldPwd || (cfg != nil && (req.BasicUsername != "" || req.BasicPassword != "")) {
-		// 有变更
-	} else {
-		msg = "没有需要修改的内容"
+	if !needOldPwd && !configChanged {
+		c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "没有需要修改的内容"}))
+		return
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": msg}))
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "账户已更新"}))
 }
 
 // BasicAuth 账户（保留兼容旧 API）

@@ -393,10 +393,21 @@
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
                     <div>
                         <div class="text-sm font-semibold text-gray-100 mb-1">账户安全</div>
-                        <div class="text-sm text-gray-500 leading-6">BasicAuth 强制启用。修改面板登录信息后，需要重新登录。</div>
+                        <div class="text-sm text-gray-500 leading-6">BasicAuth 为面板增加额外一层登录验证。修改面板登录信息后，需要重新登录。</div>
                     </div>
                     <div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="sm:col-span-2">
+                                <label class="flex items-center gap-3 cursor-pointer select-none">
+                                    <input type="checkbox" x-model="acct.basic_auth_enabled" class="w-4 h-4">
+                                    <span class="text-sm text-gray-200">启用 BasicAuth 二次验证</span>
+                                </label>
+                                <template x-if="!acct.basic_auth_enabled">
+                                    <div class="mt-2 p-3 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm leading-6">
+                                        关闭后，面板将少一层防护。如果只是为了省去输入麻烦，建议保留开启并设置一个简单的账号密码，也比完全关闭更安全。
+                                    </div>
+                                </template>
+                            </div>
                             <div><label class="label">BasicAuth 用户名</label><input type="text" x-model="acct.basic_username" class="input-field" autocomplete="off"></div>
                             <div><label class="label">BasicAuth 新密码</label><input type="password" x-model="acct.basic_password" class="input-field" placeholder="留空不修改" autocomplete="new-password"></div>
                             <div><label class="label">面板登录用户名</label><input type="text" x-model="acct.web_username" class="input-field" autocomplete="off"></div>
@@ -462,7 +473,7 @@ function settingsPage() {
     return {
         loading: true,
         panelTitle: '', smtp: {}, access: { tls_port: 0, random_suffix: '', trust_cloudflare: false, trust_reverse_proxy: false, trusted_proxies: [], trusted_proxies_text: '' }, tls: { tls_mode:'self_signed', domain:'', tls_cert_path:'', tls_key_path:'', acme_email:'' }, tlsUpload: { cert_pem:'', key_pem:'' }, osList: '', siteTypeList: '',
-        acct: { web_username:'', web_password:'', web_password2:'', basic_username:'', basic_password:'', old_password:'' },
+        acct: { web_username:'', web_password:'', web_password2:'', basic_username:'', basic_password:'', old_password:'', basic_auth_enabled:true },
         vpSetup: false, vpUnlocked: false,
         update: { current_version:'', hasUpdate:false, latestVersion:'', releaseNotes:'', checking:false },
         updateRun: { running:false, message:'', percent:0, downloadedBytes:0, totalBytes:0, completed:false, error:'' },
@@ -504,7 +515,7 @@ function settingsPage() {
                 } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/tls'); this.tls = Object.assign(this.tls, d.data || {}); } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/smtp'); this.smtp = d.data; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; } catch(e) {} })(),
+                (async () => { try { const d = await api('/api/settings/account'); this.acct.web_username = d.data.web_username || ''; this.acct.basic_username = d.data.basic_username || ''; this.acct.basic_auth_enabled = d.data.basic_auth_enabled !== false; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/view-password/status'); this.vpSetup = d.data.is_setup; this.vpUnlocked = d.data.is_unlocked; } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
                 (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypeList = JSON.parse(d.data.svalue || '[]').join('\n'); } catch(e) {} })(),
@@ -879,13 +890,19 @@ function settingsPage() {
         async saveAccount() {
             if (this.acct.web_password && this.acct.web_password.length < 8) { showToast('面板密码至少需要 8 个字符','error'); return; }
             if (this.acct.web_password && this.acct.web_password !== this.acct.web_password2) { showToast('两次输入的新密码不一致','error'); return; }
+            // 关闭 BasicAuth 时给出明确风险提示，需二次确认
+            if (this.acct.basic_auth_enabled === false) {
+                const ok = await confirmModal('确认关闭 BasicAuth？\n\nBasicAuth 为面板增加额外一层登录验证。关闭后防护会减弱。\n如果只是为了省去输入麻烦，建议保留开启并设置一个简单的账号密码，也比完全关闭更安全。');
+                if (!ok) return;
+            }
             const body = {};
             if (this.acct.web_username) body.web_username = this.acct.web_username;
             if (this.acct.web_password) body.web_password = this.acct.web_password;
             if (this.acct.basic_username) body.basic_username = this.acct.basic_username;
             if (this.acct.basic_password) body.basic_password = this.acct.basic_password;
             if (this.acct.old_password) body.old_password = this.acct.old_password;
-            if (!body.web_username && !body.web_password && !body.basic_username && !body.basic_password) {
+            body.basic_auth_enabled = this.acct.basic_auth_enabled === true;
+            if (!body.web_username && !body.web_password && !body.basic_username && !body.basic_password && body.basic_auth_enabled) {
                 showToast('没有需要修改的内容','warning'); return;
             }
             try {

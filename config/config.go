@@ -12,6 +12,26 @@ var (
 	configPath string
 )
 
+// securityKeyPresent reports whether the "security" block in the raw config
+// JSON explicitly contains the "basic_auth_enabled" key. This lets LoadConfig
+// distinguish "field absent (old config)" from "explicitly set to false".
+func securityKeyPresent(raw []byte) bool {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		return false
+	}
+	secRaw, ok := top["security"]
+	if !ok {
+		return false
+	}
+	var sec map[string]json.RawMessage
+	if err := json.Unmarshal(secRaw, &sec); err != nil {
+		return false
+	}
+	_, ok = sec["basic_auth_enabled"]
+	return ok
+}
+
 // ConfigPath returns the path LoadConfig was last called with, so other
 // packages (e.g. the panel self-update flow, which needs to hand it to a
 // watchdog subprocess) don't need their own copy of it.
@@ -143,6 +163,20 @@ func LoadConfig(path string) (*Config, error) {
 	}
 	if cfg.Security.BanDurationHours == 0 {
 		cfg.Security.BanDurationHours = 24
+	}
+	// 旧配置可能没有 basic_auth_enabled 字段（之前版本强制开启 BasicAuth）。
+	// 为向后兼容、避免升级后悄悄关闭这层防护：仅当字段缺失时才默认开启；
+	// 若用户显式写为 false，则尊重其关闭选择。
+	if !securityKeyPresent(data) && !cfg.Security.BasicAuthEnabled {
+		cfg.Security.BasicAuthEnabled = true
+	}
+	if cfg.Panel.TrustedProxies == nil {
+		// Trust a same-host reverse proxy by default: the kernel drops
+		// inbound packets that claim a loopback source address on a
+		// non-loopback interface, so honoring X-Forwarded-For from
+		// 127.0.0.1/::1 doesn't let a remote attacker spoof ClientIP().
+		// Set "trusted_proxies": [] explicitly to opt out.
+		cfg.Panel.TrustedProxies = []string{"127.0.0.1", "::1"}
 	}
 	if cfg.Systemd.ServiceName == "" {
 		cfg.Systemd.ServiceName = "server-panel"

@@ -9,10 +9,6 @@ import (
 )
 
 type BasicAuthChecker struct {
-	// Enabled controls whether HTTP Basic authentication is required. When
-	// false, the middleware only enforces the IP ban (defense in depth) and
-	// lets requests through without credential checks.
-	Enabled       bool
 	RecordAttempt func(ip string, attemptType string)
 	IsBanned      func(ip string) bool
 }
@@ -30,7 +26,13 @@ func BasicAuth(checker *BasicAuthChecker) gin.HandlerFunc {
 			return
 		}
 
-		if !checker.Enabled {
+		// BasicAuth 是否启用由运行时配置决定（设置界面可动态开关，保存后立即生效）。
+		// 配置缺失时默认开启，避免误关安全防护。
+		enabled := true
+		if cfg := config.AppConfig; cfg != nil {
+			enabled = cfg.Security.BasicAuthEnabled
+		}
+		if !enabled {
 			c.Next()
 			return
 		}
