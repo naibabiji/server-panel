@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "website_detail_content"}}
-<div x-data="websiteDetail()" x-init="init()" class="p-6 max-w-5xl">
+<div x-data="websiteDetail()" class="p-6 max-w-5xl">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h2 class="text-lg font-semibold text-gray-100" x-text="w.name || w.domain || '加载中...'"></h2>

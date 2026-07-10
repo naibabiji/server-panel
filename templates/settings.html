@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "settings_content"}}
-<div x-data="settingsPage()" x-init="init()" class="p-6 max-w-6xl">
+<div x-data="settingsPage()" class="p-6 max-w-6xl">
     <div class="flex items-end justify-between gap-4 pb-5 mb-5 border-b border-[#202833]">
         <div>
             <h2 class="text-xl font-semibold text-purple-200">系统设置</h2>
@@ -19,7 +19,38 @@
         </nav>
 
         <div class="min-w-0">
-            <section id="basic" x-show="loaded.basic" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section x-show="!loaded.basic" x-transition.opacity.duration.150ms class="border border-[#2a3038] bg-[#171b21] mb-5">
+                <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
+                    <div class="skeleton-block h-5 w-24"></div>
+                    <div class="skeleton-block h-4 w-72 mt-2"></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
+                    <div>
+                        <div class="skeleton-block h-4 w-24 mb-3"></div>
+                        <div class="skeleton-block h-4 w-full mb-2"></div>
+                        <div class="skeleton-block h-4 w-2/3"></div>
+                    </div>
+                    <div>
+                        <div class="skeleton-block h-4 w-16 mb-2"></div>
+                        <div class="skeleton-block h-10 w-full"></div>
+                        <div class="skeleton-block h-9 w-24 mt-3"></div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
+                    <div>
+                        <div class="skeleton-block h-4 w-24 mb-3"></div>
+                        <div class="skeleton-block h-4 w-full mb-2"></div>
+                        <div class="skeleton-block h-4 w-5/6"></div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="skeleton-block h-10"></div>
+                        <div class="skeleton-block h-10"></div>
+                        <div class="skeleton-block h-20 sm:col-span-2"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="basic" x-show="loaded.basic" x-transition.opacity.duration.150ms x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">基础设置</div>
                     <div class="text-sm text-gray-500 mt-1">这些配置决定后台在浏览器中如何显示和访问。</div>
@@ -107,7 +138,7 @@
                 </div>
             </section>
 
-            <section id="update" x-show="loaded.update" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="update" x-show="loaded.update" x-transition.opacity.duration.150ms x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">更新</div>
                     <div class="text-sm text-gray-500 mt-1">面板版本检查/更新、自动更新策略，以及系统包更新。</div>
@@ -203,7 +234,7 @@
                 </div>
             </section>
 
-            <section id="backup" x-show="loaded.backup" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="backup" x-show="loaded.backup" x-transition.opacity.duration.150ms x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">备份</div>
                     <div class="text-sm text-gray-500 mt-1">生成数据库和密钥的打包备份（.tar.gz），可选发送到管理员邮箱。密钥用于解密已保存的服务器/网站密码，不包含在内的话恢复后这些密码将无法解密。</div>
@@ -351,7 +382,7 @@
                 </div>
             </div>
 
-            <section id="security" x-show="loaded.security" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="security" x-show="loaded.security" x-transition.opacity.duration.150ms x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">安全</div>
                     <div class="text-sm text-gray-500 mt-1">BasicAuth、面板登录和查看密码都在这里管理。</div>
@@ -404,7 +435,7 @@
                 </div>
             </section>
 
-            <section id="notification" x-show="loaded.notification" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="notification" x-show="loaded.notification" x-transition.opacity.duration.150ms x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">通知</div>
                     <div class="text-sm text-gray-500 mt-1">配置告警邮件发送方式。</div>
@@ -428,7 +459,7 @@
                 </div>
             </section>
 
-            <section id="dictionary" x-show="loaded.dictionary" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
+            <section id="dictionary" x-show="loaded.dictionary" x-transition.opacity.duration.150ms x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="text-base font-semibold text-gray-100">字典</div>
                     <div class="text-sm text-gray-500 mt-1">这些列表会出现在添加或编辑服务器、网站的表单中。</div>
@@ -944,9 +975,9 @@ function settingsPage() {
             } catch(e) { showToast(e.message,'error'); }
         },
         async setupVP() {
-            const pw = await passwordPromptModal('查看密码', {title:'设置查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'new-password'});
+            const pw = await passwordPromptModal('查看密码', {title:'设置查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'one-time-code'});
             if (!pw) return;
-            const pw2 = await passwordPromptModal('再次输入查看密码', {title:'确认查看密码', autocomplete:'new-password'});
+            const pw2 = await passwordPromptModal('再次输入查看密码', {title:'确认查看密码', autocomplete:'one-time-code'});
             if (!pw2) return;
             if (pw !== pw2) { showToast('两次输入的查看密码不一致','error'); return; }
             try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2}}); this.vpSetup = true; this.vpUnlocked = false; showToast('查看密码已设置','success'); } catch(e) { showToast(e.message,'error'); }
@@ -954,9 +985,9 @@ function settingsPage() {
         async changeVP() {
             const oldPw = await passwordPromptModal('当前查看密码', {title:'修改查看密码'});
             if (!oldPw) return;
-            const newPw = await passwordPromptModal('新的查看密码', {title:'设置新查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'new-password'});
+            const newPw = await passwordPromptModal('新的查看密码', {title:'设置新查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'one-time-code'});
             if (!newPw) return;
-            const newPw2 = await passwordPromptModal('再次输入新的查看密码', {title:'确认新查看密码', autocomplete:'new-password'});
+            const newPw2 = await passwordPromptModal('再次输入新的查看密码', {title:'确认新查看密码', autocomplete:'one-time-code'});
             if (!newPw2) return;
             if (newPw !== newPw2) { showToast('两次输入的新查看密码不一致','error'); return; }
             try {
@@ -975,9 +1006,9 @@ function settingsPage() {
                 confirmText: '继续'
             }) || '';
             if (confirm !== 'DELETE_SAVED_PASSWORDS') { showToast('确认短语不匹配，已取消','error'); return; }
-            const pw = await passwordPromptModal('新的查看密码', {title:'重置查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'new-password'});
+            const pw = await passwordPromptModal('新的查看密码', {title:'重置查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'one-time-code'});
             if (!pw) return;
-            const pw2 = await passwordPromptModal('再次输入新的查看密码', {title:'确认新查看密码', autocomplete:'new-password'});
+            const pw2 = await passwordPromptModal('再次输入新的查看密码', {title:'确认新查看密码', autocomplete:'one-time-code'});
             if (!pw2) return;
             if (pw !== pw2) { showToast('两次输入的新查看密码不一致','error'); return; }
             try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2, force:true, confirm}}); this.vpSetup = true; this.vpUnlocked = false; showToast('查看密码已重置，已保存密码已清空','success'); } catch(e) { showToast(e.message,'error'); }

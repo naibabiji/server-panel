@@ -303,18 +303,26 @@ function inputModal(options = {}) {
         input.onfocus = () => { input.style.borderColor = '#8b5cf6'; input.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.18)'; };
         input.onblur = () => { input.style.borderColor = '#374151'; input.style.boxShadow = 'none'; };
 
-        // 密码字段：用 text + CSS 掩码(-webkit-text-security:disc)替代 type=password。
-        // type=password 即使加 autocomplete=new-password，Chrome 等仍会弹"已存密码"
-        // 自动填充提示；改成 text 后浏览器根本不识别为密码字段 → 不弹、不存、不填。
-        // 无 <form>/无配对用户名，并对第三方密码管理器加 ignore 属性。附显隐开关便于核对。
+        // 二次验证/查看密码字段：保持 text 类型并按一次性验证码提示浏览器，
+        // 初始不带 -webkit-text-security，聚焦后再掩码，降低 Chromium 初始化
+        // 扫描把它误判成登录密码框的概率。
         if (input.type === 'password') {
             input.type = 'text';
-            input.style.webkitTextSecurity = 'disc';
-            input.autocomplete = 'off';
+            input.autocomplete = 'one-time-code';
+            input.inputMode = 'text';
+            input.spellcheck = false;
+            input.setAttribute('autocorrect', 'off');
+            input.setAttribute('autocapitalize', 'off');
             input.setAttribute('data-lpignore', 'true');
             input.setAttribute('data-1p-ignore', '');
-            input.setAttribute('data-form-type', 'other');
+            input.setAttribute('data-form-type', 'one-time-code');
             input.style.paddingRight = '44px';
+            input.onfocus = () => {
+                input.style.borderColor = '#8b5cf6';
+                input.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.18)';
+                if (input.dataset.revealed !== 'true') input.style.webkitTextSecurity = 'disc';
+            };
+            input.onblur = () => { input.style.borderColor = '#374151'; input.style.boxShadow = 'none'; };
 
             const wrap = document.createElement('div');
             wrap.style.cssText = 'position:relative;';
@@ -326,6 +334,7 @@ function inputModal(options = {}) {
             toggle.onclick = () => {
                 const showing = input.style.webkitTextSecurity === '';
                 input.style.webkitTextSecurity = showing ? 'disc' : '';
+                input.dataset.revealed = showing ? 'false' : 'true';
                 toggle.textContent = showing ? '显示' : '隐藏';
                 input.focus();
             };
@@ -379,10 +388,9 @@ function passwordPromptModal(label, options = {}) {
         title: options.title || '密码验证',
         label,
         message: options.message || '',
-        // type=password 由 inputModal 内部转为 text + CSS 掩码，让浏览器不识别为
-        // 密码字段，从而不弹自动填充/保存提示（详见 inputModal 密码分支）。
+        // type=password 由 inputModal 内部转为 text + 一次性验证码语义 + 聚焦后掩码。
         type: 'password',
-        autocomplete: options.autocomplete || 'new-password',
+        autocomplete: options.autocomplete || 'one-time-code',
         placeholder: options.placeholder || '',
         confirmText: options.confirmText || '确认',
     });

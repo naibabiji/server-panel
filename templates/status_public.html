@@ -29,7 +29,7 @@
     <div id="pwd-gate" class="card pwd-box" style="display:none">
         <h2 style="margin-bottom:12px;font-size:16px;">需要密码</h2>
         <div style="position:relative;display:inline-block;width:100%;max-width:280px;">
-            <input type="password" id="pwd-input" placeholder="请输入访问密码" autocomplete="new-password" readonly onfocus="this.removeAttribute('readonly')" data-lpignore="true" data-1p-ignore data-form-type="other" style="padding-right:44px;">
+            <input type="text" id="pwd-input" placeholder="请输入访问密码" autocomplete="one-time-code" inputmode="text" spellcheck="false" autocorrect="off" autocapitalize="off" data-lpignore="true" data-1p-ignore data-form-type="one-time-code" onfocus="maskPwdInput(this)" style="padding-right:44px;">
             <button type="button" onclick="togglePwd(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);margin-top:0;background:transparent;border:none;color:var(--sub);cursor:pointer;font-size:12px;padding:2px 4px;">显示</button>
         </div>
         <button onclick="verifyPwd()">验证</button>
@@ -135,10 +135,17 @@ async function verifyPwd() {
 
 function togglePwd(btn) {
     const input = document.getElementById('pwd-input');
-    const showing = input.type === 'text';
-    input.type = showing ? 'password' : 'text';
+    const showing = input.style.webkitTextSecurity === '';
+    input.style.webkitTextSecurity = showing ? 'disc' : '';
+    input.dataset.revealed = showing ? 'false' : 'true';
     btn.textContent = showing ? '显示' : '隐藏';
     input.focus();
+}
+
+function maskPwdInput(input) {
+    if (input.dataset.revealed !== 'true') {
+        input.style.webkitTextSecurity = 'disc';
+    }
 }
 
 loadStatus();

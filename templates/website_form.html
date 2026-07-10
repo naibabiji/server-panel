@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "website_form_content"}}
-<div x-data="websiteForm()" x-init="init()" class="p-6 max-w-2xl">
+<div x-data="websiteForm()" class="p-6 max-w-2xl">
     <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑网站' : '添加网站'"></h2>
     <div class="card space-y-4" x-show="loading" x-cloak>
         <div class="skeleton-block h-9"></div>

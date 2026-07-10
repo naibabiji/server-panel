@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "customer_detail_content"}}
-<div x-data="customerDetail()" x-init="init()" class="p-6 max-w-6xl">
+<div x-data="customerDetail()" class="p-6 max-w-6xl">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h2 class="text-lg font-semibold text-gray-100" x-text="customer.name || '加载中...'"></h2>

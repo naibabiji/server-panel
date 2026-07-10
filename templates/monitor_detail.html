@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "monitor_detail_content"}}
-<div x-data="monitorDetail()" x-init="init()" class="p-6">
+<div x-data="monitorDetail()" class="p-6">
     <div class="flex items-center justify-between mb-4">
         <div>
             <h2 class="text-lg font-semibold text-purple-300" x-text="server.name || '加载中...'"></h2>

@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "provider_detail_content"}}
-<div x-data="providerDetail()" x-init="init()" class="p-6 max-w-6xl">
+<div x-data="providerDetail()" class="p-6 max-w-6xl">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h2 class="text-lg font-semibold text-gray-100" x-text="provider.name || '加载中...'"></h2>
