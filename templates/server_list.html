@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "server_list_content"}}
-<div x-data="serverList()" x-init="fetch()" class="p-6">
+<div x-data="serverList()" x-init="fetch(); loadProviders()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 class="text-lg font-semibold text-gray-100">服务器</h2>
         <a href="servers/new" class="btn-primary text-sm">添加服务器</a>
@@ -12,6 +12,10 @@
                 <option value="">全部状态</option>
                 <option value="active">活跃</option>
                 <option value="expired">过期</option>
+            </select>
+            <select x-model="filterProvider" @change="resetAndFetch()" class="input-field w-36">
+                <option value="">全部服务商</option>
+                <template x-for="p in providers" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
             </select>
         </div>
     </div>
@@ -62,13 +66,14 @@
 function serverList() {
     return {
         ...paginationState(),
-        items: [], loading: true, search: '', filterStatus: '',
+        items: [], loading: true, search: '', filterStatus: '', filterProvider: '', providers: [],
         async fetch() {
             this.loading = true;
             try {
                 const params = new URLSearchParams({
                     search: this.search,
                     status: this.filterStatus,
+                    provider_id: this.filterProvider,
                     page: this.page,
                     page_size: this.pageSize,
                 });
@@ -80,6 +85,12 @@ function serverList() {
                 await this.ensurePageHasItems(this.items);
             } catch(e) {}
             this.loading = false;
+        },
+        async loadProviders() {
+            try {
+                const d = await cachedApi('/api/providers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST });
+                this.providers = d.data.items || [];
+            } catch(e) {}
         },
         async del(id) {
             if (!await confirmModal('确认删除此服务器？')) return;
