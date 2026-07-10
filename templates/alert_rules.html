@@ -36,7 +36,7 @@
             <h3 class="text-lg font-semibold text-purple-300 mb-4">添加告警规则</h3>
             <div class="space-y-3">
                 <div><label class="label">告警类型</label>
-                    <select x-model="form.alert_type" class="input-field">
+                    <select x-model="form.alert_type" @change="applyTypeDefaults()" class="input-field">
                         <option value="server_expiry">服务器到期</option><option value="website_expiry">网站到期</option>
                         <option value="http_probe_down">HTTP探测异常</option><option value="cpu_high">CPU过高</option>
                         <option value="memory_high">内存过高</option><option value="disk_high">磁盘过高</option>
@@ -44,8 +44,19 @@
                     </select>
                 </div>
                 <div><label class="label">规则名称</label><input type="text" x-model="form.name" class="input-field" placeholder="例如：到期提醒"></div>
-                <div><label class="label">阈值</label><input type="number" x-model="form.threshold_value" class="input-field" placeholder="天数/百分比/分钟"></div>
-                <div><label class="label">连续次数（CPU/内存用）</label><input type="number" x-model="form.threshold_count" class="input-field" placeholder="默认 3"></div>
+                <div x-show="thresholdVisible()">
+                    <label class="label" x-text="thresholdLabel()"></label>
+                    <input type="number" min="0" :step="thresholdStep()" x-model.number="form.threshold_value" class="input-field" :placeholder="thresholdPlaceholder()">
+                    <div class="text-xs text-gray-500 mt-1" x-text="thresholdHelp()"></div>
+                </div>
+                <div x-show="thresholdCountVisible()">
+                    <label class="label">连续采样次数</label>
+                    <input type="number" min="1" step="1" x-model.number="form.threshold_count" class="input-field" placeholder="默认 3">
+                    <div class="text-xs text-gray-500 mt-1">连续 N 次采样都超过阈值才触发；实际时长取决于监控数据上报间隔。</div>
+                </div>
+                <div x-show="form.alert_type === 'http_probe_down'" class="text-xs text-gray-500 bg-gray-900/60 border border-gray-700/60 rounded px-3 py-2">
+                    HTTP 探测异常不使用数值阈值；启用探测的服务器被判定不可用时触发。
+                </div>
                 <div class="flex items-center gap-2"><input type="checkbox" x-model="form.notify_user" :true-value="1" :false-value="0"><span class="text-sm text-gray-400">通知客户</span></div>
                 <div><label class="label">通知邮箱</label><input type="text" x-model="form.notify_email" class="input-field" placeholder="留空使用管理员邮箱"></div>
             </div>
@@ -60,22 +71,91 @@
 function alertRules() {
     return {
         rules: [], showModal: false, saving: false,
-        form: { alert_type:'server_expiry', name:'', threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' },
+        form: { alert_type:'server_expiry', name:'', enabled:1, threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' },
         typeLabel(t) {
             const m = { server_expiry:'服务器到期', website_expiry:'网站到期', http_probe_down:'HTTP探测异常', cpu_high:'CPU过高', memory_high:'内存过高', disk_high:'磁盘过高', server_offline:'服务器离线' };
             return m[t] || t;
         },
         formatThreshold(r) {
             if (['server_expiry','website_expiry'].includes(r.alert_type)) return '提前 ' + r.threshold_value + ' 天';
-            if (['cpu_high','memory_high','disk_high'].includes(r.alert_type)) return r.threshold_value + '%';
-            if (r.alert_type === 'server_offline') return r.threshold_value + ' 分钟';
-            return r.threshold_value;
+            if (['cpu_high','memory_high'].includes(r.alert_type)) return r.threshold_value + '% · 连续 ' + (r.threshold_count || 3) + ' 次';
+            if (r.alert_type === 'disk_high') return r.threshold_value + '%';
+            if (r.alert_type === 'server_offline') return '离线超过 ' + r.threshold_value + ' 分钟';
+            if (r.alert_type === 'http_probe_down') return '探测失败';
+            return r.threshold_value || '-';
+        },
+        typeDefaults(t) {
+            const m = {
+                server_expiry: { threshold_value:30, threshold_count:3 },
+                website_expiry: { threshold_value:30, threshold_count:3 },
+                http_probe_down: { threshold_value:0, threshold_count:3 },
+                cpu_high: { threshold_value:90, threshold_count:3 },
+                memory_high: { threshold_value:90, threshold_count:3 },
+                disk_high: { threshold_value:90, threshold_count:3 },
+                server_offline: { threshold_value:5, threshold_count:3 },
+            };
+            return m[t] || m.server_expiry;
+        },
+        applyTypeDefaults() {
+            Object.assign(this.form, this.typeDefaults(this.form.alert_type));
+        },
+        thresholdVisible() {
+            return this.form.alert_type !== 'http_probe_down';
+        },
+        thresholdCountVisible() {
+            return ['cpu_high','memory_high'].includes(this.form.alert_type);
+        },
+        thresholdLabel() {
+            if (['server_expiry','website_expiry'].includes(this.form.alert_type)) return '提前提醒天数';
+            if (['cpu_high','memory_high','disk_high'].includes(this.form.alert_type)) return '使用率阈值（%）';
+            if (this.form.alert_type === 'server_offline') return '离线时长阈值（分钟）';
+            return '阈值';
+        },
+        thresholdPlaceholder() {
+            if (['server_expiry','website_expiry'].includes(this.form.alert_type)) return '例如 30，表示到期前 30 天内提醒';
+            if (['cpu_high','memory_high','disk_high'].includes(this.form.alert_type)) return '例如 90，表示超过 90%';
+            if (this.form.alert_type === 'server_offline') return '例如 5，表示离线超过 5 分钟';
+            return '';
+        },
+        thresholdHelp() {
+            if (['server_expiry','website_expiry'].includes(this.form.alert_type)) return '单位：天。资源到期日在该天数范围内时触发。';
+            if (['cpu_high','memory_high'].includes(this.form.alert_type)) return '单位：百分比。需要配合连续采样次数判断，不是固定秒数或分钟数。';
+            if (this.form.alert_type === 'disk_high') return '单位：百分比。当前代码按最新一次磁盘使用率判断。';
+            if (this.form.alert_type === 'server_offline') return '单位：分钟。服务器离线超过该时长后触发。';
+            return '';
+        },
+        thresholdStep() {
+            return ['cpu_high','memory_high','disk_high'].includes(this.form.alert_type) ? '0.1' : '1';
         },
         async fetch() { try { const d = await api('/api/alerts/rules'); this.rules = d.data || []; } catch(e) {} },
-        openAdd() { this.form = { alert_type:'server_expiry', name:'', threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' }; this.showModal = true; },
+        openAdd() { this.form = { alert_type:'server_expiry', name:'', enabled:1, threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' }; this.showModal = true; },
         async save() {
             this.saving = true;
-            try { await api('/api/alerts/rules', {method:'POST', body: this.form}); this.showModal = false; await this.fetch(); showToast('添加成功','success'); }
+            const body = {
+                ...this.form,
+                name: (this.form.name || '').trim(),
+                notify_email: (this.form.notify_email || '').trim(),
+                enabled: this.form.enabled ? 1 : 0,
+                threshold_value: this.thresholdVisible() ? (Number(this.form.threshold_value) || 0) : 0,
+                threshold_count: parseInt(this.form.threshold_count, 10) || 3,
+                notify_user: this.form.notify_user ? 1 : 0,
+            };
+            if (!body.name) {
+                showToast('请输入规则名称','error');
+                this.saving = false;
+                return;
+            }
+            if (this.thresholdVisible() && body.threshold_value <= 0) {
+                showToast('请输入大于 0 的阈值','error');
+                this.saving = false;
+                return;
+            }
+            if (this.thresholdCountVisible() && body.threshold_count < 1) {
+                showToast('连续采样次数不能小于 1','error');
+                this.saving = false;
+                return;
+            }
+            try { await api('/api/alerts/rules', {method:'POST', body}); this.showModal = false; await this.fetch(); showToast('添加成功','success'); }
             catch(e) { showToast(e.message,'error'); }
             this.saving = false;
         },

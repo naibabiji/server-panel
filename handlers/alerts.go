@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
@@ -49,6 +50,10 @@ func (h *AlertHandler) CreateRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
 		return
 	}
+	if !normalizeAlertRule(&r) {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的告警类型"))
+		return
+	}
 	result, err := h.db().Exec(
 		`INSERT INTO alert_rules (alert_type, name, enabled, threshold_value, threshold_count, notify_user, notify_email, server_id)
 		 VALUES (?,?,?,?,?,?,?,?)`,
@@ -68,6 +73,10 @@ func (h *AlertHandler) UpdateRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
 		return
 	}
+	if !normalizeAlertRule(&r) {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的告警类型"))
+		return
+	}
 	result, err := h.db().Exec(
 		`UPDATE alert_rules SET alert_type=?, name=?, enabled=?, threshold_value=?, threshold_count=?, notify_user=?, notify_email=?, server_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
 		r.AlertType, r.Name, r.Enabled, r.ThresholdValue, r.ThresholdCount, r.NotifyUser, r.NotifyEmail, r.ServerID, id)
@@ -80,6 +89,68 @@ func (h *AlertHandler) UpdateRule(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
+}
+
+func normalizeAlertRule(r *models.AlertRule) bool {
+	r.AlertType = strings.TrimSpace(r.AlertType)
+	r.Name = strings.TrimSpace(r.Name)
+	r.NotifyEmail = strings.TrimSpace(r.NotifyEmail)
+	if r.ThresholdCount <= 0 {
+		r.ThresholdCount = 3
+	}
+
+	switch r.AlertType {
+	case "server_expiry":
+		if r.Name == "" {
+			r.Name = "服务器到期提醒"
+		}
+		if r.ThresholdValue <= 0 {
+			r.ThresholdValue = 30
+		}
+	case "website_expiry":
+		if r.Name == "" {
+			r.Name = "网站到期提醒"
+		}
+		if r.ThresholdValue <= 0 {
+			r.ThresholdValue = 30
+		}
+	case "http_probe_down":
+		if r.Name == "" {
+			r.Name = "HTTP 探测异常"
+		}
+		r.ThresholdValue = 0
+	case "cpu_high":
+		if r.Name == "" {
+			r.Name = "CPU 过高"
+		}
+		if r.ThresholdValue <= 0 {
+			r.ThresholdValue = 90
+		}
+	case "memory_high":
+		if r.Name == "" {
+			r.Name = "内存过高"
+		}
+		if r.ThresholdValue <= 0 {
+			r.ThresholdValue = 90
+		}
+	case "disk_high":
+		if r.Name == "" {
+			r.Name = "磁盘过高"
+		}
+		if r.ThresholdValue <= 0 {
+			r.ThresholdValue = 90
+		}
+	case "server_offline":
+		if r.Name == "" {
+			r.Name = "服务器离线"
+		}
+		if r.ThresholdValue <= 0 {
+			r.ThresholdValue = 5
+		}
+	default:
+		return false
+	}
+	return true
 }
 
 func (h *AlertHandler) DeleteRule(c *gin.Context) {
