@@ -9,7 +9,7 @@
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">名称</th><th class="table-header">官网</th><th class="table-header">联系方式</th><th class="table-header">备注</th><th class="table-header">操作</th>
+                <th class="table-header">名称</th><th class="table-header">官网</th><th class="table-header">联系方式</th><th class="table-header">服务数量</th><th class="table-header">备注</th><th class="table-header">操作</th>
             </tr></thead>
             <tbody>
             <template x-for="p in items" :key="p.id">
@@ -17,6 +17,7 @@
                     <td class="table-cell text-white"><a :href="'providers/'+p.id" class="hover:text-purple-200" x-text="p.name"></a></td>
                     <td class="table-cell"><a :href="externalURL(p.website)" target="_blank" rel="noopener noreferrer" class="text-purple-400 hover:text-purple-300 text-sm" x-text="p.website||'--'"></a></td>
                     <td class="table-cell text-gray-400" x-text="p.contact||'--'"></td>
+                    <td class="table-cell text-gray-400" x-text="p.server_count || 0"></td>
                     <td class="table-cell text-gray-400 text-sm whitespace-pre-wrap" x-text="p.notes||'--'"></td>
                     <td class="table-cell">
                         <a :href="'providers/'+p.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">详情</a>

@@ -12,7 +12,7 @@
         <table class="w-full">
             <thead><tr>
                 <th class="table-header">名称</th><th class="table-header">联系人</th><th class="table-header">邮箱</th>
-                <th class="table-header">公司</th><th class="table-header">操作</th>
+                <th class="table-header">公司</th><th class="table-header">服务器数量</th><th class="table-header">网站数量</th><th class="table-header">操作</th>
             </tr></thead>
             <tbody>
             <template x-for="u in items" :key="u.id">
@@ -21,6 +21,8 @@
                     <td class="table-cell text-gray-400" x-text="u.contact_person||'--'"></td>
                     <td class="table-cell text-gray-400" x-text="u.email||'--'"></td>
                     <td class="table-cell text-gray-400" x-text="u.company||'--'"></td>
+                    <td class="table-cell text-gray-400" x-text="u.server_count || 0"></td>
+                    <td class="table-cell text-gray-400" x-text="u.website_count || 0"></td>
                     <td class="table-cell">
                         <a :href="'customers/'+u.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">详情</a>
                         <a :href="'customers/'+u.id+'/edit'" class="text-sm text-purple-300 hover:text-purple-200 mr-2">编辑</a>

@@ -12,13 +12,21 @@
                 <option value="">全部服务器</option>
                 <template x-for="s in servers" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
             </select>
+            <select x-model="filterCustomer" @change="resetAndFetch()" class="input-field w-36">
+                <option value="">全部客户</option>
+                <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+            </select>
         </div>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">
             <thead><tr>
                 <th class="table-header">名称</th><th class="table-header">域名</th><th class="table-header">服务器</th>
-                <th class="table-header">类型</th><th class="table-header">面板</th><th class="table-header">状态</th><th class="table-header">到期日</th><th class="table-header">操作</th>
+                <th class="table-header">类型</th><th class="table-header">面板</th><th class="table-header">状态</th>
+                <th class="table-header cursor-pointer select-none hover:text-gray-200" @click="toggleSort('expiry_date')">
+                    到期日<span x-text="sortIndicator('expiry_date')"></span>
+                </th>
+                <th class="table-header">操作</th>
             </tr></thead>
             <tbody>
             <template x-for="w in items" :key="w.id">
@@ -29,10 +37,11 @@
                     <td class="table-cell"><span class="badge-info text-xs" x-text="w.site_type || '--'"></span></td>
                     <td class="table-cell text-gray-400" x-text="w.panel_type == 'none' ? '--' : (w.panel_type || '--')"></td>
                     <td class="table-cell"><span :class="w.status=='active'?'badge-success':'badge-danger'" x-text="w.status=='active'?'运行中':'已到期'"></span></td>
-                    <td class="table-cell text-gray-400" x-text="w.expiry_date || '--'"></td>
+                    <td class="table-cell" :class="expiryClass(w.expiry_date)" x-text="w.expiry_date || '--'"></td>
                     <td class="table-cell">
                         <a :href="'websites/'+w.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">详情</a>
                         <a :href="'websites/'+w.id+'/edit'" class="text-sm text-purple-300 hover:text-purple-200 mr-2">编辑</a>
+                        <a href="#" @click.prevent="renew(w)" class="text-sm text-green-400 hover:text-green-300 mr-2">续费</a>
                         <a href="#" @click.prevent="del(w.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
                     </td>
                 </tr>
@@ -56,13 +65,17 @@
 function websiteList() {
     return {
         ...paginationState(),
-        items: [], servers: [], loading: true, search: '', filterServer: '',
+        items: [], servers: [], customers: [], loading: true, search: '', filterServer: '', filterCustomer: '',
+        sortBy: 'created_at', sortOrder: 'desc',
         async fetch() {
             this.loading = true;
             try {
                 const params = new URLSearchParams({
                     search: this.search,
                     server_id: this.filterServer,
+                    customer_id: this.filterCustomer,
+                    sort: this.sortBy,
+                    order: this.sortOrder,
                     page: this.page,
                     page_size: this.pageSize,
                 });
@@ -79,6 +92,7 @@ function websiteList() {
             await Promise.all([
                 this.fetch(),
                 (async () => { try { const d = await cachedApi('/api/servers?page_size=100', {}, { ttl: API_CACHE_TTL_LIST }); this.servers = d.data.items || []; } catch(e) {} })(),
+                (async () => { try { const d = await cachedApi('/api/customers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST }); this.customers = d.data.items || []; } catch(e) {} })(),
             ]);
         },
         externalURL(domain) {
@@ -89,6 +103,38 @@ function websiteList() {
         serverURL(w) {
             if (!w || !w.server_id) return '#';
             return 'servers/' + w.server_id;
+        },
+        toggleSort(field) {
+            if (this.sortBy === field) {
+                this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortBy = field;
+                this.sortOrder = 'asc';
+            }
+            this.resetAndFetch();
+        },
+        sortIndicator(field) {
+            if (this.sortBy !== field) return '';
+            return this.sortOrder === 'asc' ? ' ▲' : ' ▼';
+        },
+        expiryClass,
+        async renew(w) {
+            const newDate = await inputModal({
+                title: '续费 ' + (w.name || w.domain),
+                label: '新到期日',
+                type: 'date',
+                defaultValue: w.expiry_date || new Date().toISOString().slice(0, 10),
+            });
+            if (!newDate) return;
+            try {
+                const d = await api('/api/websites/' + w.id);
+                const full = d.data;
+                full.expiry_date = newDate;
+                full.status = 'active';
+                await api('/api/websites/' + w.id, { method: 'PUT', body: full });
+                showToast('续费成功', 'success');
+                await this.fetch();
+            } catch (e) { showToast(e.message, 'error'); }
         },
         async del(id) {
             if (!await confirmModal('确认删除此网站？')) return;

@@ -292,6 +292,18 @@ function fmtTime(t) {
          + `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 }
 
+// 到期日临近程度对应的文字颜色：已过期/3 天内红色，30 天内黄色，其余默认灰色。
+function expiryClass(dateStr) {
+    if (!dateStr) return 'text-gray-400';
+    const expiry = new Date(dateStr + 'T00:00:00');
+    if (isNaN(expiry.getTime())) return 'text-gray-400';
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const days = Math.round((expiry - today) / 86400000);
+    if (days <= 3) return 'text-red-400 font-medium';
+    if (days <= 30) return 'text-yellow-400';
+    return 'text-gray-400';
+}
+
 function paginationState(pageSize = 30) {
     return {
         page: 1,

@@ -30,6 +30,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 	customerID := c.Query("customer_id")
 	providerID := c.Query("provider_id")
 	serverType := c.Query("server_type")
+	orderBy := buildServerOrderBy(c.Query("sort"), c.Query("order"))
 
 	if page < 1 {
 		page = 1
@@ -76,7 +77,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 		FROM servers s
 		LEFT JOIN customers u ON s.customer_id = u.id
 		LEFT JOIN providers p ON s.provider_id = p.id ` +
-		where + " ORDER BY s.created_at DESC LIMIT ? OFFSET ?"
+		where + " ORDER BY " + orderBy + " LIMIT ? OFFSET ?"
 	args = append(args, pageSize, offset)
 
 	rows, err := h.DB.Query(query, args...)
@@ -119,6 +120,25 @@ func (h *ServerHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(models.PaginatedResult{
 		Items: servers, Total: total, Page: page, PageSize: pageSize,
 	}))
+}
+
+// buildServerOrderBy whitelists the sortable columns for the server list so the
+// sort/order query params can't be used to inject arbitrary SQL. Rows with no
+// expiry_date always sort last, regardless of direction, so an empty date never
+// masquerades as "soonest to expire".
+func buildServerOrderBy(sort, order string) string {
+	dir := "DESC"
+	if order == "asc" {
+		dir = "ASC"
+	}
+	switch sort {
+	case "expiry_date":
+		return "CASE WHEN s.expiry_date = '' THEN 1 ELSE 0 END ASC, s.expiry_date " + dir
+	case "name":
+		return "s.name " + dir
+	default:
+		return "s.created_at " + dir
+	}
 }
 
 func (h *ServerHandler) Get(c *gin.Context) {

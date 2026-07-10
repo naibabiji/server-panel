@@ -12,4 +12,6 @@ type Customer struct {
 	Notes         string `json:"notes"`
 	CreatedAt     string `json:"created_at"`
 	UpdatedAt     string `json:"updated_at"`
+	ServerCount   int    `json:"server_count,omitempty"`
+	WebsiteCount  int    `json:"website_count,omitempty"`
 }

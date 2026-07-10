@@ -1,6 +1,6 @@
 {{template "base" .}}
 {{define "server_list_content"}}
-<div x-data="serverList()" x-init="fetch(); loadProviders()" class="p-6">
+<div x-data="serverList()" x-init="fetch(); loadProviders(); loadCustomers()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 class="text-lg font-semibold text-gray-100">服务器</h2>
         <a href="servers/new" class="btn-primary text-sm">添加服务器</a>
@@ -17,6 +17,10 @@
                 <option value="">全部服务商</option>
                 <template x-for="p in providers" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
             </select>
+            <select x-model="filterCustomer" @change="resetAndFetch()" class="input-field w-36">
+                <option value="">全部客户</option>
+                <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
+            </select>
         </div>
     </div>
 
@@ -25,7 +29,10 @@
             <thead><tr>
                 <th class="table-header">名称</th><th class="table-header">IP</th><th class="table-header">服务商</th><th class="table-header">类型</th>
                 <th class="table-header">面板</th><th class="table-header">状态</th><th class="table-header">在线</th>
-                <th class="table-header">到期日</th><th class="table-header">操作</th>
+                <th class="table-header cursor-pointer select-none hover:text-gray-200" @click="toggleSort('expiry_date')">
+                    到期日<span x-text="sortIndicator('expiry_date')"></span>
+                </th>
+                <th class="table-header">操作</th>
             </tr></thead>
             <tbody>
             <template x-for="s in items" :key="s.id">
@@ -37,11 +44,12 @@
                     <td class="table-cell text-gray-400" x-text="s.panel_type == 'none' ? '--' : s.panel_type"></td>
                     <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></td>
                     <td class="table-cell"><span :class="s.is_online ? 'text-green-400' : 'text-gray-500'" x-text="s.is_online ? '在线' : '未知'"></span></td>
-                    <td class="table-cell text-gray-400" x-text="s.expiry_date || '--'"></td>
+                    <td class="table-cell" :class="expiryClass(s.expiry_date)" x-text="s.expiry_date || '--'"></td>
                     <td class="table-cell">
                         <div class="flex gap-2">
                             <a :href="'servers/'+s.id" class="text-sm text-purple-300 hover:text-purple-200">详情</a>
                             <a :href="'servers/'+s.id+'/edit'" class="text-sm text-gray-300 hover:text-white">编辑</a>
+                            <a href="#" @click.prevent="renew(s)" class="text-sm text-green-400 hover:text-green-300">续费</a>
                             <a href="#" @click.prevent="del(s.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
                         </div>
                     </td>
@@ -66,7 +74,8 @@
 function serverList() {
     return {
         ...paginationState(),
-        items: [], loading: true, search: '', filterStatus: '', filterProvider: '', providers: [],
+        items: [], loading: true, search: '', filterStatus: '', filterProvider: '', filterCustomer: '',
+        providers: [], customers: [], sortBy: 'created_at', sortOrder: 'desc',
         async fetch() {
             this.loading = true;
             try {
@@ -74,6 +83,9 @@ function serverList() {
                     search: this.search,
                     status: this.filterStatus,
                     provider_id: this.filterProvider,
+                    customer_id: this.filterCustomer,
+                    sort: this.sortBy,
+                    order: this.sortOrder,
                     page: this.page,
                     page_size: this.pageSize,
                 });
@@ -91,6 +103,44 @@ function serverList() {
                 const d = await cachedApi('/api/providers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST });
                 this.providers = d.data.items || [];
             } catch(e) {}
+        },
+        async loadCustomers() {
+            try {
+                const d = await cachedApi('/api/customers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST });
+                this.customers = d.data.items || [];
+            } catch(e) {}
+        },
+        toggleSort(field) {
+            if (this.sortBy === field) {
+                this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.sortBy = field;
+                this.sortOrder = 'asc';
+            }
+            this.resetAndFetch();
+        },
+        sortIndicator(field) {
+            if (this.sortBy !== field) return '';
+            return this.sortOrder === 'asc' ? ' ▲' : ' ▼';
+        },
+        expiryClass,
+        async renew(s) {
+            const newDate = await inputModal({
+                title: '续费 ' + s.name,
+                label: '新到期日',
+                type: 'date',
+                defaultValue: s.expiry_date || new Date().toISOString().slice(0, 10),
+            });
+            if (!newDate) return;
+            try {
+                const d = await api('/api/servers/' + s.id);
+                const full = d.data;
+                full.expiry_date = newDate;
+                full.status = 'active';
+                await api('/api/servers/' + s.id, { method: 'PUT', body: full });
+                showToast('续费成功', 'success');
+                await this.fetch();
+            } catch (e) { showToast(e.message, 'error'); }
         },
         async del(id) {
             if (!await confirmModal('确认删除此服务器？')) return;

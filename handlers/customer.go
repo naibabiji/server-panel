@@ -46,7 +46,10 @@ func (h *CustomerHandler) List(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 	rows, err := h.db().Query(
-		"SELECT id, name, contact_person, phone, email, company, start_date, address, notes, created_at, updated_at FROM customers "+where+" ORDER BY created_at DESC LIMIT ? OFFSET ?",
+		`SELECT c.id, c.name, c.contact_person, c.phone, c.email, c.company, c.start_date, c.address, c.notes, c.created_at, c.updated_at,
+			(SELECT COUNT(*) FROM servers s WHERE s.customer_id = c.id) AS server_count,
+			(SELECT COUNT(*) FROM websites w WHERE w.customer_id = c.id) AS website_count
+		FROM customers c `+where+" ORDER BY c.created_at DESC LIMIT ? OFFSET ?",
 		append(args, pageSize, offset)...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
@@ -58,7 +61,7 @@ func (h *CustomerHandler) List(c *gin.Context) {
 	for rows.Next() {
 		var u models.Customer
 		rows.Scan(&u.ID, &u.Name, &u.ContactPerson, &u.Phone, &u.Email, &u.Company,
-			&u.StartDate, &u.Address, &u.Notes, &u.CreatedAt, &u.UpdatedAt)
+			&u.StartDate, &u.Address, &u.Notes, &u.CreatedAt, &u.UpdatedAt, &u.ServerCount, &u.WebsiteCount)
 		customers = append(customers, u)
 	}
 

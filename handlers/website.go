@@ -31,6 +31,7 @@ func (h *WebsiteHandler) List(c *gin.Context) {
 	serverID := c.Query("server_id")
 	customerID := c.Query("customer_id")
 	status := c.Query("status")
+	orderBy := buildWebsiteOrderBy(c.Query("sort"), c.Query("order"))
 
 	if page < 1 {
 		page = 1
@@ -70,7 +71,7 @@ func (h *WebsiteHandler) List(c *gin.Context) {
 		 FROM websites w
 		 LEFT JOIN servers s ON w.server_id = s.id
 		 LEFT JOIN customers u ON w.customer_id = u.id `+
-			where+" ORDER BY w.created_at DESC LIMIT ? OFFSET ?",
+			where+" ORDER BY "+orderBy+" LIMIT ? OFFSET ?",
 		append(args, pageSize, offset)...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
@@ -94,6 +95,24 @@ func (h *WebsiteHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, models.SuccessResponse(models.PaginatedResult{
 		Items: websites, Total: total, Page: page, PageSize: pageSize,
 	}))
+}
+
+// buildWebsiteOrderBy whitelists the sortable columns for the website list so the
+// sort/order query params can't be used to inject arbitrary SQL. Rows with no
+// expiry_date always sort last, regardless of direction.
+func buildWebsiteOrderBy(sort, order string) string {
+	dir := "DESC"
+	if order == "asc" {
+		dir = "ASC"
+	}
+	switch sort {
+	case "expiry_date":
+		return "CASE WHEN w.expiry_date = '' THEN 1 ELSE 0 END ASC, w.expiry_date " + dir
+	case "name":
+		return "w.name " + dir
+	default:
+		return "w.created_at " + dir
+	}
 }
 
 func (h *WebsiteHandler) Get(c *gin.Context) {

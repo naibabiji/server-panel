@@ -48,7 +48,9 @@ func (h *ProviderHandler) List(c *gin.Context) {
 
 	offset := (page - 1) * pageSize
 	rows, err := h.db().Query(
-		"SELECT id, name, website, contact, private_notes_enc <> '', notes, created_at, updated_at FROM providers "+where+" ORDER BY name LIMIT ? OFFSET ?",
+		`SELECT p.id, p.name, p.website, p.contact, p.private_notes_enc <> '', p.notes, p.created_at, p.updated_at,
+			(SELECT COUNT(*) FROM servers s WHERE s.provider_id = p.id) AS server_count
+		FROM providers p `+where+" ORDER BY p.name LIMIT ? OFFSET ?",
 		append(args, pageSize, offset)...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
@@ -60,7 +62,7 @@ func (h *ProviderHandler) List(c *gin.Context) {
 	for rows.Next() {
 		var p models.Provider
 		var hasPrivateNotes int
-		if err := rows.Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &hasPrivateNotes, &p.Notes, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &hasPrivateNotes, &p.Notes, &p.CreatedAt, &p.UpdatedAt, &p.ServerCount); err != nil {
 			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取服务商列表失败"))
 			return
 		}
