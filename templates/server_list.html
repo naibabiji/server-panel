@@ -19,7 +19,7 @@
     <div class="card overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">名称</th><th class="table-header">IP</th><th class="table-header">类型</th>
+                <th class="table-header">名称</th><th class="table-header">IP</th><th class="table-header">服务商</th><th class="table-header">类型</th>
                 <th class="table-header">面板</th><th class="table-header">状态</th><th class="table-header">在线</th>
                 <th class="table-header">到期日</th><th class="table-header">操作</th>
             </tr></thead>
@@ -28,6 +28,7 @@
                 <tr class="border-t border-[#252c35] hover:bg-[#1d232b]">
                     <td class="table-cell"><a :href="'servers/'+s.id" class="text-purple-300 hover:text-purple-200" x-text="s.name"></a></td>
                     <td class="table-cell text-gray-400" x-text="s.ip_address || '--'"></td>
+                    <td class="table-cell text-gray-400" x-text="s.provider_name || '--'"></td>
                     <td class="table-cell"><span class="badge-info" x-text="s.server_type"></span></td>
                     <td class="table-cell text-gray-400" x-text="s.panel_type == 'none' ? '--' : s.panel_type"></td>
                     <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></td>
