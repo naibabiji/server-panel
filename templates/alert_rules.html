@@ -21,6 +21,7 @@
                     <td class="table-cell"><span x-text="r.notify_user ? '是' : '否'" class="text-gray-400 text-sm"></span></td>
                     <td class="table-cell">
                         <a href="#" @click.prevent="toggle(r)" class="text-sm mr-2" :class="r.enabled ? 'text-yellow-400' : 'text-green-400'" x-text="r.enabled ? '禁用' : '启用'"></a>
+                        <a href="#" @click.prevent="openEdit(r)" class="text-sm text-blue-400 mr-2">编辑</a>
                         <a href="#" @click.prevent="del(r.id)" class="text-sm text-red-400">删除</a>
                     </td>
                 </tr>
@@ -33,7 +34,7 @@
     <!-- Add Rule Modal -->
     <div class="modal-overlay" x-show="showModal" x-cloak @click.self="showModal=false">
         <div class="modal-content">
-            <h3 class="text-lg font-semibold text-purple-300 mb-4">添加告警规则</h3>
+            <h3 class="text-lg font-semibold text-purple-300 mb-4" x-text="editingID ? '编辑告警规则' : '添加告警规则'"></h3>
             <div class="space-y-3">
                 <div><label class="label">告警类型</label>
                     <select x-model="form.alert_type" @change="applyTypeDefaults()" class="input-field">
@@ -57,11 +58,11 @@
                 <div x-show="form.alert_type === 'http_probe_down'" class="text-xs text-gray-500 bg-gray-900/60 border border-gray-700/60 rounded px-3 py-2">
                     HTTP 探测异常不使用数值阈值；启用探测的服务器被判定不可用时触发。
                 </div>
-                <div class="flex items-center gap-2"><input type="checkbox" x-model="form.notify_user" :true-value="1" :false-value="0"><span class="text-sm text-gray-400">通知客户</span></div>
+                <div class="flex items-center gap-2"><input type="checkbox" :checked="!!form.notify_user" @change="form.notify_user = $event.target.checked ? 1 : 0"><span class="text-sm text-gray-400">通知客户</span></div>
                 <div><label class="label">通知邮箱</label><input type="text" x-model="form.notify_email" class="input-field" placeholder="留空使用管理员邮箱"></div>
             </div>
             <div class="flex gap-3 mt-5">
-                <button @click="save()" class="btn-primary" :disabled="saving">保存</button>
+                <button @click="save()" class="btn-primary" :disabled="saving" x-text="saving ? '保存中...' : '保存'"></button>
                 <button @click="showModal=false" class="btn-secondary">取消</button>
             </div>
         </div>
@@ -70,7 +71,7 @@
 <script>
 function alertRules() {
     return {
-        rules: [], showModal: false, saving: false,
+        rules: [], showModal: false, saving: false, editingID: null,
         form: { alert_type:'server_expiry', name:'', enabled:1, threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' },
         typeLabel(t) {
             const m = { server_expiry:'服务器到期', website_expiry:'网站到期', http_probe_down:'HTTP探测异常', cpu_high:'CPU过高', memory_high:'内存过高', disk_high:'磁盘过高', server_offline:'服务器离线' };
@@ -128,7 +129,30 @@ function alertRules() {
             return ['cpu_high','memory_high','disk_high'].includes(this.form.alert_type) ? '0.1' : '1';
         },
         async fetch() { try { const d = await api('/api/alerts/rules'); this.rules = d.data || []; } catch(e) {} },
-        openAdd() { this.form = { alert_type:'server_expiry', name:'', enabled:1, threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' }; this.showModal = true; },
+        blankForm() {
+            return { alert_type:'server_expiry', name:'', enabled:1, threshold_value:30, threshold_count:3, notify_user:0, notify_email:'' };
+        },
+        openAdd() {
+            this.editingID = null;
+            this.form = this.blankForm();
+            this.saving = false;
+            this.showModal = true;
+        },
+        openEdit(r) {
+            this.editingID = r.id;
+            this.form = {
+                alert_type: r.alert_type,
+                name: r.name || '',
+                enabled: r.enabled ? 1 : 0,
+                threshold_value: Number(r.threshold_value) || 0,
+                threshold_count: parseInt(r.threshold_count, 10) || 3,
+                notify_user: r.notify_user ? 1 : 0,
+                notify_email: r.notify_email || '',
+                server_id: r.server_id || null,
+            };
+            this.saving = false;
+            this.showModal = true;
+        },
         async save() {
             this.saving = true;
             const body = {
@@ -155,7 +179,15 @@ function alertRules() {
                 this.saving = false;
                 return;
             }
-            try { await api('/api/alerts/rules', {method:'POST', body}); this.showModal = false; await this.fetch(); showToast('添加成功','success'); }
+            try {
+                const url = this.editingID ? '/api/alerts/rules/' + this.editingID : '/api/alerts/rules';
+                const method = this.editingID ? 'PUT' : 'POST';
+                await api(url, {method, body});
+                this.showModal = false;
+                this.editingID = null;
+                await this.fetch();
+                showToast(method === 'PUT' ? '更新成功' : '添加成功','success');
+            }
             catch(e) { showToast(e.message,'error'); }
             this.saving = false;
         },

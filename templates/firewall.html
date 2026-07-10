@@ -27,9 +27,9 @@
         </div>
     </div>
 
-    <!-- 封禁历史 -->
+    <!-- 当前封禁 -->
     <div class="card">
-        <div class="text-sm font-medium text-gray-300 mb-3">封禁历史</div>
+        <div class="text-sm font-medium text-gray-300 mb-3">当前封禁</div>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead><tr><th class="table-header">IP</th><th class="table-header">原因</th><th class="table-header">来源</th><th class="table-header">到期时间</th><th class="table-header">封禁时间</th><th class="table-header">操作</th></tr></thead>
@@ -46,7 +46,7 @@
                 </template>
                 </tbody>
             </table>
-            <div class="text-gray-500 text-sm py-4 text-center" x-show="!bans.items||bans.items.length==0">暂无封禁记录</div>
+            <div class="text-gray-500 text-sm py-4 text-center" x-show="!bans.items||bans.items.length==0">暂无当前封禁</div>
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-700/50 px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
                 <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
                 <div class="flex items-center gap-2">

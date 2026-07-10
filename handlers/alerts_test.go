@@ -66,6 +66,37 @@ func TestCreateAlertRuleNormalizesHTTPProbeThreshold(t *testing.T) {
 	}
 }
 
+func TestUpdateAlertRulePersistsEditableFields(t *testing.T) {
+	db := newAlertHandlerTestDB(t)
+	h := &AlertHandler{DB: db}
+	if _, err := db.Exec(`INSERT INTO alert_rules
+		(alert_type, name, enabled, threshold_value, threshold_count, notify_user, notify_email)
+		VALUES ('cpu_high', 'old', 1, 90, 3, 1, 'old@example.com')`); err != nil {
+		t.Fatalf("insert alert rule: %v", err)
+	}
+
+	w := performAlertRuleRequestOnRoute(h.UpdateRule, http.MethodPut, "/api/alerts/rules/:id", "/api/alerts/rules/1",
+		`{"alert_type":"memory_high","name":"内存提醒","enabled":0,"threshold_value":85,"threshold_count":4,"notify_user":0,"notify_email":"ops@example.com"}`)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	var alertType, name, notifyEmail string
+	var enabled, thresholdCount, notifyUser int
+	var thresholdValue float64
+	if err := db.QueryRow(`SELECT alert_type, name, enabled, threshold_value, threshold_count, notify_user, notify_email
+		FROM alert_rules WHERE id = 1`).Scan(
+		&alertType, &name, &enabled, &thresholdValue, &thresholdCount, &notifyUser, &notifyEmail); err != nil {
+		t.Fatalf("query alert rule: %v", err)
+	}
+	if alertType != "memory_high" || name != "内存提醒" || enabled != 0 || thresholdValue != 85 ||
+		thresholdCount != 4 || notifyUser != 0 || notifyEmail != "ops@example.com" {
+		t.Fatalf("stored rule = %q %q %d %.1f %d %d %q",
+			alertType, name, enabled, thresholdValue, thresholdCount, notifyUser, notifyEmail)
+	}
+}
+
 func newAlertHandlerTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	db, err := sql.Open("sqlite", "file:"+strings.ReplaceAll(t.Name(), "/", "-")+"?mode=memory&cache=shared")
@@ -92,9 +123,13 @@ func newAlertHandlerTestDB(t *testing.T) *sql.DB {
 }
 
 func performAlertRuleRequest(handler gin.HandlerFunc, method string, target string, body string) *httptest.ResponseRecorder {
+	return performAlertRuleRequestOnRoute(handler, method, target, target, body)
+}
+
+func performAlertRuleRequestOnRoute(handler gin.HandlerFunc, method string, route string, target string, body string) *httptest.ResponseRecorder {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.Handle(method, target, handler)
+	router.Handle(method, route, handler)
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
