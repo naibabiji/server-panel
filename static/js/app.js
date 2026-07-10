@@ -8,6 +8,7 @@ let _authRedirecting = false;
 const API_CACHE_PREFIX = 'spApiCache:';
 const API_CACHE_TTL = 5 * 60 * 1000;        // 默认 5 分钟（字典等极少变的数据）
 const API_CACHE_TTL_LIST = 60 * 1000;       // 列表 60 秒（含 is_online/last_seen 等实时字段，60s 内可能略滞后于 agent 上报）
+const API_CACHE_TTL_STABLE_LIST = 10 * 60 * 1000; // 客户/服务商等低频变更列表 10 分钟
 
 function apiCacheKey(path) { return API_CACHE_PREFIX + path; }
 
@@ -43,9 +44,12 @@ function apiCacheDropPrefix(pathPrefix) {
 
 // mutation 成功后按资源前缀失效相关 GET 缓存。
 // 服务器变更会顺带失效网站列表（website 列表 JOIN servers 取 server_name）。
+// 客户/服务商名称会出现在关联列表中，变更后同步清理依赖缓存。
 function apiCacheInvalidate(path) {
     if (path === '/api/settings/os-list') apiCacheDropPrefix('/api/settings/os-list');
     else if (path === '/api/settings/site-type-list') apiCacheDropPrefix('/api/settings/site-type-list');
+    else if (path.indexOf('/api/customers') === 0) { apiCacheDropPrefix('/api/customers'); apiCacheDropPrefix('/api/servers'); apiCacheDropPrefix('/api/websites'); }
+    else if (path.indexOf('/api/providers') === 0) { apiCacheDropPrefix('/api/providers'); apiCacheDropPrefix('/api/servers'); }
     else if (path.indexOf('/api/servers') === 0) { apiCacheDropPrefix('/api/servers'); apiCacheDropPrefix('/api/websites'); }
     else if (path.indexOf('/api/websites') === 0) apiCacheDropPrefix('/api/websites');
 }
@@ -62,6 +66,104 @@ async function cachedApi(path, options = {}, cacheOpts = {}) {
     const data = await api(path, options);
     apiCacheSet(path, data);
     return data;
+}
+
+const PREFETCH_DELAY_MS = 120;
+const PREFETCH_PAGE_PATHS = new Set(['/', '/servers', '/websites', '/customers', '/providers', '/settings']);
+const PREFETCH_API_GROUPS = {
+    'servers-list': [{ path: '/api/servers?search=&status=&page=1&page_size=30', ttl: API_CACHE_TTL_LIST }],
+    'websites-list': [{ path: '/api/websites?search=&server_id=&page=1&page_size=30', ttl: API_CACHE_TTL_LIST }],
+    'customers-list': [{ path: '/api/customers?search=&page=1&page_size=30', ttl: API_CACHE_TTL_STABLE_LIST }],
+    'providers-list': [{ path: '/api/providers?search=&page=1&page_size=30', ttl: API_CACHE_TTL_STABLE_LIST }],
+    'servers-dropdown': [{ path: '/api/servers?page_size=100', ttl: API_CACHE_TTL_LIST }],
+    'settings-dictionary': [
+        { path: '/api/settings/os-list', ttl: API_CACHE_TTL },
+        { path: '/api/settings/site-type-list', ttl: API_CACHE_TTL },
+    ],
+};
+const _prefetchedPages = new Set();
+const _prefetchTimers = new WeakMap();
+const _prefetchControllers = new WeakMap();
+
+function prefetchAllowed() {
+    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if (conn && conn.saveData) return false;
+    if (window.matchMedia && !window.matchMedia('(hover: hover) and (pointer: fine)').matches) return false;
+    return true;
+}
+
+function normalizedPanelPath(href) {
+    try {
+        const url = new URL(href, window.location.href);
+        if (url.origin !== window.location.origin) return '';
+        const prefix = document.body.dataset.panelPrefix || '';
+        if (!url.pathname.startsWith(prefix)) return '';
+        let path = url.pathname.slice(prefix.length) || '/';
+        if (path.length > 1) path = path.replace(/\/$/, '');
+        return path;
+    } catch (e) {
+        return '';
+    }
+}
+
+function prefetchPage(href, signal) {
+    const path = normalizedPanelPath(href);
+    if (!PREFETCH_PAGE_PATHS.has(path)) return;
+    const key = window.location.origin + (document.body.dataset.panelPrefix || '') + path;
+    if (_prefetchedPages.has(key) || key === window.location.href.split('#')[0]) return;
+    _prefetchedPages.add(key);
+    fetch(key, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: { 'X-Purpose': 'prefetch' },
+        signal,
+    }).catch(() => {});
+}
+
+function prefetchApiGroups(groups) {
+    if (!groups) return;
+    groups.split(',')
+        .map(group => group.trim())
+        .filter(Boolean)
+        .forEach(group => {
+            (PREFETCH_API_GROUPS[group] || []).forEach(item => {
+                cachedApi(item.path, {}, { ttl: item.ttl }).catch(() => {});
+            });
+        });
+}
+
+function setupHoverPrefetch(root = document) {
+    if (!prefetchAllowed()) return;
+    const start = (event) => {
+        const el = event.target.closest('[data-prefetch-page], [data-prefetch-api]');
+        if (!el || !root.contains(el) || _prefetchTimers.has(el)) return;
+        const timer = setTimeout(() => {
+            _prefetchTimers.delete(el);
+            const controller = new AbortController();
+            _prefetchControllers.set(el, controller);
+            if (el.dataset.prefetchPage !== undefined && el.href) prefetchPage(el.href, controller.signal);
+            prefetchApiGroups(el.dataset.prefetchApi || '');
+        }, PREFETCH_DELAY_MS);
+        _prefetchTimers.set(el, timer);
+    };
+    const stop = (event) => {
+        const el = event.target.closest('[data-prefetch-page], [data-prefetch-api]');
+        if (!el) return;
+        const timer = _prefetchTimers.get(el);
+        if (timer) {
+            clearTimeout(timer);
+            _prefetchTimers.delete(el);
+        }
+        const controller = _prefetchControllers.get(el);
+        if (controller) {
+            controller.abort();
+            _prefetchControllers.delete(el);
+        }
+    };
+    root.addEventListener('pointerover', start, { passive: true });
+    root.addEventListener('pointerout', stop, { passive: true });
+    root.addEventListener('focusin', start);
+    root.addEventListener('focusout', stop);
 }
 
 function api(path, options = {}) {

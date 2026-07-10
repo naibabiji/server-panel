@@ -78,7 +78,7 @@ function websiteList() {
         async init() {
             await Promise.all([
                 this.fetch(),
-                (async () => { try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {} })(),
+                (async () => { try { const d = await cachedApi('/api/servers?page_size=100', {}, { ttl: API_CACHE_TTL_LIST }); this.servers = d.data.items || []; } catch(e) {} })(),
             ]);
         },
         externalURL(domain) {

@@ -53,7 +53,10 @@ function providerList() {
                     page: this.page,
                     page_size: this.pageSize,
                 });
-                const d = await api('/api/providers?' + params.toString());
+                const url = '/api/providers?' + params.toString();
+                const d = this.search
+                    ? await api(url)
+                    : await cachedApi(url, {}, { ttl: API_CACHE_TTL_STABLE_LIST });
                 this.items = d.data.items || [];
                 this.setPagination(d.data);
                 await this.ensurePageHasItems(this.items);

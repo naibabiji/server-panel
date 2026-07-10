@@ -211,9 +211,9 @@ function serverForm() {
             // 露出来（空白），直到这批请求跑完骨架屏才出现，变成"先空白 -> 骨架屏
             // -> 真实内容"三段式而不是"骨架屏 -> 真实内容"两段式。
             await Promise.all([
-                (async () => { try { const d = await api('/api/customers?page_size=100'); this.customers = d.data.items || []; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/providers?page_size=100'); this.providers = d.data.items || []; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]'); } catch(e) {} })(),
+                (async () => { try { const d = await cachedApi('/api/customers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST }); this.customers = d.data.items || []; } catch(e) {} })(),
+                (async () => { try { const d = await cachedApi('/api/providers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST }); this.providers = d.data.items || []; } catch(e) {} })(),
+                (async () => { try { const d = await cachedApi('/api/settings/os-list'); this.osList = JSON.parse(d.data.svalue || '[]'); } catch(e) {} })(),
             ]);
             if (this.id) {
                 await this.load();
@@ -222,14 +222,14 @@ function serverForm() {
         },
         async refreshCustomers(selectedID) {
             try {
-                const d = await api('/api/customers?page_size=100');
+                const d = await cachedApi('/api/customers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST });
                 this.customers = d.data.items || [];
                 if (selectedID) this.form.customer_id = selectedID.toString();
             } catch(e) {}
         },
         async refreshProviders(selectedID) {
             try {
-                const d = await api('/api/providers?page_size=100');
+                const d = await cachedApi('/api/providers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST });
                 this.providers = d.data.items || [];
                 if (selectedID) this.form.provider_id = selectedID.toString();
             } catch(e) {}

@@ -93,9 +93,9 @@ function websiteForm() {
             // 并行加载下拉数据源，确保编辑回显时选项已存在，下拉才能正确选中。
             // loading 必须在这一步之前置 true，理由同 server_form.html。
             await Promise.all([
-                (async () => { try { const d = await api('/api/servers?page_size=100'); this.servers = d.data.items || []; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/customers?page_size=100'); this.customers = d.data.items || []; } catch(e) {} })(),
-                (async () => { try { const d = await api('/api/settings/site-type-list'); this.siteTypes = JSON.parse(d.data.svalue || '[]'); } catch(e) {} })(),
+                (async () => { try { const d = await cachedApi('/api/servers?page_size=100', {}, { ttl: API_CACHE_TTL_LIST }); this.servers = d.data.items || []; } catch(e) {} })(),
+                (async () => { try { const d = await cachedApi('/api/customers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST }); this.customers = d.data.items || []; } catch(e) {} })(),
+                (async () => { try { const d = await cachedApi('/api/settings/site-type-list'); this.siteTypes = JSON.parse(d.data.svalue || '[]'); } catch(e) {} })(),
             ]);
             if (this.id) {
                 await this.load();
@@ -120,7 +120,7 @@ function websiteForm() {
         },
         async refreshCustomers(selectedID) {
             try {
-                const d = await api('/api/customers?page_size=100');
+                const d = await cachedApi('/api/customers?page_size=100', {}, { ttl: API_CACHE_TTL_STABLE_LIST });
                 this.customers = d.data.items || [];
                 if (selectedID !== undefined && selectedID !== null) this.form.customer_id = selectedID;
             } catch(e) {}
