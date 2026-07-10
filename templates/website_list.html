@@ -66,7 +66,7 @@ function websiteList() {
     return {
         ...paginationState(),
         items: [], servers: [], customers: [], loading: true, search: '', filterServer: '', filterCustomer: '',
-        sortBy: 'created_at', sortOrder: 'desc',
+        sortBy: 'expiry_date', sortOrder: 'asc',
         async fetch() {
             this.loading = true;
             try {

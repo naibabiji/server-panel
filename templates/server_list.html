@@ -75,7 +75,7 @@ function serverList() {
     return {
         ...paginationState(),
         items: [], loading: true, search: '', filterStatus: '', filterProvider: '', filterCustomer: '',
-        providers: [], customers: [], sortBy: 'created_at', sortOrder: 'desc',
+        providers: [], customers: [], sortBy: 'expiry_date', sortOrder: 'asc',
         async fetch() {
             this.loading = true;
             try {
