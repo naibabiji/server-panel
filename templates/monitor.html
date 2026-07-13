@@ -1,8 +1,7 @@
 {{template "base" .}}
 {{define "monitor_content"}}
 <div x-data="monitorPage()" x-init="fetch()" class="p-6">
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold text-purple-300">性能监控</h2>
+    <div class="flex items-center justify-start mb-4">
         <div class="text-xs text-gray-500" x-text="lastUpdate ? '更新于 ' + lastUpdate : ''"></div>
     </div>
 

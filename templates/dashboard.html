@@ -2,8 +2,7 @@
 {{define "dashboard_content"}}
 <div x-data="dashboardPage()" class="p-6">
     <div class="mb-5 pb-5 border-b border-[#202833]">
-        <h2 class="text-xl font-semibold text-purple-200">仪表盘</h2>
-        <div class="text-sm text-gray-500 mt-1">服务器状态、到期提醒和最近告警。</div>
+        <div class="text-sm text-gray-500">服务器状态、到期提醒和最近告警。</div>
         <div class="flex flex-wrap gap-2 mt-3">
             <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="panelUpdate.hasUpdate" x-text="'面板有新版本 ' + panelUpdate.latestVersion + ' 可用'"></a>
             <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="sysUpdateCount > 0" x-text="sysUpdateCount + ' 个系统包可更新'"></a>

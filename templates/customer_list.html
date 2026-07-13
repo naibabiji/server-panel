@@ -2,11 +2,8 @@
 {{define "customer_list_content"}}
 <div x-data="customerList()" x-init="fetch()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 class="text-lg font-semibold text-purple-200">客户</h2>
-        <a href="customers/new" class="btn-primary text-sm">添加客户</a>
-    </div>
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <input type="text" x-model="search" @input="resetAndFetch()" placeholder="搜索..." class="input-field w-48">
+        <a href="customers/new" class="btn-primary text-sm">添加客户</a>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">

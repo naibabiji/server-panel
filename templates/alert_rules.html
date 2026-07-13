@@ -1,8 +1,7 @@
 {{template "base" .}}
 {{define "alert_rules_content"}}
 <div x-data="alertRules()" x-init="fetch()" class="p-6">
-    <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg font-semibold text-purple-300">告警规则</h2>
+    <div class="flex items-center justify-end mb-4">
         <button @click="openAdd()" class="btn-primary text-sm">+ 添加规则</button>
     </div>
     <div class="card overflow-x-auto">

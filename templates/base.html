@@ -77,8 +77,8 @@
             <button @click="sidebarOpen=!sidebarOpen" class="lg:hidden text-gray-400 hover:text-white">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
-            <div class="flex-1"></div>
-            <div x-data="globalSearch()" @keydown.escape.window="close()" class="relative w-full max-w-xs">
+            <div class="flex-1 min-w-0 truncate text-base font-medium text-gray-200">{{if eq .Active "dashboard"}}仪表盘{{else if eq .Active "monitor"}}性能监控{{else if eq .Active "server_list"}}服务器管理{{else if eq .Active "server_detail"}}服务器管理{{else if eq .Active "server_form"}}服务器管理{{else if eq .Active "customer_list"}}客户管理{{else if eq .Active "customer_detail"}}客户管理{{else if eq .Active "customer_form"}}客户管理{{else if eq .Active "website_list"}}网站管理{{else if eq .Active "website_detail"}}网站管理{{else if eq .Active "website_form"}}网站管理{{else if eq .Active "provider_list"}}服务商管理{{else if eq .Active "provider_detail"}}服务商管理{{else if eq .Active "provider_form"}}服务商管理{{else if eq .Active "firewall"}}安全防御{{else if eq .Active "alert_rules"}}告警管理{{else if eq .Active "alert_log"}}告警日志{{else if eq .Active "settings"}}系统设置{{end}}</div>
+            <div x-data="globalSearch()" @keydown.escape.window="close()" class="relative w-56 sm:w-64 lg:w-72 shrink-0">
                 <div class="relative">
                     <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     <input type="text" x-model="q" @input="onInput()" @focus="open = q.trim().length > 0"

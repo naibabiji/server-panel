@@ -2,11 +2,7 @@
 {{define "website_list_content"}}
 <div x-data="websiteList()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 class="text-lg font-semibold text-purple-200">网站</h2>
-        <a href="websites/new" class="btn-primary text-sm">添加网站</a>
-    </div>
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
             <input type="text" x-model="search" @input="resetAndFetch()" placeholder="搜索名称/域名..." class="input-field w-48">
             <select x-model="filterServer" @change="resetAndFetch()" class="input-field w-40">
                 <option value="">全部服务器</option>
@@ -17,6 +13,7 @@
                 <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
             </select>
         </div>
+        <a href="websites/new" class="btn-primary text-sm">添加网站</a>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">

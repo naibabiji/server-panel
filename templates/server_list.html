@@ -2,11 +2,7 @@
 {{define "server_list_content"}}
 <div x-data="serverList()" x-init="fetch(); loadProviders(); loadCustomers()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h2 class="text-lg font-semibold text-gray-100">服务器</h2>
-        <a href="servers/new" class="btn-primary text-sm">添加服务器</a>
-    </div>
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
             <input type="text" x-model="search" @input="resetAndFetch()" placeholder="搜索名称/IP/机房..." class="input-field w-48">
             <select x-model="filterStatus" @change="resetAndFetch()" class="input-field w-32">
                 <option value="">全部状态</option>
@@ -22,6 +18,7 @@
                 <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
             </select>
         </div>
+        <a href="servers/new" class="btn-primary text-sm">添加服务器</a>
     </div>
 
     <div class="card overflow-x-auto">
