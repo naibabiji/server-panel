@@ -355,6 +355,42 @@ function paginationState(pageSize = 30) {
     };
 }
 
+// 标题栏的服务器/网站快速搜索：输入防抖后并行查两个列表接口，各取前 6 条。
+function globalSearch() {
+    return {
+        q: '', open: false, loading: false,
+        servers: [], websites: [],
+        _timer: null, _seq: 0,
+        onInput() {
+            const term = this.q.trim();
+            this.open = term.length > 0;
+            clearTimeout(this._timer);
+            if (!term) { this.servers = []; this.websites = []; this.loading = false; return; }
+            this._timer = setTimeout(() => this.run(term), 250);
+        },
+        async run(term) {
+            const seq = ++this._seq;
+            this.loading = true;
+            try {
+                const params = new URLSearchParams({ search: term, page: 1, page_size: 6 });
+                const [sRes, wRes] = await Promise.all([
+                    api('/api/servers?' + params.toString()).catch(() => null),
+                    api('/api/websites?' + params.toString()).catch(() => null),
+                ]);
+                if (seq !== this._seq) return;
+                this.servers = (sRes && sRes.data.items) || [];
+                this.websites = (wRes && wRes.data.items) || [];
+            } finally {
+                if (seq === this._seq) this.loading = false;
+            }
+        },
+        serverHref(s) { return (document.body.dataset.panelPrefix || '') + '/servers/' + s.id; },
+        websiteHref(w) { return (document.body.dataset.panelPrefix || '') + '/websites/' + w.id; },
+        close() { this.open = false; },
+        clear() { this.q = ''; this.servers = []; this.websites = []; this.open = false; },
+    };
+}
+
 function formatUptime(seconds) {
     const d = Math.floor(seconds / 86400);
     const h = Math.floor((seconds % 86400) / 3600);

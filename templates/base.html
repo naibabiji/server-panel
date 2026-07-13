@@ -73,10 +73,53 @@
     </aside>
     <!-- 主内容区 -->
     <main class="flex-1 overflow-y-auto">
-        <div class="sticky top-0 z-30 bg-[#0d1117]/95 backdrop-blur border-b border-[#252c35] px-5 py-3 flex items-center justify-between">
+        <div class="sticky top-0 z-30 bg-[#0d1117]/95 backdrop-blur border-b border-[#252c35] px-5 py-3 flex items-center justify-between gap-4">
             <button @click="sidebarOpen=!sidebarOpen" class="lg:hidden text-gray-400 hover:text-white">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
+            <div class="flex-1"></div>
+            <div x-data="globalSearch()" @keydown.escape.window="close()" class="relative w-full max-w-xs">
+                <div class="relative">
+                    <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input type="text" x-model="q" @input="onInput()" @focus="open = q.trim().length > 0"
+                           placeholder="搜索服务器、网站..."
+                           class="input-field w-full pl-9 pr-8 text-sm">
+                    <button x-show="q" @click="clear()" x-cloak type="button" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <div x-show="open" @click.outside="close()" x-cloak
+                     class="absolute right-0 mt-1 w-80 max-w-[90vw] max-h-96 overflow-y-auto bg-[#171b21] border border-[#2a3038] shadow-lg z-40">
+                    <template x-if="loading">
+                        <div class="px-4 py-3 text-sm text-gray-500">搜索中...</div>
+                    </template>
+                    <template x-if="!loading && q.trim() && servers.length === 0 && websites.length === 0">
+                        <div class="px-4 py-3 text-sm text-gray-500">未找到相关服务器或网站</div>
+                    </template>
+                    <template x-if="!loading && servers.length > 0">
+                        <div>
+                            <div class="px-4 pt-3 pb-1 text-xs text-gray-500">服务器</div>
+                            <template x-for="s in servers" :key="'s'+s.id">
+                                <a :href="serverHref(s)" class="block px-4 py-2 hover:bg-[#1d232b]">
+                                    <div class="text-sm text-purple-300" x-text="s.name"></div>
+                                    <div class="text-xs text-gray-500" x-text="s.ip_address || '--'"></div>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
+                    <template x-if="!loading && websites.length > 0">
+                        <div>
+                            <div class="px-4 pt-3 pb-1 text-xs text-gray-500">网站</div>
+                            <template x-for="w in websites" :key="'w'+w.id">
+                                <a :href="websiteHref(w)" class="block px-4 py-2 hover:bg-[#1d232b]">
+                                    <div class="text-sm text-blue-300" x-text="w.name || w.domain"></div>
+                                    <div class="text-xs text-gray-500" x-text="w.domain"></div>
+                                </a>
+                            </template>
+                        </div>
+                    </template>
+                </div>
+            </div>
         </div>
         {{if eq .ContentTemplate "dashboard_content"}}{{template "dashboard_content" .}}{{end}}
                 {{if eq .ContentTemplate "server_list_content"}}{{template "server_list_content" .}}{{end}}
