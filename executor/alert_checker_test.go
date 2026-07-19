@@ -58,6 +58,164 @@ func TestWebsiteExpiryAlertUsesWebsiteIDAndResolves(t *testing.T) {
 	}
 }
 
+// Regression test: an item that goes overdue without ever being renewed must
+// keep its expiry alert open, not have it silently auto-resolved just
+// because it fell out of the "next N days" window.
+func TestServerExpiryAlertStaysOpenWhenOverdueAndUnrenewed(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO customers (id, email) VALUES (1, 'user@example.com')`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, customer_id, status, expiry_date) VALUES (10, 'server-1', 1, 'active', date('now','-3 days'))`)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, enabled) VALUES ('server_expiry', 7, 1)`)
+
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+
+	var resolved int
+	if err := db.QueryRow(`SELECT resolved FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&resolved); err != nil {
+		t.Fatalf("query alert: %v", err)
+	}
+	if resolved != 0 {
+		t.Fatalf("resolved = %d, want 0 (overdue server must not be silently resolved)", resolved)
+	}
+
+	// Re-running the check (as the ticker does every interval) must not
+	// flip it to resolved just because the item is still overdue.
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+	if err := db.QueryRow(`SELECT resolved FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&resolved); err != nil {
+		t.Fatalf("query alert after re-run: %v", err)
+	}
+	if resolved != 0 {
+		t.Fatalf("resolved after re-run = %d, want 0", resolved)
+	}
+}
+
+// Regression test: the same unresolved alert row must track a website's
+// actual state as it moves from "about to expire" to "overdue" - not
+// freeze at whatever wording/level applied when it first triggered, and
+// not create a second row for the same target.
+func TestServerExpiryAlertMessageEscalatesWhenItGoesOverdue(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO customers (id, email) VALUES (1, 'user@example.com')`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, customer_id, status, expiry_date) VALUES (10, 'server-1', 1, 'active', date('now','+3 days'))`)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, enabled) VALUES ('server_expiry', 7, 1)`)
+
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+
+	var message, level string
+	var resolved int
+	if err := db.QueryRow(`SELECT message, level, resolved FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&message, &level, &resolved); err != nil {
+		t.Fatalf("query alert: %v", err)
+	}
+	if !strings.Contains(message, "3 天后到期") {
+		t.Fatalf("initial message = %q, want it to mention 3 天后到期", message)
+	}
+	if level != "warning" {
+		t.Fatalf("initial level = %q, want warning", level)
+	}
+
+	execAlertSQL(t, db, `UPDATE servers SET expiry_date = date('now','-2 days') WHERE id = 10`)
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&count); err != nil {
+		t.Fatalf("count alerts: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("alert_log rows for this target = %d, want 1 (must update in place, not duplicate)", count)
+	}
+
+	if err := db.QueryRow(`SELECT message, level, resolved FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&message, &level, &resolved); err != nil {
+		t.Fatalf("query alert after going overdue: %v", err)
+	}
+	if !strings.Contains(message, "已过期 2 天") {
+		t.Fatalf("message after going overdue = %q, want it to mention 已过期 2 天", message)
+	}
+	if level != "critical" {
+		t.Fatalf("level after going overdue = %q, want critical", level)
+	}
+	if resolved != 0 {
+		t.Fatalf("resolved = %d, want 0", resolved)
+	}
+}
+
+// Regression test: a transient failure reading rules/items must abort the
+// whole check, not resolve alerts for targets it failed to re-confirm as
+// still expiring. Simulated here by dropping the servers table out from
+// under an in-flight check.
+func TestCheckExpiryAlertsDoesNotResolveOnQueryFailure(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO customers (id, email) VALUES (1, 'user@example.com')`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, customer_id, status, expiry_date) VALUES (10, 'server-1', 1, 'active', date('now','-2 days'))`)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, enabled) VALUES ('server_expiry', 7, 1)`)
+
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+	var resolved int
+	if err := db.QueryRow(`SELECT resolved FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&resolved); err != nil {
+		t.Fatalf("query alert before failure: %v", err)
+	}
+	if resolved != 0 {
+		t.Fatalf("resolved before failure = %d, want 0", resolved)
+	}
+
+	execAlertSQL(t, db, `DROP TABLE servers`)
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+
+	if err := db.QueryRow(`SELECT resolved FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&resolved); err != nil {
+		t.Fatalf("query alert after failure: %v", err)
+	}
+	if resolved != 0 {
+		t.Fatalf("resolved after a failed read = %d, want 0 (a read failure must never resolve live alerts)", resolved)
+	}
+}
+
+// Regression test: with zero enabled server_expiry rules, an overdue
+// server must not get an alert at all - enabled=0/no-rule means "this
+// alert type is off", not "fall back to a default 7-day window".
+func TestCheckExpiryAlertsCreatesNothingWithoutAnEnabledRule(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO customers (id, email) VALUES (1, 'user@example.com')`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, customer_id, status, expiry_date) VALUES (10, 'server-1', 1, 'active', date('now','-3 days'))`)
+	// No alert_rules row at all for server_expiry.
+
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+
+	var count int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM alert_log WHERE alert_type = 'server_expiry'`).Scan(&count); err != nil {
+		t.Fatalf("count alerts: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("alert_log rows = %d, want 0 (no enabled rule means no alerting)", count)
+	}
+}
+
+// Regression test: an already-open expiry alert must be resolved once its
+// rule is disabled, not left open forever just because the overdue server
+// itself never changed.
+func TestCheckExpiryAlertsResolvesExistingAlertWhenRuleIsDisabled(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO customers (id, email) VALUES (1, 'user@example.com')`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, customer_id, status, expiry_date) VALUES (10, 'server-1', 1, 'active', date('now','-3 days'))`)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, enabled) VALUES ('server_expiry', 7, 1)`)
+
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+	var resolved int
+	if err := db.QueryRow(`SELECT resolved FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&resolved); err != nil {
+		t.Fatalf("query alert before disabling rule: %v", err)
+	}
+	if resolved != 0 {
+		t.Fatalf("resolved before disabling rule = %d, want 0", resolved)
+	}
+
+	execAlertSQL(t, db, `UPDATE alert_rules SET enabled = 0 WHERE alert_type = 'server_expiry'`)
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+
+	if err := db.QueryRow(`SELECT resolved FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&resolved); err != nil {
+		t.Fatalf("query alert after disabling rule: %v", err)
+	}
+	if resolved != 1 {
+		t.Fatalf("resolved after disabling rule = %d, want 1", resolved)
+	}
+}
+
 func TestAlertRecipientsUseRuleEmailAndUserEmail(t *testing.T) {
 	db := newAlertTestDB(t)
 	execAlertSQL(t, db, `INSERT INTO customers (id, email) VALUES (1, 'user@example.com')`)
@@ -93,6 +251,7 @@ func newAlertTestDB(t *testing.T) *sql.DB {
 			name TEXT NOT NULL,
 			customer_id INTEGER,
 			status TEXT NOT NULL DEFAULT 'active',
+			expiry_date TEXT NOT NULL DEFAULT '',
 			is_online INTEGER NOT NULL DEFAULT 0,
 			last_seen_at DATETIME,
 			http_probe_enabled INTEGER NOT NULL DEFAULT 0,

@@ -2,6 +2,7 @@ package executor
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -40,11 +41,22 @@ func runAlertCheck() {
 var allowedTables = map[string]bool{"servers": true, "websites": true}
 var allowedColumns = map[string]bool{"expiry_date": true, "cpu_percent": true, "memory_percent": true, "disk_percent": true}
 
+// checkExpiryAlerts triggers/updates/resolves the "about to expire" and
+// "already expired, unrenewed" alert for every active server or website.
+// It reads the widest configured threshold (the largest "notify N days
+// before" rule) as the query window, then classifies each matched row by
+// its actual remaining days rather than by which threshold matched -
+// that keeps the alert message accurate ("已过期 N 天" vs "将在 N 天后到期")
+// even as time passes and a row moves from upcoming to overdue, instead of
+// freezing whatever wording was used at first-alert time.
+//
+// Any failure while reading rules/items aborts the whole check without
+// calling resolveInactiveAlerts, so a transient DB read error can never be
+// mistaken for "nothing is expiring anymore" and mass-resolve live alerts.
 func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 	if !allowedTables[table] || !allowedColumns[dateCol] {
 		return
 	}
-	activeTargets := make(map[alertTarget]bool)
 
 	rows, err := db.Query(
 		"SELECT threshold_value FROM alert_rules WHERE alert_type = ? AND enabled = 1",
@@ -52,60 +64,121 @@ func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 	if err != nil {
 		return
 	}
-
-	var thresholds []float64
+	var maxDays float64
+	hasEnabledRule := false
 	for rows.Next() {
+		hasEnabledRule = true
 		var daysBefore float64
-		if err := rows.Scan(&daysBefore); err == nil {
-			thresholds = append(thresholds, daysBefore)
+		if err := rows.Scan(&daysBefore); err != nil {
+			rows.Close()
+			return
 		}
+		if daysBefore > maxDays {
+			maxDays = daysBefore
+		}
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return
 	}
 	rows.Close()
-
-	for _, daysBefore := range thresholds {
-		if daysBefore <= 0 {
-			daysBefore = 7
-		}
-		dateModifier := fmt.Sprintf("+%d days", int(daysBefore))
-
-		if table == "servers" {
-			itemRows, err := db.Query(
-				`SELECT id, name FROM servers
-				 WHERE expiry_date != '' AND expiry_date <= date('now', ?) AND expiry_date >= date('now')
-				 AND status = 'active'`,
-				dateModifier)
-			if err != nil {
-				continue
-			}
-			for itemRows.Next() {
-				var serverID int64
-				var itemName string
-				itemRows.Scan(&serverID, &itemName)
-				activeTargets[alertTarget{serverID: serverID}] = true
-				createAlert(db, alertType, &serverID, nil, "warning",
-					fmt.Sprintf("服务器 %s 将在 %d 天后到期", itemName, int(daysBefore)))
-			}
-			itemRows.Close()
-		} else {
-			itemRows, err := db.Query(
-				`SELECT id, name, server_id FROM websites
-				 WHERE expiry_date != '' AND expiry_date <= date('now', ?) AND expiry_date >= date('now')
-				 AND status = 'active'`,
-				dateModifier)
-			if err != nil {
-				continue
-			}
-			for itemRows.Next() {
-				var websiteID, serverID int64
-				var itemName string
-				itemRows.Scan(&websiteID, &itemName, &serverID)
-				activeTargets[alertTarget{serverID: serverID, websiteID: websiteID}] = true
-				createAlert(db, alertType, &serverID, &websiteID, "warning",
-					fmt.Sprintf("网站 %s 将在 %d 天后到期", itemName, int(daysBefore)))
-			}
-			itemRows.Close()
-		}
+	// No enabled rule for this alert type: nothing should be alerting, and
+	// any previously-open alert (from a rule that has since been disabled
+	// or deleted) must be resolved rather than left hanging open forever.
+	if !hasEnabledRule {
+		resolveInactiveAlerts(db, alertType, nil)
+		return
 	}
+	if maxDays <= 0 {
+		maxDays = 7
+	}
+	dateModifier := fmt.Sprintf("+%d days", int(maxDays))
+
+	type expiryTarget struct {
+		id, serverID, websiteID int64
+		name                    string
+		daysLeft                int
+	}
+	var targets []expiryTarget
+	label := "服务器"
+
+	if table == "servers" {
+		itemRows, err := db.Query(
+			`SELECT id, name, CAST(julianday(expiry_date) - julianday(date('now')) AS INTEGER)
+			 FROM servers
+			 WHERE expiry_date != '' AND expiry_date <= date('now', ?) AND status = 'active'`,
+			dateModifier)
+		if err != nil {
+			return
+		}
+		for itemRows.Next() {
+			var t expiryTarget
+			if err := itemRows.Scan(&t.id, &t.name, &t.daysLeft); err != nil {
+				itemRows.Close()
+				return
+			}
+			t.serverID = t.id
+			targets = append(targets, t)
+		}
+		if err := itemRows.Err(); err != nil {
+			itemRows.Close()
+			return
+		}
+		itemRows.Close()
+	} else {
+		label = "网站"
+		itemRows, err := db.Query(
+			`SELECT id, name, server_id, CAST(julianday(expiry_date) - julianday(date('now')) AS INTEGER)
+			 FROM websites
+			 WHERE expiry_date != '' AND expiry_date <= date('now', ?) AND status = 'active'`,
+			dateModifier)
+		if err != nil {
+			return
+		}
+		for itemRows.Next() {
+			var t expiryTarget
+			if err := itemRows.Scan(&t.id, &t.name, &t.serverID, &t.daysLeft); err != nil {
+				itemRows.Close()
+				return
+			}
+			t.websiteID = t.id
+			targets = append(targets, t)
+		}
+		if err := itemRows.Err(); err != nil {
+			itemRows.Close()
+			return
+		}
+		itemRows.Close()
+	}
+
+	// Item rows are fully drained and closed above before any alert write,
+	// same reasoning as executor/auto_renewal.go.
+	activeTargets := make(map[alertTarget]bool)
+	for _, t := range targets {
+		var serverID *int64 = &t.serverID
+		var websiteID *int64
+		if table == "servers" {
+			activeTargets[alertTarget{serverID: t.serverID}] = true
+		} else {
+			websiteID = &t.websiteID
+			activeTargets[alertTarget{serverID: t.serverID, websiteID: t.websiteID}] = true
+		}
+
+		var level, message string
+		switch {
+		case t.daysLeft < 0:
+			level = "critical"
+			message = fmt.Sprintf("%s %s 已过期 %d 天，尚未续费", label, t.name, -t.daysLeft)
+		case t.daysLeft == 0:
+			level = "warning"
+			message = fmt.Sprintf("%s %s 今天到期", label, t.name)
+		default:
+			level = "warning"
+			message = fmt.Sprintf("%s %s 将在 %d 天后到期", label, t.name, t.daysLeft)
+		}
+		upsertAlert(db, alertType, serverID, websiteID, level, message)
+	}
+
 	resolveInactiveAlerts(db, alertType, activeTargets)
 }
 
@@ -310,6 +383,50 @@ func createAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64
 		return
 	}
 
+	notifyAlert(db, alertType, serverID, websiteID, message)
+}
+
+// upsertAlert is like createAlert but, when an unresolved alert for the same
+// target already exists, refreshes its message/level instead of leaving it
+// as a no-op. Expiry alerts need this: the same unresolved row lives from
+// "will expire in N days" through "already overdue by N days", and the
+// wording/severity must track that instead of freezing at first trigger.
+// A notification is only (re-)sent when the alert is first created or when
+// it escalates to critical, so re-running this every tick doesn't spam.
+func upsertAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64, level, message string) {
+	where, args := alertTargetWhere(alertType, serverID, websiteID)
+	var id int64
+	var existingMessage, existingLevel string
+	err := db.QueryRow(`SELECT id, message, level FROM alert_log WHERE `+where+` AND resolved = 0`, args...).
+		Scan(&id, &existingMessage, &existingLevel)
+	switch {
+	case err == nil:
+		if existingMessage == message && existingLevel == level {
+			return
+		}
+		if _, err := db.Exec(`UPDATE alert_log SET message = ?, level = ? WHERE id = ?`, message, level, id); err != nil {
+			log.Printf("update alert failed: type=%s id=%d: %v", alertType, id, err)
+			return
+		}
+		if level == "critical" && existingLevel != "critical" {
+			notifyAlert(db, alertType, serverID, websiteID, message)
+		}
+		return
+	case !errors.Is(err, sql.ErrNoRows):
+		log.Printf("check existing alert failed: type=%s: %v", alertType, err)
+		return
+	}
+
+	if _, err := db.Exec(
+		`INSERT INTO alert_log (alert_type, server_id, website_id, level, message) VALUES (?,?,?,?,?)`,
+		alertType, nullableID(serverID), nullableID(websiteID), level, message); err != nil {
+		log.Printf("create alert failed: type=%s server_id=%v website_id=%v: %v", alertType, nullableID(serverID), nullableID(websiteID), err)
+		return
+	}
+	notifyAlert(db, alertType, serverID, websiteID, message)
+}
+
+func notifyAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64, message string) {
 	go func() {
 		for _, recipient := range alertRecipients(db, alertType, serverID, websiteID) {
 			if err := SendMail(recipient, "Server Panel 告警", message); err != nil {

@@ -730,8 +730,10 @@ func waitForHealthy(url string, interval, timeout time.Duration) bool {
 // core tables are readable; if not, the new binary's migrations likely broke
 // something and the database backup should be restored too, not just the binary.
 func shouldRestoreDBAfterHealthFailure(dbPath string) bool {
-	dsn := dbPath + "?_journal_mode=WAL"
-	db, err := sql.Open("sqlite", dsn)
+	// Read-only sanity check - no WAL/pragma tuning needed here (and
+	// modernc.org/sqlite doesn't recognize the mattn-style _journal_mode=
+	// DSN param anyway, see database.Open).
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return true
 	}

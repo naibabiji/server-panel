@@ -9,12 +9,13 @@
         </div>
     </div>
     <div class="overflow-x-auto mb-6">
-        <div class="border border-[#2a3038] bg-[#171b21]" style="display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));min-width:760px;">
+        <div class="border border-[#2a3038] bg-[#171b21]" style="display:grid;grid-template-columns:repeat(6,minmax(140px,1fr));min-width:900px;">
             <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">服务器总数</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1" x-text="stats.total_servers" x-show="!loading">0</div></div>
             <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">网站总数</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-purple-300" x-text="stats.total_websites" x-show="!loading">0</div></div>
             <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">Agent 在线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-green-400" x-text="stats.online_count" x-show="!loading">0</div></div>
             <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">Agent 离线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-red-400" x-text="stats.offline_count" x-show="!loading">0</div></div>
-            <div class="p-5"><div class="text-sm text-gray-400">30 天内到期</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count" x-show="!loading">0</div></div>
+            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">30 天内到期</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count" x-show="!loading">0</div></div>
+            <div class="p-5"><div class="text-sm text-gray-400">已到期未处理</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-red-500" x-text="stats.overdue_count" x-show="!loading">0</div></div>
         </div>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] mb-6" x-show="httpProbeIssues.length">
@@ -32,6 +33,40 @@
                 </a>
             </template>
         </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6" x-show="!loading && (expiring.overdue_servers.length || expiring.overdue_websites.length)">
+        <section class="border border-red-900 bg-[#171b21]">
+            <div class="px-5 py-4 border-b border-red-900 bg-[#181e26] text-sm font-semibold text-red-400">已到期未处理的服务器</div>
+            <div class="p-5">
+                <template x-for="item in expiring.overdue_servers" :key="'overdue-server-'+item.id">
+                    <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="text-sm text-gray-100" x-text="item.name"></div>
+                                <div class="text-xs text-gray-500" x-text="'到期日：' + item.expiry_date"></div>
+                            </div>
+                            <div class="text-sm text-red-500" x-text="daysText(item.days_left)"></div>
+                        </div>
+                    </a>
+                </template>
+            </div>
+        </section>
+        <section class="border border-red-900 bg-[#171b21]">
+            <div class="px-5 py-4 border-b border-red-900 bg-[#181e26] text-sm font-semibold text-red-400">已到期未处理的网站</div>
+            <div class="p-5">
+                <template x-for="item in expiring.overdue_websites" :key="'overdue-website-'+item.id">
+                    <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="text-sm text-gray-100" x-text="item.name"></div>
+                                <div class="text-xs text-gray-500" x-text="websiteMeta(item)"></div>
+                            </div>
+                            <div class="text-sm text-red-500" x-text="daysText(item.days_left)"></div>
+                        </div>
+                    </a>
+                </template>
+            </div>
+        </section>
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <section class="border border-[#2a3038] bg-[#171b21]">
@@ -141,8 +176,8 @@
 function dashboardPage() {
     return {
         loading: true,
-        stats: { total_servers: 0, total_websites: 0, online_count: 0, offline_count: 0, expiring_count: 0 },
-        expiring: { servers: [], websites: [] },
+        stats: { total_servers: 0, total_websites: 0, online_count: 0, offline_count: 0, expiring_count: 0, overdue_count: 0 },
+        expiring: { servers: [], websites: [], overdue_servers: [], overdue_websites: [] },
         httpProbeIssues: [],
         alerts: [],
         panelUpdate: { hasUpdate: false, latestVersion: '' },
@@ -159,9 +194,11 @@ function dashboardPage() {
                 } catch(e) {} })(),
                 (async () => { try {
                     const d = await api('/api/dashboard/expiring');
-                    this.expiring = d.data || { servers: [], websites: [] };
+                    this.expiring = d.data || {};
                     this.expiring.servers = this.expiring.servers || [];
                     this.expiring.websites = this.expiring.websites || [];
+                    this.expiring.overdue_servers = this.expiring.overdue_servers || [];
+                    this.expiring.overdue_websites = this.expiring.overdue_websites || [];
                 } catch(e) {} })(),
                 (async () => { try {
                     const d = await api('/api/dashboard/http-probe-issues');
@@ -188,7 +225,8 @@ function dashboardPage() {
             return (document.body.dataset.panelPrefix || '') + path;
         },
         daysText(days) {
-            if (days <= 0) return '今天到期';
+            if (days < 0) return '已过期 ' + (-days) + ' 天';
+            if (days === 0) return '今天到期';
             return days + ' 天';
         },
         websiteMeta(item) {

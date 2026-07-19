@@ -439,19 +439,24 @@ func (h *ServerHandler) Delete(c *gin.Context) {
 }
 
 func (h *ServerHandler) GetStats(c *gin.Context) {
-	var total, online, offline, expiring int
+	var total, online, offline, expiring, overdue int
 	h.DB.QueryRow("SELECT COUNT(*) FROM servers").Scan(&total)
 	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE is_online = 1").Scan(&online)
 	h.DB.QueryRow(`SELECT COUNT(*) FROM servers
 		WHERE is_online = 0 AND status = 'active'
 		AND (agent_version != '' OR last_seen_at IS NOT NULL)`).Scan(&offline)
-	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date <= date('now','+30 days') AND expiry_date >= date('now') AND status = 'active'").Scan(&expiring)
+	// Same "expiring"/"overdue" split as /api/dashboard/stats - expiring is
+	// the next-30-days window, overdue is already past expiry_date and
+	// still active (not yet renewed/handled).
+	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date >= date('now') AND expiry_date <= date('now','+30 days') AND status = 'active'").Scan(&expiring)
+	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date < date('now') AND status = 'active'").Scan(&overdue)
 
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]int{
 		"total":    total,
 		"online":   online,
 		"offline":  offline,
 		"expiring": expiring,
+		"overdue":  overdue,
 	}))
 }
 

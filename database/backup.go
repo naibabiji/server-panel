@@ -42,8 +42,10 @@ func VerifyDBBackup(path string) error {
 	if _, err := os.Stat(path); err != nil {
 		return fmt.Errorf("backup file not found: %w", err)
 	}
-	dsn := path + "?_journal_mode=WAL"
-	db, err := sql.Open("sqlite", dsn)
+	// Read-only single-connection integrity check - no WAL/pragma tuning
+	// needed here (and modernc.org/sqlite doesn't recognize the mattn-style
+	// _journal_mode= DSN param anyway, see database.Open).
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return fmt.Errorf("failed to open backup: %w", err)
 	}
