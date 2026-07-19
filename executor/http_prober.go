@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/naibabiji/server-panel/database"
@@ -70,22 +71,48 @@ func runProbe() {
 		}
 	}
 
+	probeServers(db, serverIDs, timeoutSec)
+}
+
+// probeConcurrency bounds how many sites are actually being checked at
+// once. Each checkDomain call can now take up to
+// probeRetryAttempts*timeoutSec + (probeRetryAttempts-1)*retryDelay in the
+// worst case (a real outage), and runProbe used to walk serverIDs one at a
+// time - with several genuinely-down sites in one cycle that serial walk
+// could stretch past the probe interval itself, delaying detection for
+// whichever sites happened to sort last. Probing with bounded concurrency
+// keeps one round's total time close to the single slowest site instead of
+// the sum of all of them.
+const probeConcurrency = 8
+
+func probeServers(db *sql.DB, serverIDs []int64, timeoutSec int) {
 	now := timeutil.NowDisplay()
+	sem := make(chan struct{}, probeConcurrency)
+	var wg sync.WaitGroup
+
 	for _, serverID := range serverIDs {
 		domain := pickRandomDomain(db, serverID)
 		if domain == "" {
 			continue
 		}
 
-		healthy, errMsg := checkDomain(domain, timeoutSec)
-		if healthy {
-			_, _ = db.Exec(`UPDATE servers SET http_probe_healthy = 1, http_probe_last_at = ?, http_probe_last_error = '' WHERE id = ?`,
-				now, serverID)
-		} else {
-			_, _ = db.Exec(`UPDATE servers SET http_probe_healthy = 0, http_probe_last_at = ?, http_probe_last_error = ? WHERE id = ?`,
-				now, errMsg, serverID)
-		}
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(serverID int64, domain string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			healthy, errMsg := checkDomain(domain, timeoutSec)
+			if healthy {
+				_, _ = db.Exec(`UPDATE servers SET http_probe_healthy = 1, http_probe_last_at = ?, http_probe_last_error = '' WHERE id = ?`,
+					now, serverID)
+			} else {
+				_, _ = db.Exec(`UPDATE servers SET http_probe_healthy = 0, http_probe_last_at = ?, http_probe_last_error = ? WHERE id = ?`,
+					now, errMsg, serverID)
+			}
+		}(serverID, domain)
 	}
+	wg.Wait()
 }
 
 func pickRandomDomain(db *sql.DB, serverID int64) string {
@@ -108,12 +135,47 @@ func pickRandomDomain(db *sql.DB, serverID int64) string {
 	return domains[rand.Intn(len(domains))]
 }
 
+// probeRetryAttempts/defaultProbeRetryDelay bound a single checkDomain call: a lone
+// slow/failed response (WAF challenge, momentary network blip, a busy
+// origin taking a few extra seconds) is common and not by itself evidence
+// the site is actually down, but until now a single miss immediately
+// flipped http_probe_healthy to false and fired the "HTTP 探测异常" alert.
+// Requiring every attempt in one probe cycle to fail before declaring the
+// site unhealthy cuts that false-positive rate without needing a schema
+// change to track failures across cycles.
+const probeRetryAttempts = 3
+
+var defaultProbeRetryDelay = 3 * time.Second
+
 func checkDomain(domain string, timeoutSec int) (bool, string) {
+	return checkDomainWithRetryDelay(domain, timeoutSec, defaultProbeRetryDelay)
+}
+
+// checkDomainWithRetryDelay takes retryDelay as a parameter (rather than
+// reading a shared package var) so it stays safe if probing is ever made
+// concurrent, and so tests can shrink the delay without touching shared
+// state that could race with t.Parallel() or a concurrent probe run.
+func checkDomainWithRetryDelay(domain string, timeoutSec int, retryDelay time.Duration) (bool, string) {
 	target, err := normalizeProbeURL(domain)
 	if err != nil {
 		return false, err.Error()
 	}
 
+	var lastErr string
+	for attempt := 1; attempt <= probeRetryAttempts; attempt++ {
+		healthy, errMsg := probeOnce(target, timeoutSec)
+		if healthy {
+			return true, ""
+		}
+		lastErr = errMsg
+		if attempt < probeRetryAttempts {
+			time.Sleep(retryDelay)
+		}
+	}
+	return false, lastErr
+}
+
+func probeOnce(target string, timeoutSec int) (bool, string) {
 	client := &http.Client{
 		Timeout: time.Duration(timeoutSec) * time.Second,
 		Transport: &http.Transport{
