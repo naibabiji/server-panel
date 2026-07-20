@@ -35,6 +35,7 @@ func Report(centerURL, apiKey, version string, snapshot *MetricSnapshot, skipVer
 
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: skipVerify},
+		DialContext:     resilientDialContext(),
 	}
 	client := &http.Client{
 		Transport: transport,

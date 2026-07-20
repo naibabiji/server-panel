@@ -238,11 +238,15 @@ function serverDetail() {
         },
         monitorStatusText() {
             if (!this.hasAgent()) return '未安装监控';
-            return this.s.is_online ? '● 在线' : '○ 未知';
+            const st = serverStatus(this.s);
+            return (st.label === '在线' ? '● ' : '○ ') + st.label;
         },
         monitorStatusClass() {
             if (!this.hasAgent()) return 'text-gray-400';
-            return this.s.is_online ? 'text-green-400' : 'text-yellow-400';
+            const cls = serverStatus(this.s).cls;
+            if (cls === 'badge-success') return 'text-green-400';
+            if (cls === 'badge-danger') return 'text-red-400';
+            return 'text-yellow-400';
         },
         serverTypeText() {
             return ({vps:'VPS', dedicated:'独立服务器', shared:'虚拟主机', other:'其他'}[this.s.server_type]) || this.s.server_type || '--';

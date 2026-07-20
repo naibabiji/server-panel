@@ -313,12 +313,35 @@ func checkDiskAlerts(db *sql.DB) {
 	resolveInactiveAlerts(db, "disk_high", activeTargets)
 }
 
+// reachabilityFreshnessWindow bounds how old a TCP reachability check
+// (executor/reachability.go, tcp_reachable_checked_at) may be before
+// checkOfflineAlerts trusts it. Without this, an ancient check result -
+// left over from a previous, unrelated outage, or from before the reachability
+// checker ever ran for this server - could otherwise get treated as
+// evidence about right now.
+const reachabilityFreshnessWindow = "-10 minutes"
+
+// checkOfflineAlerts fires on a lost Agent heartbeat (is_online = 0 for
+// longer than the configured threshold), but a lost heartbeat alone doesn't
+// mean the server is actually down - the Agent process, its DNS resolution,
+// or its own outbound network can break while the server keeps serving
+// traffic fine. It cross-checks the independent TCP reachability signal
+// (executor/reachability.go, tcp_reachable) to tell the two apart: only a
+// server with a *fresh, post-heartbeat-loss* confirmation that it's also
+// TCP-unreachable gets the critical "server_offline" alert. Everything else -
+// confirmed still-reachable, not yet checked, or a check too stale/old to
+// trust - gets the lower severity "agent_offline" alert instead, so an
+// unconfirmed guess is never the thing that pages someone about a server
+// outage that might not be happening. "agent_offline" shares server_offline's
+// threshold/enabled flag (there's no separate rule to configure) and, via
+// createAlertUsingRule, its notification routing too.
 func checkOfflineAlerts(db *sql.DB) {
 	rows, err := db.Query("SELECT threshold_value FROM alert_rules WHERE alert_type = 'server_offline' AND enabled = 1")
 	if err != nil {
 		return
 	}
-	activeTargets := make(map[alertTarget]bool)
+	offlineTargets := make(map[alertTarget]bool)
+	agentOfflineTargets := make(map[alertTarget]bool)
 
 	var thresholds []float64
 	for rows.Next() {
@@ -335,24 +358,49 @@ func checkOfflineAlerts(db *sql.DB) {
 		}
 
 		minutes := int(threshold)
+		// tcp_reachable is only trusted (non-NULL in the result) when its
+		// check ran after this outage started (checked_at > last_seen_at)
+		// and recently enough (checked_at within reachabilityFreshnessWindow)
+		// - otherwise the CASE forces NULL, which the loop below treats the
+		// same as "not yet confirmed".
 		sRows, err := db.Query(
-			`SELECT id, name FROM servers WHERE is_online = 0 AND status = 'active'
+			`SELECT id, name,
+			   CASE WHEN tcp_reachable_checked_at IS NOT NULL
+			             AND tcp_reachable_checked_at > last_seen_at
+			             AND tcp_reachable_checked_at >= datetime('now', ?)
+			        THEN tcp_reachable
+			        ELSE NULL
+			   END
+			 FROM servers WHERE is_online = 0 AND status = 'active'
 			 AND last_seen_at IS NOT NULL AND last_seen_at < datetime('now', ? || ' minutes')`,
-			strconv.Itoa(-minutes))
+			reachabilityFreshnessWindow, strconv.Itoa(-minutes))
 		if err != nil {
 			continue
 		}
 		for sRows.Next() {
 			var id int64
 			var name string
-			sRows.Scan(&id, &name)
-			activeTargets[alertTarget{serverID: id}] = true
-			createAlert(db, "server_offline", &id, nil, "critical",
-				fmt.Sprintf("服务器 %s 已离线超过 %d 分钟", name, minutes))
+			var confirmedReachable sql.NullInt64
+			sRows.Scan(&id, &name, &confirmedReachable)
+
+			if confirmedReachable.Valid && confirmedReachable.Int64 == 0 {
+				offlineTargets[alertTarget{serverID: id}] = true
+				createAlert(db, "server_offline", &id, nil, "critical",
+					fmt.Sprintf("服务器 %s 已离线超过 %d 分钟", name, minutes))
+				continue
+			}
+
+			agentOfflineTargets[alertTarget{serverID: id}] = true
+			message := fmt.Sprintf("服务器 %s 的 Agent 探针已失联超过 %d 分钟，服务器网络可达性尚未确认（请检查探针进程/DNS/出站网络，或等待面板下一轮网络探测）", name, minutes)
+			if confirmedReachable.Valid {
+				message = fmt.Sprintf("服务器 %s 的 Agent 探针已失联超过 %d 分钟，但服务器网络仍可达（请检查探针进程/DNS/出站网络）", name, minutes)
+			}
+			createAlertUsingRule(db, "agent_offline", "server_offline", &id, nil, "warning", message)
 		}
 		sRows.Close()
 	}
-	resolveInactiveAlerts(db, "server_offline", activeTargets)
+	resolveInactiveAlerts(db, "server_offline", offlineTargets)
+	resolveInactiveAlerts(db, "agent_offline", agentOfflineTargets)
 }
 
 func alertTypeToLabel(t string) string {
@@ -369,6 +417,18 @@ func alertTypeToLabel(t string) string {
 }
 
 func createAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64, level, message string) {
+	createAlertUsingRule(db, alertType, alertType, serverID, websiteID, level, message)
+}
+
+// createAlertUsingRule is like createAlert but looks up notification routing
+// (notify_user/notify_email) under ruleType instead of alertType. This is
+// for alert types that are a derived/secondary flavor of another type that's
+// the one actually configurable in Settings - "agent_offline" (alert_checker.go's
+// checkOfflineAlerts) doesn't get its own alert_rules row, and is meant to
+// share the routing configured on its source "server_offline" rule rather
+// than silently falling back to the admin default because a lookup under
+// "agent_offline" never matches anything.
+func createAlertUsingRule(db *sql.DB, alertType, ruleType string, serverID *int64, websiteID *int64, level, message string) {
 	var count int
 	where, args := alertTargetWhere(alertType, serverID, websiteID)
 	_ = db.QueryRow(`SELECT COUNT(*) FROM alert_log WHERE `+where+` AND resolved = 0`, args...).Scan(&count)
@@ -383,7 +443,7 @@ func createAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64
 		return
 	}
 
-	notifyAlert(db, alertType, serverID, websiteID, message)
+	notifyAlertUsingRule(db, alertType, ruleType, serverID, websiteID, message)
 }
 
 // upsertAlert is like createAlert but, when an unresolved alert for the same
@@ -427,8 +487,16 @@ func upsertAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64
 }
 
 func notifyAlert(db *sql.DB, alertType string, serverID *int64, websiteID *int64, message string) {
+	notifyAlertUsingRule(db, alertType, alertType, serverID, websiteID, message)
+}
+
+// notifyAlertUsingRule sends the alert email(s), looking up notify_user/
+// notify_email routing under ruleType rather than alertType - see
+// createAlertUsingRule. alertType is kept for logging only, so a failed
+// send is still attributed to the alert that was actually created.
+func notifyAlertUsingRule(db *sql.DB, alertType, ruleType string, serverID *int64, websiteID *int64, message string) {
 	go func() {
-		for _, recipient := range alertRecipients(db, alertType, serverID, websiteID) {
+		for _, recipient := range alertRecipients(db, ruleType, serverID, websiteID) {
 			if err := SendMail(recipient, "Server Panel 告警", message); err != nil {
 				log.Printf("send alert email failed: recipient=%q type=%s server_id=%v website_id=%v: %v",
 					recipient, alertType, nullableID(serverID), nullableID(websiteID), err)

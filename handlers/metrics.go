@@ -23,6 +23,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		`SELECT s.id, s.name, s.ip_address, s.is_online, s.last_seen_at,
 		 COALESCE(s.provider_id, 0), COALESCE(p.name, ''),
 		 COALESCE(s.agent_version,''), s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at,
+		 s.tcp_reachable,
 		 m.cpu_percent, m.memory_percent, m.disk_percent, m.load_avg_1, m.uptime_seconds, m.recorded_at,
 		 m.net_rx_bytes, m.net_tx_bytes
 		 FROM servers s
@@ -54,6 +55,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		HTTPProbeEnabled int     `json:"http_probe_enabled"`
 		HTTPProbeHealthy *int    `json:"http_probe_healthy"`
 		HTTPProbeLastAt  string  `json:"http_probe_last_at"`
+		TCPReachable     *int    `json:"tcp_reachable"`
 		CPUPercent       float64 `json:"cpu_percent"`
 		MemoryPercent    float64 `json:"memory_percent"`
 		DiskPercent      float64 `json:"disk_percent"`
@@ -67,13 +69,14 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 	items := []OverviewItem{}
 	for rows.Next() {
 		var item OverviewItem
-		var probeHealthy sql.NullInt64
+		var probeHealthy, tcpReachable sql.NullInt64
 		var lastSeen, probeLast, agentVer, recorded sql.NullString
 		var cpu, mem, disk, load sql.NullFloat64
 		var uptime sql.NullInt64
 		var netRX, netTX sql.NullInt64
 		err := rows.Scan(&item.ID, &item.Name, &item.IPAddress, &item.IsOnline, &lastSeen,
 			&item.ProviderID, &item.ProviderName, &agentVer, &item.HTTPProbeEnabled, &probeHealthy, &probeLast,
+			&tcpReachable,
 			&cpu, &mem, &disk, &load, &uptime, &recorded,
 			&netRX, &netTX)
 		if err != nil {
@@ -83,6 +86,10 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		if probeHealthy.Valid {
 			v := int(probeHealthy.Int64)
 			item.HTTPProbeHealthy = &v
+		}
+		if tcpReachable.Valid {
+			v := int(tcpReachable.Int64)
+			item.TCPReachable = &v
 		}
 		if lastSeen.Valid {
 			item.LastSeenAt = lastSeen.String

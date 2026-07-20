@@ -27,6 +27,7 @@ func (h *AgentDataHandler) Uninstall(c *gin.Context) {
 		`UPDATE servers
 		 SET agent_api_key_hash = '', agent_api_key_enc = '',
 		     agent_version = '', last_seen_at = NULL, is_online = 0,
+		     tcp_reachable = NULL, tcp_reachable_checked_at = NULL,
 		     updated_at = CURRENT_TIMESTAMP
 		 WHERE id = ?`,
 		serverID,

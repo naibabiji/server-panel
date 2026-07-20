@@ -121,7 +121,7 @@ function alertRules() {
             if (['server_expiry','website_expiry'].includes(this.form.alert_type)) return '单位：天。资源到期日在该天数范围内时触发。';
             if (['cpu_high','memory_high'].includes(this.form.alert_type)) return '单位：百分比。需要配合连续采样次数判断，不是固定秒数或分钟数。';
             if (this.form.alert_type === 'disk_high') return '单位：百分比。当前代码按最新一次磁盘使用率判断。';
-            if (this.form.alert_type === 'server_offline') return '单位：分钟。服务器离线超过该时长后触发。';
+            if (this.form.alert_type === 'server_offline') return '单位：分钟。服务器离线超过该时长后触发；若面板 TCP 探测发现服务器网络仍可达，会改为触发级别更低的"探针失联"告警，而不是"服务器离线"。';
             return '';
         },
         thresholdStep() {

@@ -131,6 +131,7 @@ func main() {
 	executor.StartHostMetricsCollector(60 * time.Second)
 	executor.StartHTTPProber(5 * time.Minute)
 	executor.StartAgentOfflineChecker(60 * time.Second)
+	executor.StartReachabilityChecker(60 * time.Second)
 	executor.StartAlertChecker(60 * time.Second)
 	executor.StartDatabaseBackupScheduler(1 * time.Hour)
 	executor.StartAutoRenewalChecker(24 * time.Hour)

@@ -40,7 +40,7 @@
                     <td class="table-cell"><span class="badge-info" x-text="s.server_type"></span></td>
                     <td class="table-cell text-gray-400" x-text="s.panel_type == 'none' ? '--' : s.panel_type"></td>
                     <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></td>
-                    <td class="table-cell"><span :class="s.is_online ? 'text-green-400' : 'text-gray-500'" x-text="s.is_online ? '在线' : '未知'"></span></td>
+                    <td class="table-cell"><span :class="serverStatus(s).cls" x-text="serverStatus(s).label"></span></td>
                     <td class="table-cell" :class="expiryClass(s.expiry_date)" x-text="s.expiry_date || '--'"></td>
                     <td class="table-cell">
                         <div class="flex gap-2">

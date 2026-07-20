@@ -71,6 +71,37 @@ var upgrades = []Upgrade{
 			`ALTER TABLE providers ADD COLUMN private_notes_enc TEXT NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		Version:     "1.7.0",
+		Description: "Track TCP-level server reachability so a lost Agent heartbeat can be told apart from a genuinely unreachable server",
+		Func:        addTCPReachabilityColumns,
+	},
+}
+
+// addTCPReachabilityColumns checks column existence via columnExists rather
+// than relying on the "duplicate column name" string match RunUpgrades/
+// RunMigrations use elsewhere - that match is driver-error-text-dependent
+// and only reliable for statements that always run against a schema new
+// enough to already have every earlier upgrade applied. This is simpler to
+// just check directly.
+func addTCPReachabilityColumns() error {
+	columns := []struct{ name, ddl string }{
+		{"tcp_reachable", `ALTER TABLE servers ADD COLUMN tcp_reachable INTEGER`},
+		{"tcp_reachable_checked_at", `ALTER TABLE servers ADD COLUMN tcp_reachable_checked_at DATETIME`},
+	}
+	for _, col := range columns {
+		exists, err := columnExists("servers", col.name)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+		if _, err := DB.Exec(col.ddl); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func LatestVersion() string {

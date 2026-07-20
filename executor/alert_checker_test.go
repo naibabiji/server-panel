@@ -216,6 +216,89 @@ func TestCheckExpiryAlertsResolvesExistingAlertWhenRuleIsDisabled(t *testing.T) 
 	}
 }
 
+// Regression test: a server whose Agent heartbeat went silent but that is
+// still TCP-reachable must get the lower-severity "agent_offline" alert,
+// not "server_offline" - the two situations have very different causes
+// (probe/DNS/network on the box vs. the box itself being down) and mixing
+// them up sends whoever's paged chasing an outage that isn't happening.
+// Only a *fresh, post-heartbeat-loss* confirmed-unreachable TCP result may
+// produce the critical "server_offline" alert; anything unconfirmed (never
+// checked, or a check too old / predating this outage) must not.
+func TestCheckOfflineAlertsSplitsByTCPReachability(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, enabled) VALUES ('server_offline', 5, 1)`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, status, is_online, last_seen_at, tcp_reachable, tcp_reachable_checked_at)
+		VALUES (10, 'reachable-agent-down', 'active', 0, datetime('now', '-10 minutes'), 1, datetime('now', '-1 minutes'))`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, status, is_online, last_seen_at, tcp_reachable, tcp_reachable_checked_at)
+		VALUES (20, 'truly-offline', 'active', 0, datetime('now', '-10 minutes'), 0, datetime('now', '-1 minutes'))`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, status, is_online, last_seen_at, tcp_reachable, tcp_reachable_checked_at)
+		VALUES (30, 'not-yet-checked', 'active', 0, datetime('now', '-10 minutes'), NULL, NULL)`)
+	// tcp_reachable_checked_at predates last_seen_at: this "unreachable"
+	// result is left over from a previous outage, before the agent came
+	// back online and went silent again - it says nothing about the
+	// current outage and must not be trusted.
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, status, is_online, last_seen_at, tcp_reachable, tcp_reachable_checked_at)
+		VALUES (40, 'stale-check-predates-outage', 'active', 0, datetime('now', '-10 minutes'), 0, datetime('now', '-20 minutes'))`)
+	// tcp_reachable_checked_at is after last_seen_at (so it's about this
+	// outage) but older than reachabilityFreshnessWindow - too old to trust
+	// as a description of the server's reachability right now.
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, status, is_online, last_seen_at, tcp_reachable, tcp_reachable_checked_at)
+		VALUES (50, 'stale-check-too-old', 'active', 0, datetime('now', '-30 minutes'), 0, datetime('now', '-25 minutes'))`)
+
+	checkOfflineAlerts(db)
+
+	assertAlertType := func(serverID int64, wantType string, wantResolved int) {
+		t.Helper()
+		var alertType string
+		var resolved int
+		if err := db.QueryRow(`SELECT alert_type, resolved FROM alert_log WHERE server_id = ?`, serverID).Scan(&alertType, &resolved); err != nil {
+			t.Fatalf("query alert for server %d: %v", serverID, err)
+		}
+		if alertType != wantType {
+			t.Fatalf("server %d alert_type = %q, want %q", serverID, alertType, wantType)
+		}
+		if resolved != wantResolved {
+			t.Fatalf("server %d resolved = %d, want %d", serverID, resolved, wantResolved)
+		}
+	}
+
+	assertAlertType(10, "agent_offline", 0)
+	assertAlertType(20, "server_offline", 0)
+	assertAlertType(30, "agent_offline", 0)
+	assertAlertType(40, "agent_offline", 0)
+	assertAlertType(50, "agent_offline", 0)
+
+	// Once the agent starts reporting again and the TCP check confirms it,
+	// the "agent_offline" alert for server 10 must resolve rather than
+	// linger open.
+	execAlertSQL(t, db, `UPDATE servers SET is_online = 1, tcp_reachable = 1 WHERE id = 10`)
+	checkOfflineAlerts(db)
+	assertAlertType(10, "agent_offline", 1)
+}
+
+// Regression test: an alert_log row of alert_type "agent_offline" gets no
+// alert_rules row of its own (users only ever configure "server_offline" -
+// see checkOfflineAlerts), so its notification routing must be looked up
+// under "server_offline" instead of silently falling back to the admin
+// default because nothing matches "agent_offline".
+func TestAgentOfflineNotificationUsesServerOfflineRule(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO customers (id, email) VALUES (1, 'user@example.com')`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, customer_id, status) VALUES (10, 'server-1', 1, 'active')`)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, notify_user, notify_email, server_id, enabled) VALUES ('server_offline', 1, 'ops@example.com', 10, 1)`)
+
+	serverID := int64(10)
+	if got := alertRecipients(db, "agent_offline", &serverID, nil); len(got) != 1 || got[0] != "" {
+		t.Fatalf("lookup under agent_offline = %#v, want just the admin-default empty recipient (no rule of that type can ever exist)", got)
+	}
+
+	got := alertRecipients(db, "server_offline", &serverID, nil)
+	want := []string{"ops@example.com", "user@example.com"}
+	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] {
+		t.Fatalf("lookup under server_offline = %#v, want %#v", got, want)
+	}
+}
+
 func TestAlertRecipientsUseRuleEmailAndUserEmail(t *testing.T) {
 	db := newAlertTestDB(t)
 	execAlertSQL(t, db, `INSERT INTO customers (id, email) VALUES (1, 'user@example.com')`)
@@ -256,7 +339,9 @@ func newAlertTestDB(t *testing.T) *sql.DB {
 			last_seen_at DATETIME,
 			http_probe_enabled INTEGER NOT NULL DEFAULT 0,
 			http_probe_healthy INTEGER,
-			http_probe_last_error TEXT NOT NULL DEFAULT ''
+			http_probe_last_error TEXT NOT NULL DEFAULT '',
+			tcp_reachable INTEGER,
+			tcp_reachable_checked_at DATETIME
 		)`,
 		`CREATE TABLE websites (
 			id INTEGER PRIMARY KEY,

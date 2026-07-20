@@ -73,6 +73,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 		s.purchase_date, s.expiry_date, s.renewal_cycle, s.auto_renewal, s.purchase_price, s.currency,
 		s.status, s.agent_version, s.last_seen_at, s.is_online,
 		s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at, s.http_probe_last_error,
+		s.tcp_reachable, s.tcp_reachable_checked_at,
 		s.status_page_enabled, s.notes, s.created_at, s.updated_at
 		FROM servers s
 		LEFT JOIN customers u ON s.customer_id = u.id
@@ -90,14 +91,15 @@ func (h *ServerHandler) List(c *gin.Context) {
 	servers := []models.Server{}
 	for rows.Next() {
 		var s models.Server
-		var probeHealthy sql.NullInt64
-		var lastSeen, probeLast sql.NullString
+		var probeHealthy, tcpReachable sql.NullInt64
+		var lastSeen, probeLast, tcpReachableAt sql.NullString
 		err := rows.Scan(&s.ID, &s.Name, &s.IPAddress, &s.ServerType, &s.OS, &s.CustomerID, &s.CustomerName,
 			&s.CPUCores, &s.RAMGB, &s.DiskGB, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
 			&s.Location, &s.SSHPort, &s.SSHUsername, &s.PanelType, &s.PanelURL, &s.PanelUsername,
 			&s.PurchaseDate, &s.ExpiryDate, &s.RenewalCycle, &s.AutoRenewal, &s.PurchasePrice, &s.Currency,
 			&s.Status, &s.AgentVersion, &lastSeen, &s.IsOnline,
 			&s.HTTPProbeEnabled, &probeHealthy, &probeLast, &s.HTTPProbeLastError,
+			&tcpReachable, &tcpReachableAt,
 			&s.StatusPageEnabled, &s.Notes, &s.CreatedAt, &s.UpdatedAt)
 		if err != nil {
 			log.Printf("read server list row failed: %v", err)
@@ -113,6 +115,13 @@ func (h *ServerHandler) List(c *gin.Context) {
 		}
 		if probeLast.Valid {
 			s.HTTPProbeLastAt = probeLast.String
+		}
+		if tcpReachable.Valid {
+			v := int(tcpReachable.Int64)
+			s.TCPReachable = &v
+		}
+		if tcpReachableAt.Valid {
+			s.TCPReachableAt = tcpReachableAt.String
 		}
 		servers = append(servers, s)
 	}
@@ -144,8 +153,8 @@ func buildServerOrderBy(sort, order string) string {
 func (h *ServerHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	var s models.Server
-	var probeHealthy sql.NullInt64
-	var lastSeen, probeLast sql.NullString
+	var probeHealthy, tcpReachable sql.NullInt64
+	var lastSeen, probeLast, tcpReachableAt sql.NullString
 
 	err := h.DB.QueryRow(
 		`SELECT s.id, s.name, s.ip_address, s.server_type, s.os, s.customer_id, COALESCE(u.name,''),
@@ -154,6 +163,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 		s.panel_password_enc, s.purchase_date, s.expiry_date, s.renewal_cycle, s.auto_renewal, s.purchase_price, s.currency,
 		s.status, s.agent_api_key_enc, s.agent_version, s.last_seen_at, s.is_online,
 		s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at, s.http_probe_last_error,
+		s.tcp_reachable, s.tcp_reachable_checked_at,
 		s.status_page_enabled, s.status_page_token, s.notes, s.created_at, s.updated_at
 		FROM servers s
 		LEFT JOIN customers u ON s.customer_id = u.id
@@ -165,6 +175,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 		&s.PanelPasswordEnc, &s.PurchaseDate, &s.ExpiryDate, &s.RenewalCycle, &s.AutoRenewal, &s.PurchasePrice, &s.Currency,
 		&s.Status, &s.AgentAPIKeyEnc, &s.AgentVersion, &lastSeen, &s.IsOnline,
 		&s.HTTPProbeEnabled, &probeHealthy, &probeLast, &s.HTTPProbeLastError,
+		&tcpReachable, &tcpReachableAt,
 		&s.StatusPageEnabled, &s.StatusPageToken, &s.Notes, &s.CreatedAt, &s.UpdatedAt)
 	if err != nil {
 		log.Printf("read server detail failed: id=%s: %v", id, err)
@@ -180,6 +191,13 @@ func (h *ServerHandler) Get(c *gin.Context) {
 	}
 	if probeLast.Valid {
 		s.HTTPProbeLastAt = probeLast.String
+	}
+	if tcpReachable.Valid {
+		v := int(tcpReachable.Int64)
+		s.TCPReachable = &v
+	}
+	if tcpReachableAt.Valid {
+		s.TCPReachableAt = tcpReachableAt.String
 	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(s))
@@ -243,6 +261,7 @@ func (h *ServerHandler) RegenerateAgentKey(c *gin.Context) {
 		`UPDATE servers
 		 SET agent_api_key_hash = ?, agent_api_key_enc = '',
 		     agent_version = '', last_seen_at = NULL, is_online = 0,
+		     tcp_reachable = NULL, tcp_reachable_checked_at = NULL,
 		     updated_at = CURRENT_TIMESTAMP
 		 WHERE id = ?`,
 		agentKeyHashStr, id,
@@ -267,6 +286,7 @@ func (h *ServerHandler) PrepareAgentUninstall(c *gin.Context) {
 		`UPDATE servers
 		 SET agent_api_key_hash = '', agent_api_key_enc = '',
 		     agent_version = '', last_seen_at = NULL, is_online = 0,
+		     tcp_reachable = NULL, tcp_reachable_checked_at = NULL,
 		     updated_at = CURRENT_TIMESTAMP
 		 WHERE id = ?`,
 		id,

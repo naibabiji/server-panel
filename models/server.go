@@ -90,6 +90,8 @@ type Server struct {
 	HTTPProbeHealthy   *int    `json:"http_probe_healthy"`
 	HTTPProbeLastAt    string  `json:"http_probe_last_at"`
 	HTTPProbeLastError string  `json:"http_probe_last_error"`
+	TCPReachable       *int    `json:"tcp_reachable"`
+	TCPReachableAt     string  `json:"tcp_reachable_checked_at"`
 	StatusPageEnabled  int     `json:"status_page_enabled"`
 	StatusPageToken    string  `json:"status_page_token"`
 	StatusPagePassword string  `json:"-"`

@@ -402,6 +402,20 @@ function formatUptime(seconds) {
     return parts.join(' ') || '<1m';
 }
 
+// serverStatus() unifies the "在线/探针异常/离线/未知" reading of a server
+// row across monitor/server_list/server_detail: is_online alone can't tell
+// "the Agent stopped reporting" apart from "the server is actually down" -
+// tcp_reachable (executor/reachability.go's TCP dial to 80/443/ssh_port)
+// is the independent signal that does. tcp_reachable is null until the
+// panel's reachability checker has run at least once for a server that's
+// currently offline, hence the '未知' fallback for that case.
+function serverStatus(s) {
+    if (s.is_online) return { label: '在线', cls: 'badge-success' };
+    if (s.tcp_reachable === 1) return { label: '探针异常', cls: 'badge-warning' };
+    if (s.tcp_reachable === 0) return { label: '离线', cls: 'badge-danger' };
+    return { label: '未知', cls: 'badge-warning' };
+}
+
 function showToast(message, type = 'info') {
     const colors = {
         success: 'background:#065f46;border-color:#059669;color:#a7f3d0;',

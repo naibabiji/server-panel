@@ -74,6 +74,8 @@ var migrations = []string{
 		http_probe_healthy    INTEGER,
 		http_probe_last_at    DATETIME,
 		http_probe_last_error TEXT NOT NULL DEFAULT '',
+		tcp_reachable         INTEGER,
+		tcp_reachable_checked_at DATETIME,
 		status_page_enabled   INTEGER NOT NULL DEFAULT 0,
 		status_page_token     TEXT NOT NULL DEFAULT '',
 		status_page_password  TEXT NOT NULL DEFAULT '',
