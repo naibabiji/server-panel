@@ -55,7 +55,7 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 		RecordOperationLog("database_backup", trigger, "failed", err.Error())
 		return result, err
 	}
-	dbPath, err := database.BackupDatabase(dir)
+	dbPath, err := database.BackupDatabaseForUserArchive(dir)
 	if err != nil {
 		setBackupStatus("failed", "", err.Error())
 		RecordOperationLog("database_backup", trigger, "failed", err.Error())

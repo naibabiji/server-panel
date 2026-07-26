@@ -3,10 +3,72 @@ package database
 import (
 	"archive/tar"
 	"compress/gzip"
+	"database/sql"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+func TestBackupDatabaseForUserArchiveExcludesMonitoringHistory(t *testing.T) {
+	dir := t.TempDir()
+	livePath := filepath.Join(dir, "live.db")
+	liveDB, err := sql.Open("sqlite", livePath)
+	if err != nil {
+		t.Fatalf("open live db: %v", err)
+	}
+	t.Cleanup(func() { _ = liveDB.Close() })
+	for _, stmt := range []string{
+		"CREATE TABLE metrics (id INTEGER PRIMARY KEY, value REAL)",
+		"CREATE TABLE host_metrics (id INTEGER PRIMARY KEY, value REAL)",
+		"CREATE TABLE settings (skey TEXT PRIMARY KEY, svalue TEXT)",
+		"INSERT INTO metrics VALUES (1, 12.5)",
+		"INSERT INTO host_metrics VALUES (1, 25.5)",
+		"INSERT INTO settings VALUES ('site_name', 'example')",
+	} {
+		if _, err := liveDB.Exec(stmt); err != nil {
+			t.Fatalf("seed live db with %q: %v", stmt, err)
+		}
+	}
+
+	oldDB := DB
+	DB = liveDB
+	t.Cleanup(func() { DB = oldDB })
+
+	backupPath, err := BackupDatabaseForUserArchive(filepath.Join(dir, "backups"))
+	if err != nil {
+		t.Fatalf("BackupDatabaseForUserArchive: %v", err)
+	}
+
+	backupDB, err := sql.Open("sqlite", backupPath)
+	if err != nil {
+		t.Fatalf("open backup db: %v", err)
+	}
+	defer backupDB.Close()
+
+	for _, table := range []string{"metrics", "host_metrics"} {
+		var count int
+		if err := backupDB.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&count); err != nil {
+			t.Fatalf("count backup table %s: %v", table, err)
+		}
+		if count != 0 {
+			t.Errorf("backup table %s has %d rows, want 0", table, count)
+		}
+		if err := liveDB.QueryRow("SELECT COUNT(*) FROM " + table).Scan(&count); err != nil {
+			t.Fatalf("count live table %s: %v", table, err)
+		}
+		if count != 1 {
+			t.Errorf("live table %s has %d rows, want 1", table, count)
+		}
+	}
+
+	var siteName string
+	if err := backupDB.QueryRow("SELECT svalue FROM settings WHERE skey = 'site_name'").Scan(&siteName); err != nil {
+		t.Fatalf("read business data from backup: %v", err)
+	}
+	if siteName != "example" {
+		t.Errorf("backup site_name = %q, want %q", siteName, "example")
+	}
+}
 
 func TestFullBackupArchiveRoundTrip(t *testing.T) {
 	srcDir := t.TempDir()

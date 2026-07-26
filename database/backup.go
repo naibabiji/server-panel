@@ -36,6 +36,48 @@ func BackupDatabase(dir string) (string, error) {
 	return backupPath, nil
 }
 
+// BackupDatabaseForUserArchive creates a restore-ready snapshot without
+// high-volume monitoring history. The live database is never modified, and
+// the metrics tables remain present in the snapshot so collection resumes
+// normally after a restore.
+func BackupDatabaseForUserArchive(dir string) (string, error) {
+	backupPath, err := BackupDatabase(dir)
+	if err != nil {
+		return "", err
+	}
+	if err := removeMonitoringHistory(backupPath); err != nil {
+		_ = os.Remove(backupPath)
+		return "", fmt.Errorf("failed to remove monitoring history from backup: %w", err)
+	}
+	return backupPath, nil
+}
+
+func removeMonitoringHistory(path string) error {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	for _, table := range []string{"metrics", "host_metrics"} {
+		if _, err := tx.Exec("DELETE FROM " + table); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if _, err := db.Exec("VACUUM"); err != nil {
+		return err
+	}
+	return nil
+}
+
 // VerifyDBBackup opens a backup file independently and runs an integrity
 // check, so a corrupt backup is caught before it's ever relied on.
 func VerifyDBBackup(path string) error {
