@@ -158,8 +158,8 @@ function websiteForm() {
                 if (!this.form.domain) { showToast('域名不能为空','error'); this.saving=false; return; }
                 if (!this.form.server_id) { showToast('请选择服务器','error'); this.saving=false; return; }
                 const payload = { ...this.form };
-                payload.server_id = parseInt(payload.server_id) || 0;
-                payload.customer_id = payload.customer_id ? parseInt(payload.customer_id) : null;
+                payload.server_id = parseInt(payload.server_id, 10) || 0;
+                payload.customer_id = payload.customer_id ? parseInt(payload.customer_id, 10) : null;
                 if (!payload.panel_password) delete payload.panel_password;
                 const method = this.isEdit ? 'PUT' : 'POST';
                 const url = this.isEdit ? '/api/websites/'+this.id : '/api/websites';
