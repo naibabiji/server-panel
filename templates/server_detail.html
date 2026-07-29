@@ -307,7 +307,7 @@ function serverDetail() {
             return (document.body.dataset.panelPrefix || '') + '/customers/' + w.customer_id;
         },
         websiteCreateURL() {
-            return (document.body.dataset.panelPrefix || '') + '/websites/new';
+            return (document.body.dataset.panelPrefix || '') + '/websites/new?server_id=' + (this.s.id || '');
         },
         externalURL(domain) {
             if (!domain) return '#';

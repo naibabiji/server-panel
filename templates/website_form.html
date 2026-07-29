@@ -100,6 +100,15 @@ function websiteForm() {
             if (this.id) {
                 await this.load();
                 this.loading = false;
+            } else {
+                // 从服务器详情页跳转过来时，自动预选所属服务器
+                const serverID = parseInt(new URLSearchParams(window.location.search).get('server_id'));
+                if (serverID) {
+                    this.form.server_id = serverID;
+                    if (!this.servers.some(s => s.id === serverID)) {
+                        this.servers = [{id: serverID, name: '服务器 #'+serverID}, ...this.servers];
+                    }
+                }
             }
         },
         async load() {
