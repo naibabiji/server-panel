@@ -102,7 +102,7 @@ function websiteForm() {
                 this.loading = false;
             } else {
                 // 从服务器详情页跳转过来时，自动预选所属服务器
-                const serverID = parseInt(new URLSearchParams(window.location.search).get('server_id'));
+                const serverID = parseInt(new URLSearchParams(window.location.search).get('server_id'), 10);
                 if (serverID) {
                     this.form.server_id = serverID;
                     if (!this.servers.some(s => s.id === serverID)) {
