@@ -28,12 +28,13 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		 m.net_rx_bytes, m.net_tx_bytes
 		 FROM servers s
 		 LEFT JOIN providers p ON s.provider_id = p.id
-		 LEFT JOIN (
-		     SELECT server_id, cpu_percent, memory_percent, disk_percent, load_avg_1, uptime_seconds, recorded_at,
-		            net_rx_bytes, net_tx_bytes,
-		            ROW_NUMBER() OVER (PARTITION BY server_id ORDER BY recorded_at DESC) rn
-		     FROM metrics
-		 ) m ON s.id = m.server_id AND m.rn = 1
+		 LEFT JOIN metrics m ON m.id = (
+		     SELECT m2.id
+		     FROM metrics m2
+		     WHERE m2.server_id = s.id
+		     ORDER BY m2.recorded_at DESC, m2.id DESC
+		     LIMIT 1
+		 )
 		 WHERE s.agent_version != '' OR s.last_seen_at IS NOT NULL OR m.recorded_at IS NOT NULL
 		 ORDER BY COALESCE(p.name, '未设置'), s.name`)
 	if err != nil {

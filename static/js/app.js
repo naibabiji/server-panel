@@ -49,8 +49,8 @@ function apiCacheInvalidate(path) {
     if (path === '/api/settings/os-list') apiCacheDropPrefix('/api/settings/os-list');
     else if (path === '/api/settings/site-type-list') apiCacheDropPrefix('/api/settings/site-type-list');
     else if (path.indexOf('/api/customers') === 0) { apiCacheDropPrefix('/api/customers'); apiCacheDropPrefix('/api/servers'); apiCacheDropPrefix('/api/websites'); }
-    else if (path.indexOf('/api/providers') === 0) { apiCacheDropPrefix('/api/providers'); apiCacheDropPrefix('/api/servers'); }
-    else if (path.indexOf('/api/servers') === 0) { apiCacheDropPrefix('/api/servers'); apiCacheDropPrefix('/api/websites'); }
+    else if (path.indexOf('/api/providers') === 0) { apiCacheDropPrefix('/api/providers'); apiCacheDropPrefix('/api/servers'); apiCacheDropPrefix('/api/monitor/overview'); }
+    else if (path.indexOf('/api/servers') === 0) { apiCacheDropPrefix('/api/servers'); apiCacheDropPrefix('/api/websites'); apiCacheDropPrefix('/api/monitor/overview'); }
     else if (path.indexOf('/api/websites') === 0) apiCacheDropPrefix('/api/websites');
 }
 
@@ -69,8 +69,9 @@ async function cachedApi(path, options = {}, cacheOpts = {}) {
 }
 
 const PREFETCH_DELAY_MS = 120;
-const PREFETCH_PAGE_PATHS = new Set(['/', '/servers', '/websites', '/customers', '/providers', '/settings']);
+const PREFETCH_PAGE_PATHS = new Set(['/', '/monitor', '/servers', '/websites', '/customers', '/providers', '/settings']);
 const PREFETCH_API_GROUPS = {
+    'monitor-overview': [{ path: '/api/monitor/overview', ttl: API_CACHE_TTL_LIST }],
     'servers-list': [{ path: '/api/servers?search=&status=&page=1&page_size=30', ttl: API_CACHE_TTL_LIST }],
     'websites-list': [{ path: '/api/websites?search=&server_id=&page=1&page_size=30', ttl: API_CACHE_TTL_LIST }],
     'customers-list': [{ path: '/api/customers?search=&page=1&page_size=30', ttl: API_CACHE_TTL_STABLE_LIST }],

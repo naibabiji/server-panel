@@ -27,6 +27,10 @@
         </table>
     </div>
 
+    <div class="text-center text-gray-500 py-12" x-show="loading && servers.length==0">
+        正在加载性能数据...
+    </div>
+
     <div class="text-center text-gray-500 py-12" x-show="!loading && servers.length==0">
         暂无服务器性能数据。<br>请为服务器安装 Agent 探针后刷新。
     </div>
@@ -38,7 +42,7 @@ function monitorPage() {
         async fetch() {
             this.loading = true;
             try {
-                const d = await api('/api/monitor/overview');
+                const d = await cachedApi('/api/monitor/overview', {}, { ttl: API_CACHE_TTL_LIST });
                 this.servers = d.data || [];
                 this.lastUpdate = fmtTime(new Date().toISOString());
             } catch(e) {}
