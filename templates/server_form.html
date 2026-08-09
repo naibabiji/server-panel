@@ -295,7 +295,7 @@ function serverForm() {
                 const d = await api(url, {method, body:payload});
                 this.done = true;
                 showToast('保存成功','success');
-                const target = !this.isEdit && d.data && d.data.id ? '/servers/' + d.data.id : '/servers';
+                const target = this.isEdit ? '/servers/' + this.id : (d.data && d.data.id ? '/servers/' + d.data.id : '/servers');
                 setTimeout(() => location.href = document.body.dataset.panelPrefix + target, 500);
             } catch(e) { showToast(e.message,'error'); }
             this.saving = false;

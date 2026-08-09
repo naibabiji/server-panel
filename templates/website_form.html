@@ -165,7 +165,8 @@ function websiteForm() {
                 const url = this.isEdit ? '/api/websites/'+this.id : '/api/websites';
                 await api(url, {method, body: payload});
                 showToast('保存成功','success');
-                setTimeout(() => location.href = document.body.dataset.panelPrefix+'/websites', 500);
+                const target = this.isEdit ? '/websites/' + this.id : '/websites';
+                setTimeout(() => location.href = document.body.dataset.panelPrefix + target, 500);
             } catch(e) { showToast(e.message,'error'); }
             this.saving = false;
         }

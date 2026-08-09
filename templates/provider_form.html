@@ -57,7 +57,8 @@ function providerForm() {
                 const url = this.isEdit ? '/api/providers/'+this.id : '/api/providers';
                 await api(url, {method, body: this.form});
                 showToast('保存成功','success');
-                setTimeout(() => location.href = document.body.dataset.panelPrefix+'/providers', 500);
+                const target = this.isEdit ? '/providers/' + this.id : '/providers';
+                setTimeout(() => location.href = document.body.dataset.panelPrefix + target, 500);
             } catch(e) { showToast(e.message,'error'); }
             this.saving = false;
         }
