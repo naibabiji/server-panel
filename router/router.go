@@ -118,7 +118,7 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		pg.GET("/login", func(c *gin.Context) {
 			c.HTML(http.StatusOK, "login.html", gin.H{
 				"PanelTitle":   cfg.Panel.PanelTitle,
-				"PanelVersion":  cfg.Panel.Version,
+				"PanelVersion": cfg.Panel.Version,
 				"RandomSuffix": suffix,
 				"AssetPrefix":  prefix + "/assets",
 			})
@@ -249,6 +249,15 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.GET("/api/monitor/:id/latest", metricsH.GetLatest)
 			protected.GET("/api/monitor/:id", metricsH.GetServerMetrics)
 
+			storageH := &handlers.LocalStorageHandler{}
+			protected.GET("/api/local-storage/devices", storageH.ListDevices)
+			protected.POST("/api/local-storage/mount", storageH.Mount)
+			protected.POST("/api/local-storage/unmount", storageH.Unmount)
+			protected.POST("/api/local-storage/format", storageH.Format)
+			protected.POST("/api/local-storage/initialize", storageH.Initialize)
+			protected.GET("/api/local-storage/users", storageH.ListUsers)
+			protected.POST("/api/local-storage/permissions/check", storageH.CheckPermission)
+
 			protected.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "dashboard.html", pageData(cfg, "dashboard", "dashboard_content", c))
 			})
@@ -317,6 +326,9 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			})
 			protected.GET("/firewall", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "firewall.html", pageData(cfg, "firewall", "firewall_content", c))
+			})
+			protected.GET("/local-storage", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "local_storage.html", pageData(cfg, "local_storage", "local_storage_content", c))
 			})
 		}
 	}

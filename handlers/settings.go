@@ -794,7 +794,7 @@ func (h *SettingsHandler) UpdateTLSConfig(c *gin.Context) {
 		message = "TLS 配置已更新，服务将在几秒内自动重启生效"
 	}
 	if changed && cfg.Panel.TLSMode == "acme" {
-		message = "ACME 配置已保存，服务将在几秒内自动重启；重启后首次访问面板时会自动向 Let's Encrypt 申请证书"
+		message = "ACME 配置已保存，服务将在几秒内自动重启并申请 Let's Encrypt 证书；请等待约 30 秒后关闭当前标签页（必要时关闭浏览器），再重新打开面板地址检查新证书"
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": message}))
 }

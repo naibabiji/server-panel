@@ -66,14 +66,14 @@ install_dependencies() {
     if command -v apt-get >/dev/null 2>&1; then
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
-        apt-get install -y ca-certificates curl openssl
+        apt-get install -y ca-certificates curl openssl util-linux e2fsprogs parted
     elif command -v dnf >/dev/null 2>&1; then
-        dnf install -y ca-certificates curl openssl
+        dnf install -y ca-certificates curl openssl util-linux e2fsprogs parted
     elif command -v yum >/dev/null 2>&1; then
-        yum install -y ca-certificates curl openssl
+        yum install -y ca-certificates curl openssl util-linux e2fsprogs parted
     else
-        for bin in curl openssl; do
-            command -v "$bin" >/dev/null 2>&1 || err "缺少依赖: $bin，请先安装 curl 和 openssl"
+        for bin in curl openssl lsblk findmnt wipefs mkfs.ext4 parted partprobe; do
+            command -v "$bin" >/dev/null 2>&1 || err "缺少依赖: $bin，请先安装磁盘管理依赖"
         done
     fi
     command -v systemctl >/dev/null 2>&1 || err "当前系统缺少 systemd/systemctl，暂不支持一键安装"

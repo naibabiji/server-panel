@@ -724,6 +724,13 @@ function settingsPage() {
                 domain: (this.tls.domain || '').trim(),
                 acme_email: (this.tls.acme_email || '').trim()
             };
+            if (body.tls_mode === 'acme') {
+                const ok = await confirmModal(
+                    "保存后面板会自动重启并向 Let's Encrypt 申请证书，期间可能短暂无法访问。" +
+                    "当前标签页可能继续显示旧的自签名证书；请等待约 30 秒后关闭当前标签页（必要时关闭浏览器），再重新打开面板地址检查新证书。确认继续？"
+                );
+                if (!ok) return;
+            }
             try { const d = await api('/api/settings/tls', {method:'PUT', body}); showToast(d.data.message || '域名与 TLS 配置已保存','success'); } catch(e) { showToast(e.message,'error'); }
         },
         async issueSelfSigned() {
