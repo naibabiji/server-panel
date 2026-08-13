@@ -127,7 +127,8 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 		return
 	}
 
-	if req.TLSPort != cfg.Panel.TLSPort {
+	portChanged := req.TLSPort != cfg.Panel.TLSPort
+	if portChanged {
 		if err := checkPortAvailable(req.TLSPort); err != nil {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse("后台 HTTPS 端口不可用: "+err.Error()))
 			return
@@ -161,6 +162,12 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 	trustCloudflare := cfg.Panel.TrustCloudflare
 	if req.TrustCloudflare != nil {
 		trustCloudflare = *req.TrustCloudflare
+	}
+	if portChanged {
+		if _, err := executor.AllowPanelPort(req.TLSPort); err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse("系统防火墙放行新端口失败，设置未保存: "+err.Error()))
+			return
+		}
 	}
 
 	changed := req.TLSPort != cfg.Panel.TLSPort ||
