@@ -1,12 +1,19 @@
 package main
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -174,11 +181,28 @@ func main() {
 					log.Printf("ACME challenge server error: %v", err)
 				}
 			}()
+			tlsConfig := manager.TLSConfig()
+			acmeGetCertificate := tlsConfig.GetCertificate
+			localHealthCertificate, certErr := generateLocalHealthCertificate()
+			if certErr != nil {
+				log.Printf("generate local health certificate failed: %v", certErr)
+			} else {
+				tlsConfig.GetCertificate = func(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+					remoteAddr := ""
+					if hello.Conn != nil && hello.Conn.RemoteAddr() != nil {
+						remoteAddr = hello.Conn.RemoteAddr().String()
+					}
+					if shouldUseLocalHealthCertificate(hello.ServerName, remoteAddr) {
+						return localHealthCertificate, nil
+					}
+					return acmeGetCertificate(hello)
+				}
+			}
 			log.Printf("HTTPS server listening on %s (mode: acme, domain: %s)", addrTLS, cfg.Panel.Domain)
 			srv := &http.Server{
 				Addr:              addrTLS,
 				Handler:           r,
-				TLSConfig:         manager.TLSConfig(),
+				TLSConfig:         tlsConfig,
 				ReadHeaderTimeout: 15 * time.Second,
 				ReadTimeout:       60 * time.Second,
 				IdleTimeout:       2 * time.Minute,
@@ -212,6 +236,51 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-quit
 	log.Printf("Received signal %v, shutting down...", sig)
+}
+
+func shouldUseLocalHealthCertificate(serverName, remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil || !net.ParseIP(host).IsLoopback() {
+		return false
+	}
+	if serverName == "" {
+		return true
+	}
+	ip := net.ParseIP(serverName)
+	return ip != nil && ip.IsLoopback()
+}
+
+func generateLocalHealthCertificate() (*tls.Certificate, error) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	template := &x509.Certificate{
+		SerialNumber:          big.NewInt(now.UnixNano()),
+		Subject:               pkix.Name{CommonName: "server-panel-local-health"},
+		NotBefore:             now.Add(-time.Minute),
+		NotAfter:              now.Add(24 * time.Hour),
+		KeyUsage:              x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
+	}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, publicKey, privateKey)
+	if err != nil {
+		return nil, err
+	}
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		return nil, err
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+	certificate, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		return nil, err
+	}
+	return &certificate, nil
 }
 
 // applyPendingRestoreIfAny checks for a restore scheduled from the web UI
