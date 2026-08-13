@@ -1,6 +1,45 @@
 package handlers
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"github.com/naibabiji/server-panel/executor"
+)
+
+func TestCachedLatestPanelReleaseForceRefresh(t *testing.T) {
+	originalFetch := fetchLatestPanelRelease
+	t.Cleanup(func() {
+		fetchLatestPanelRelease = originalFetch
+		panelReleaseCache.Lock()
+		panelReleaseCache.release = nil
+		panelReleaseCache.expireAt = time.Time{}
+		panelReleaseCache.lastErr = nil
+		panelReleaseCache.errExpireAt = time.Time{}
+		panelReleaseCache.Unlock()
+	})
+
+	panelReleaseCache.Lock()
+	panelReleaseCache.release = &executor.GithubRelease{TagName: "v1.4.40"}
+	panelReleaseCache.expireAt = time.Now().Add(panelReleaseCacheTTL)
+	panelReleaseCache.Unlock()
+
+	requests := 0
+	fetchLatestPanelRelease = func() (*executor.GithubRelease, error) {
+		requests++
+		return &executor.GithubRelease{TagName: "v1.4.41"}, nil
+	}
+
+	cached, err := cachedLatestPanelRelease(false)
+	if err != nil || cached.TagName != "v1.4.40" || requests != 0 {
+		t.Fatalf("cached result = (%v, %v), requests = %d", cached, err, requests)
+	}
+
+	refreshed, err := cachedLatestPanelRelease(true)
+	if err != nil || refreshed.TagName != "v1.4.41" || requests != 1 {
+		t.Fatalf("refreshed result = (%v, %v), requests = %d", refreshed, err, requests)
+	}
+}
 
 func TestIsValidAutoUpdateWindow(t *testing.T) {
 	tests := []struct {

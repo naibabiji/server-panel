@@ -757,7 +757,8 @@ function settingsPage() {
         async checkUpdate(silent = false) {
             this.update.checking = true;
             try {
-                const d = await api('/api/update/check');
+                const path = silent ? '/api/update/check' : '/api/update/check?force=1';
+                const d = await api(path);
                 this.update.current_version = d.data.current_version;
                 this.update.hasUpdate = d.data.has_update;
                 this.update.latestVersion = d.data.latest_version;

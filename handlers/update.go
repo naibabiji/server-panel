@@ -28,9 +28,12 @@ var panelReleaseCache = struct {
 }{}
 
 const panelReleaseCacheTTL = 5 * time.Minute
+
 // 访问 GitHub 失败（离线/网络不通）时，把错误也缓存一小段时间，
 // 避免每次缓存过期都重新发起最长为 5 秒的阻塞请求。
 const panelReleaseErrTTL = 60 * time.Second
+
+var fetchLatestPanelRelease = executor.FetchLatestPanelRelease
 
 func (h *UpdateHandler) db() *sql.DB {
 	if h.DB != nil {
@@ -50,7 +53,8 @@ func (h *UpdateHandler) currentVersion() string {
 // the running version. Read-only, safe to poll.
 func (h *UpdateHandler) CheckUpdate(c *gin.Context) {
 	current := h.currentVersion()
-	release, err := cachedLatestPanelRelease()
+	forceRefresh := c.Query("force") == "1"
+	release, err := cachedLatestPanelRelease(forceRefresh)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse("检查更新失败: "+err.Error()))
 		return
@@ -68,23 +72,23 @@ func (h *UpdateHandler) CheckUpdate(c *gin.Context) {
 	}))
 }
 
-func cachedLatestPanelRelease() (*executor.GithubRelease, error) {
+func cachedLatestPanelRelease(forceRefresh bool) (*executor.GithubRelease, error) {
 	now := time.Now()
 	panelReleaseCache.Lock()
-	if panelReleaseCache.release != nil && now.Before(panelReleaseCache.expireAt) {
+	if !forceRefresh && panelReleaseCache.release != nil && now.Before(panelReleaseCache.expireAt) {
 		release := panelReleaseCache.release
 		panelReleaseCache.Unlock()
 		return release, nil
 	}
 	// 命中失败缓存：直接复用上次的错误，避免重复发起网络请求
-	if panelReleaseCache.lastErr != nil && now.Before(panelReleaseCache.errExpireAt) {
+	if !forceRefresh && panelReleaseCache.lastErr != nil && now.Before(panelReleaseCache.errExpireAt) {
 		err := panelReleaseCache.lastErr
 		panelReleaseCache.Unlock()
 		return nil, err
 	}
 	panelReleaseCache.Unlock()
 
-	release, err := executor.FetchLatestPanelRelease()
+	release, err := fetchLatestPanelRelease()
 	if err != nil {
 		panelReleaseCache.Lock()
 		panelReleaseCache.lastErr = err
