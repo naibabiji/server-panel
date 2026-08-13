@@ -3,25 +3,33 @@
 <div x-data="localStoragePage()" class="p-6 space-y-6">
     <div class="border border-[#2a3038] bg-[#171b21] p-5">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-            <div><h2 class="text-lg font-semibold text-gray-100">磁盘与挂载</h2><p class="text-sm text-gray-500 mt-1">仅允许操作非系统盘；挂载目录限定为 /mnt/&lt;名称&gt;。</p></div>
+            <div><h2 class="text-lg font-semibold text-gray-100">磁盘与挂载</h2><p class="text-sm text-gray-500 mt-1">整块磁盘和它下面的分区是包含关系，容量不要重复相加。</p></div>
             <button @click="loadDevices()" class="btn-secondary text-sm">刷新</button>
+        </div>
+        <div class="mb-4 border border-blue-800/60 bg-blue-950/20 px-4 py-3 text-sm text-blue-200">
+            <div class="font-medium">怎样找到需要挂载的数据盘？</div>
+            <div class="mt-1 text-blue-300/80">先找到容量和服务商购买容量相符的“整块磁盘”，再操作缩进在它下面、已有文件系统的“分区”。系统盘已自动保护，虚拟光驱可以忽略。挂载目录限定为 /mnt/&lt;名称&gt;。</div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full">
-                <thead><tr><th class="table-header">设备</th><th class="table-header">容量</th><th class="table-header">文件系统</th><th class="table-header">挂载点</th><th class="table-header">状态</th><th class="table-header">操作</th></tr></thead>
+                <thead><tr><th class="table-header">磁盘 / 分区</th><th class="table-header">容量</th><th class="table-header">文件系统</th><th class="table-header">挂载位置</th><th class="table-header">状态</th><th class="table-header">操作</th></tr></thead>
                 <tbody>
                 <template x-for="d in devices" :key="d.path">
-                    <tr class="border-t border-gray-700/50">
-                        <td class="table-cell"><div class="font-mono text-gray-200" x-text="d.path"></div><div class="text-xs text-gray-500" x-text="[d.type,d.model,d.serial].filter(Boolean).join(' · ')"></div></td>
-                        <td class="table-cell text-sm" x-text="formatBytes(d.size)"></td>
-                        <td class="table-cell text-sm"><span x-text="d.fstype || '未格式化'"></span><div class="font-mono text-xs text-gray-500" x-show="d.uuid" x-text="d.uuid"></div></td>
-                        <td class="table-cell text-sm"><div x-text="(d.mountpoints || []).join(', ') || '--'"></div><div class="text-xs text-gray-500" x-show="d.used_bytes" x-text="formatBytes(d.used_bytes) + ' 已用 / ' + formatBytes(d.available_bytes) + ' 可用'"></div></td>
-                        <td class="table-cell"><span :class="d.system ? 'badge-warning' : ((d.mountpoints||[]).length ? 'badge-success' : 'badge-info')" x-text="d.system ? '系统盘（已保护）' : ((d.mountpoints||[]).length ? '已挂载' : '未挂载')"></span><span class="badge-success ml-1" x-show="d.managed_fstab">自动挂载</span></td>
+                    <tr class="border-t border-gray-700/50" :class="{'bg-[#13171c]': d.parent, 'opacity-60': d.type === 'rom'}">
+                        <td class="table-cell">
+                            <div class="flex items-center gap-2" :class="d.parent ? 'pl-7' : ''"><span x-show="d.parent" class="text-gray-600">↳</span><span class="font-mono text-gray-200" x-text="d.path"></span><span class="text-[11px] px-1.5 py-0.5 border border-gray-700 text-gray-400" x-text="deviceKind(d)"></span></div>
+                            <div class="text-xs text-gray-500 mt-1" :class="d.parent ? 'pl-14' : ''" x-text="deviceDescription(d)"></div>
+                        </td>
+                        <td class="table-cell text-sm"><div x-text="formatBytes(d.size)"></div><div x-show="d.has_children" class="text-xs text-gray-500 mt-1">整盘容量，已包含下方分区</div></td>
+                        <td class="table-cell text-sm"><span x-text="filesystemLabel(d)"></span><div class="font-mono text-xs text-gray-500" x-show="d.uuid" x-text="d.uuid"></div></td>
+                        <td class="table-cell text-sm"><div x-text="mountpointLabel(d)"></div><div class="text-xs text-gray-500" x-show="d.used_bytes" x-text="formatBytes(d.used_bytes) + ' 已用 / ' + formatBytes(d.available_bytes) + ' 可用'"></div></td>
+                        <td class="table-cell"><span :class="statusClass(d)" x-text="statusLabel(d)"></span><span class="badge-success ml-1" x-show="d.managed_fstab">开机自动挂载</span></td>
                         <td class="table-cell whitespace-nowrap space-x-2">
-                            <button x-show="d.can_mount" @click="openMount(d)" class="text-sm text-green-400">挂载</button>
+                            <button x-show="d.can_mount" @click="openMount(d)" class="btn-primary text-xs px-3 py-1.5">挂载此分区</button>
                             <button x-show="!d.system && (d.mountpoints||[]).length" @click="unmount(d)" class="text-sm text-yellow-400">卸载</button>
                             <button x-show="d.can_format" @click="openDestructive(d, 'format')" class="text-sm text-red-400">格式化分区</button>
                             <button x-show="d.can_initialize" @click="openDestructive(d, 'initialize')" class="text-sm text-red-400">初始化裸盘</button>
+                            <span x-show="!hasAction(d)" class="text-xs text-gray-600">无需操作</span>
                         </td>
                     </tr>
                 </template>
@@ -64,6 +72,13 @@ function localStoragePage() { return {
     devices: [], users: [], selected: null, mountModal: false, destructiveModal: false, mountPoint: '/mnt/backup-storage', confirmation: '', destructiveAction: '', permissionForm: {username:'', path:'/mnt/backup-storage'}, permission: null,
     async init() { await Promise.all([this.loadDevices(), this.loadUsers()]); },
     formatBytes(n) { if (!n) return '0 B'; const u=['B','KB','MB','GB','TB']; let i=0,v=Number(n); while(v>=1024&&i<u.length-1){v/=1024;i++;} return v.toFixed(i?1:0)+' '+u[i]; },
+    deviceKind(d) { if (d.type === 'rom') return '虚拟光驱'; if (d.type === 'disk') return '整块磁盘'; if (d.type === 'part') return '分区'; return d.type || '设备'; },
+    deviceDescription(d) { if (d.type === 'rom') return '安装介质，可忽略'; if (d.parent) return '属于 ' + d.parent; return [d.model,d.serial].filter(Boolean).join(' · ') || (d.has_children ? '下方列出该磁盘的分区' : '未分区的数据盘'); },
+    filesystemLabel(d) { if (d.type === 'rom') return '安装介质'; if (d.has_children) return '已分区（请查看下方）'; if (d.fstype) return d.fstype; return d.type === 'disk' ? '全新裸盘（尚未分区）' : '未格式化'; },
+    mountpointLabel(d) { if ((d.mountpoints||[]).length) return d.mountpoints.join(', '); if (d.type === 'rom') return '无需挂载'; if (d.has_children) return '请操作下方分区'; return '尚未挂载'; },
+    statusLabel(d) { if (d.system) return '系统盘（已保护）'; if (d.type === 'rom') return '虚拟光驱（可忽略）'; if ((d.mountpoints||[]).length) return '已挂载'; if (d.has_children) return '包含分区'; if (d.can_mount) return '可以挂载'; if (d.can_initialize) return '全新裸盘'; return '未挂载'; },
+    statusClass(d) { if (d.system) return 'badge-warning'; if ((d.mountpoints||[]).length) return 'badge-success'; if (d.can_mount) return 'badge-success'; return 'badge-info'; },
+    hasAction(d) { return d.can_mount || (!d.system && (d.mountpoints||[]).length) || d.can_format || d.can_initialize; },
     async loadDevices() { try { const d=await api('/api/local-storage/devices'); this.devices=d.data||[]; } catch(e){ showToast(e.message,'error'); } },
     async loadUsers() { try { const d=await api('/api/local-storage/users'); this.users=d.data||[]; } catch(e){ showToast(e.message,'error'); } },
     openMount(d) { this.selected=d; this.mountPoint='/mnt/backup-storage'; this.mountModal=true; },
