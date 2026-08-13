@@ -198,10 +198,53 @@ restart_service() {
     fi
 }
 
+validate_tls_port() {
+    if ! [[ "$TLS_PORT" =~ ^[0-9]+$ ]] || [ "$TLS_PORT" -lt 1 ] || [ "$TLS_PORT" -gt 65535 ]; then
+        err "HTTPS 端口必须是 1-65535 之间的整数，当前值: $TLS_PORT"
+    fi
+}
+
+load_existing_tls_port() {
+    local configured_port
+    configured_port="$(sed -n 's/^[[:space:]]*"tls_port"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$CONFIG_FILE" | head -n 1)"
+    if [ -n "$configured_port" ]; then
+        TLS_PORT="$configured_port"
+    else
+        warn "无法从现有配置读取 HTTPS 端口，将检查默认端口 $TLS_PORT"
+    fi
+    validate_tls_port
+}
+
+configure_firewall() {
+    log "检查系统防火墙..."
+
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q '^Status: active'; then
+        if ufw allow "${TLS_PORT}/tcp" >/dev/null; then
+            log "UFW 已放行面板端口 ${TLS_PORT}/tcp"
+        else
+            warn "UFW 放行 ${TLS_PORT}/tcp 失败，请手动执行: ufw allow ${TLS_PORT}/tcp"
+        fi
+        return
+    fi
+
+    if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+        if firewall-cmd --permanent --add-port="${TLS_PORT}/tcp" >/dev/null && firewall-cmd --reload >/dev/null; then
+            log "firewalld 已放行面板端口 ${TLS_PORT}/tcp"
+        else
+            warn "firewalld 放行 ${TLS_PORT}/tcp 失败，请手动检查防火墙规则"
+        fi
+        return
+    fi
+
+    warn "未检测到已启用的 UFW 或 firewalld；如有云防火墙/安全组，请手动放行 ${TLS_PORT}/tcp"
+}
+
 upgrade_existing() {
+    load_existing_tls_port
     download_binary
     write_service
     restart_service
+    configure_firewall
     echo ""
     log "升级完成，配置和数据库已保留: $CONFIG_FILE"
     echo "  systemctl status server-panel"
@@ -384,12 +427,14 @@ main() {
             PUBLIC_URL="https://${DOMAIN}:${TLS_PORT}"
         fi
     fi
+    validate_tls_port
 
     download_binary
     generate_tls_cert
     write_config
     write_service
     restart_service
+    configure_firewall
     print_summary
 }
 

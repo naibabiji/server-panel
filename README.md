@@ -25,6 +25,8 @@ curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/insta
 
 安装后访问 `https://your-server:8444/<随机路径>/login`，账号密码在安装日志中查看。
 
+安装脚本会自动为已经启用的 UFW 或 firewalld 放行面板 HTTPS 端口。若服务器提供商还配置了云防火墙或安全组，仍需在提供商控制台手动放行对应 TCP 端口（默认 `8444`）。
+
 ## 界面预览
 
 <table>
