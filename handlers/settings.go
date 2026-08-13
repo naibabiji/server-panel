@@ -488,12 +488,12 @@ func (h *SettingsHandler) GetAccount(c *gin.Context) {
 
 func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 	var req struct {
-		WebUsername        string `json:"web_username"`
-		WebPassword        string `json:"web_password"`
-		OldPassword        string `json:"old_password"`
-		BasicUsername      string `json:"basic_username"`
-		BasicPassword      string `json:"basic_password"`
-		BasicAuthEnabled   *bool  `json:"basic_auth_enabled"`
+		WebUsername      string `json:"web_username"`
+		WebPassword      string `json:"web_password"`
+		OldPassword      string `json:"old_password"`
+		BasicUsername    string `json:"basic_username"`
+		BasicPassword    string `json:"basic_password"`
+		BasicAuthEnabled *bool  `json:"basic_auth_enabled"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
@@ -768,11 +768,12 @@ func (h *SettingsHandler) UpdateTLSConfig(c *gin.Context) {
 				"检测到 %d 端口已被占用（常见于已安装 Caddy/Nginx），无法自动申请证书，请改用自签证书或手动上传证书配合反向代理", cfg.Panel.ACMEChallengePort)))
 			return
 		}
-		if cfg.Panel.TLSPort != cfg.Panel.ACMEChallengePort {
-			if err := checkPortAvailable(cfg.Panel.TLSPort); err != nil {
-				c.JSON(http.StatusBadRequest, models.ErrorResponse(fmt.Sprintf("HTTPS 端口 %d 已被占用，请先在「面板访问」里更换端口", cfg.Panel.TLSPort)))
-				return
-			}
+		// The current process already owns TLSPort and will reuse it after the
+		// restart, so only the separate HTTP-01 challenge port must be free.
+		if _, err := executor.AllowPanelPort(cfg.Panel.ACMEChallengePort); err != nil {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(fmt.Sprintf(
+				"系统防火墙放行 ACME 验证端口 %d 失败，设置未保存: %v", cfg.Panel.ACMEChallengePort, err)))
+			return
 		}
 	}
 	changed := (req.TLSMode != "" && req.TLSMode != cfg.Panel.TLSMode) || domain != cfg.Panel.Domain
