@@ -12,7 +12,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/executor"
-	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -35,9 +34,6 @@ func (h *FileManagerHandler) Roots(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) AddRoot(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	var req struct{ Path, Name string }
 	if c.ShouldBindJSON(&req) != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse("请求参数无效"))
@@ -53,9 +49,6 @@ func (h *FileManagerHandler) AddRoot(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) RemoveRoot(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	path := c.Query("root")
 	if err := executor.RemoveCustomFileRoot(h.DB, path); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
@@ -91,9 +84,6 @@ func (h *FileManagerHandler) Download(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) Upload(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	root, path := c.PostForm("root"), c.DefaultPostForm("path", "/")
 	header, err := c.FormFile("file")
 	if err != nil || filepath.Base(header.Filename) != header.Filename {
@@ -119,9 +109,6 @@ func (h *FileManagerHandler) Upload(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) Mkdir(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	var req struct {
 		Root string `json:"root"`
 		Path string `json:"path"`
@@ -140,9 +127,6 @@ func (h *FileManagerHandler) Mkdir(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) Rename(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	var req struct {
 		Root    string `json:"root"`
 		Path    string `json:"path"`
@@ -161,9 +145,6 @@ func (h *FileManagerHandler) Rename(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) Delete(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	root, path := c.Query("root"), c.Query("path")
 	if err := executor.DeleteManagedFile(h.DB, h.dataDir(), root, path); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
@@ -174,9 +155,6 @@ func (h *FileManagerHandler) Delete(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) Transfer(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	var req struct {
 		Root        string `json:"root"`
 		Source      string `json:"source"`
@@ -227,9 +205,6 @@ func (h *FileManagerHandler) Transfer(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) Compress(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	var req struct {
 		Root string `json:"root"`
 		Path string `json:"path"`
@@ -248,9 +223,6 @@ func (h *FileManagerHandler) Compress(c *gin.Context) {
 }
 
 func (h *FileManagerHandler) Extract(c *gin.Context) {
-	if !h.requireWriteToken(c) {
-		return
-	}
 	var req struct {
 		Root string `json:"root"`
 		Path string `json:"path"`
@@ -266,17 +238,4 @@ func (h *FileManagerHandler) Extract(c *gin.Context) {
 	}
 	executor.RecordOperationLog("file_extract", filepath.Join(req.Root, req.Path), "success", "解压到 "+dest)
 	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "解压完成"}))
-}
-
-func (h *FileManagerHandler) requireWriteToken(c *gin.Context) bool {
-	sessionToken, ok := getSessionToken(c)
-	if !ok {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("会话已过期，请重新登录"))
-		return false
-	}
-	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
-		c.JSON(http.StatusForbidden, models.ErrorResponse("文件写操作需要重新输入查看密码"))
-		return false
-	}
-	return true
 }
