@@ -258,6 +258,20 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.GET("/api/local-storage/users", storageH.ListUsers)
 			protected.POST("/api/local-storage/permissions/check", storageH.CheckPermission)
 
+			filesH := &handlers.FileManagerHandler{DB: db}
+			protected.GET("/api/files/roots", filesH.Roots)
+			protected.POST("/api/files/roots", filesH.AddRoot)
+			protected.DELETE("/api/files/roots", filesH.RemoveRoot)
+			protected.GET("/api/files/list", filesH.List)
+			protected.GET("/api/files/download", filesH.Download)
+			protected.POST("/api/files/upload", middleware.MaxBodyBytes(1<<30), filesH.Upload)
+			protected.POST("/api/files/mkdir", filesH.Mkdir)
+			protected.PUT("/api/files/rename", filesH.Rename)
+			protected.DELETE("/api/files/delete", filesH.Delete)
+			protected.POST("/api/files/transfer", filesH.Transfer)
+			protected.POST("/api/files/compress", filesH.Compress)
+			protected.POST("/api/files/extract", filesH.Extract)
+
 			protected.GET("/", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "dashboard.html", pageData(cfg, "dashboard", "dashboard_content", c))
 			})
@@ -329,6 +343,9 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			})
 			protected.GET("/local-storage", func(c *gin.Context) {
 				c.HTML(http.StatusOK, "local_storage.html", pageData(cfg, "local_storage", "local_storage_content", c))
+			})
+			protected.GET("/files", func(c *gin.Context) {
+				c.HTML(http.StatusOK, "files.html", pageData(cfg, "files", "files_content", c))
 			})
 		}
 	}

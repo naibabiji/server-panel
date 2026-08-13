@@ -59,13 +59,17 @@
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 告警日志
             </a>
-            <a href="/{{.RandomSuffix}}/settings" class="sidebar-link {{if eq .Active "settings"}}active{{end}}" data-prefetch-page>
-                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.46 2.37a1.724 1.724 0 001.065 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.46a1.724 1.724 0 00-2.573 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.46-2.37a1.724 1.724 0 00-1.065-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.46.996.608 2.296.07 2.573-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                系统设置
-            </a>
             <a href="/{{.RandomSuffix}}/local-storage" class="sidebar-link {{if eq .Active "local_storage"}}active{{end}}">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6c0-1.105 3.582-2 8-2s8 .895 8 2-3.582 2-8 2-8-.895-8-2zm0 0v6c0 1.105 3.582 2 8 2s8-.895 8-2V6m-16 6v6c0 1.105 3.582 2 8 2s8-.895 8-2v-6"/></svg>
                 本机存储
+            </a>
+            <a href="/{{.RandomSuffix}}/files" class="sidebar-link {{if eq .Active "files"}}active{{end}}">
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+                文件管理
+            </a>
+            <a href="/{{.RandomSuffix}}/settings" class="sidebar-link {{if eq .Active "settings"}}active{{end}}" data-prefetch-page>
+                <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.46 2.37a1.724 1.724 0 001.065 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.46a1.724 1.724 0 00-2.573 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.46-2.37a1.724 1.724 0 00-1.065-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.46.996.608 2.296.07 2.573-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                系统设置
             </a>
         </nav>
         <div class="px-3 py-3 border-t border-[#252c35]">
@@ -81,7 +85,7 @@
             <button @click="sidebarOpen=!sidebarOpen" class="lg:hidden text-gray-400 hover:text-white">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
-            <div class="flex-1 min-w-0 truncate text-base font-medium text-gray-200">{{if eq .Active "dashboard"}}仪表盘{{else if eq .Active "monitor"}}性能监控{{else if eq .Active "server_list"}}服务器管理{{else if eq .Active "server_detail"}}服务器管理{{else if eq .Active "server_form"}}服务器管理{{else if eq .Active "customer_list"}}客户管理{{else if eq .Active "customer_detail"}}客户管理{{else if eq .Active "customer_form"}}客户管理{{else if eq .Active "website_list"}}网站管理{{else if eq .Active "website_detail"}}网站管理{{else if eq .Active "website_form"}}网站管理{{else if eq .Active "provider_list"}}服务商管理{{else if eq .Active "provider_detail"}}服务商管理{{else if eq .Active "provider_form"}}服务商管理{{else if eq .Active "firewall"}}安全防御{{else if eq .Active "alert_rules"}}告警管理{{else if eq .Active "alert_log"}}告警日志{{else if eq .Active "settings"}}系统设置{{else if eq .Active "local_storage"}}本机存储{{end}}</div>
+            <div class="flex-1 min-w-0 truncate text-base font-medium text-gray-200">{{if eq .Active "dashboard"}}仪表盘{{else if eq .Active "monitor"}}性能监控{{else if eq .Active "server_list"}}服务器管理{{else if eq .Active "server_detail"}}服务器管理{{else if eq .Active "server_form"}}服务器管理{{else if eq .Active "customer_list"}}客户管理{{else if eq .Active "customer_detail"}}客户管理{{else if eq .Active "customer_form"}}客户管理{{else if eq .Active "website_list"}}网站管理{{else if eq .Active "website_detail"}}网站管理{{else if eq .Active "website_form"}}网站管理{{else if eq .Active "provider_list"}}服务商管理{{else if eq .Active "provider_detail"}}服务商管理{{else if eq .Active "provider_form"}}服务商管理{{else if eq .Active "firewall"}}安全防御{{else if eq .Active "alert_rules"}}告警管理{{else if eq .Active "alert_log"}}告警日志{{else if eq .Active "settings"}}系统设置{{else if eq .Active "local_storage"}}本机存储{{else if eq .Active "files"}}文件管理{{end}}</div>
             <div x-data="globalSearch()" @keydown.escape.window="close()" class="relative w-56 sm:w-64 lg:w-72 shrink-0">
                 <div class="relative">
                     <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -145,6 +149,7 @@
                 {{if eq .ContentTemplate "alert_log_content"}}{{template "alert_log_content" .}}{{end}}
                 {{if eq .ContentTemplate "settings_content"}}{{template "settings_content" .}}{{end}}
                 {{if eq .ContentTemplate "local_storage_content"}}{{template "local_storage_content" .}}{{end}}
+                {{if eq .ContentTemplate "files_content"}}{{template "files_content" .}}{{end}}
     </main>
 </div>
 <script>
