@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/naibabiji/server-panel/config"
 )
 
 func TestCompareVersions(t *testing.T) {
@@ -137,5 +139,27 @@ func TestBinarySupportsWatchdog(t *testing.T) {
 	}
 	if binarySupportsWatchdog(withoutWatchdog) {
 		t.Fatal("expected without-watchdog helper to not support watchdog")
+	}
+}
+
+func TestHealthURLUsesACMEDomainForSNI(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Panel.TLSPort = 443
+	cfg.Panel.TLSMode = "acme"
+	cfg.Panel.Domain = "panel.example.com"
+	if got := healthURL(cfg); got != "https://panel.example.com:443/healthz" {
+		t.Fatalf("healthURL() = %q", got)
+	}
+	if got := healthDialAddress(cfg); got != "127.0.0.1:443" {
+		t.Fatalf("healthDialAddress() = %q", got)
+	}
+}
+
+func TestHealthURLUsesLoopbackForNonACME(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Panel.TLSPort = 8444
+	cfg.Panel.TLSMode = "self_signed"
+	if got := healthURL(cfg); got != "https://127.0.0.1:8444/healthz" {
+		t.Fatalf("healthURL() = %q", got)
 	}
 }

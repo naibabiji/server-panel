@@ -11,12 +11,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -118,6 +120,17 @@ func ExecutePanelUpdate(opts PanelUpdateOptions) error {
 	}
 	if !panelUpdateMu.TryLock() {
 		return fmt.Errorf("已有更新任务正在执行，请稍后再试")
+	}
+	dataDir := "/www/server/server-panel"
+	if opts.Config != nil && opts.Config.Panel.DataDir != "" {
+		dataDir = opts.Config.Panel.DataDir
+	}
+	if _, err := os.Stat(rollbackPlanPath(dataDir)); err == nil {
+		panelUpdateMu.Unlock()
+		return fmt.Errorf("上一轮更新仍在进行健康检查，请等待约 4 分钟后再试")
+	} else if !os.IsNotExist(err) {
+		panelUpdateMu.Unlock()
+		return fmt.Errorf("无法确认上一轮更新状态: %w", err)
 	}
 
 	release, err := FetchLatestPanelRelease()
@@ -315,6 +328,7 @@ func runPanelUpdate(opts PanelUpdateOptions, release *GithubRelease) {
 			BackupDB:       backupDBPath,
 			ConfigPath:     opts.ConfigPath,
 			HealthURL:      healthURL(opts.Config),
+			HealthDialAddr: healthDialAddress(opts.Config),
 			BinaryPath:     binaryPath,
 			ServiceName:    serviceName,
 			Trigger:        opts.Trigger,
@@ -541,6 +555,7 @@ type rollbackPlan struct {
 	BackupDB       string    `json:"backup_db"`
 	ConfigPath     string    `json:"config_path"`
 	HealthURL      string    `json:"health_url"`
+	HealthDialAddr string    `json:"health_dial_address,omitempty"`
 	BinaryPath     string    `json:"binary_path"`
 	ServiceName    string    `json:"service_name"`
 	Trigger        string    `json:"trigger"`
@@ -573,10 +588,25 @@ func readRollbackPlanFile(path string) (*rollbackPlan, error) {
 
 func healthURL(cfg *config.Config) string {
 	port := 8444
+	host := "127.0.0.1"
 	if cfg != nil && cfg.Panel.TLSPort > 0 {
 		port = cfg.Panel.TLSPort
 	}
-	return fmt.Sprintf("https://127.0.0.1:%d/healthz", port)
+	// The URL host controls TLS SNI. ACME certificates only cover the panel
+	// domain, so using 127.0.0.1 here makes autocert reject every probe. Keep
+	// the domain in the URL so older watchdog binaries also probe correctly.
+	if cfg != nil && cfg.Panel.TLSMode == "acme" && strings.TrimSpace(cfg.Panel.Domain) != "" {
+		host = strings.TrimSpace(cfg.Panel.Domain)
+	}
+	return fmt.Sprintf("https://%s/healthz", net.JoinHostPort(host, strconv.Itoa(port)))
+}
+
+func healthDialAddress(cfg *config.Config) string {
+	port := 8444
+	if cfg != nil && cfg.Panel.TLSPort > 0 {
+		port = cfg.Panel.TLSPort
+	}
+	return net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 }
 
 func startUpdateWatchdog(backupBinary, planPath, configPath string) error {
@@ -632,7 +662,7 @@ func RunUpdateWatchdog(planPath string, cfg *config.Config) {
 		return
 	}
 
-	if waitForHealthy(plan.HealthURL, 3*time.Second, 4*time.Minute) {
+	if waitForHealthyAt(plan.HealthURL, plan.HealthDialAddr, 3*time.Second, 4*time.Minute) {
 		RecordOperationLog("panel_"+plan.Trigger+"_update", plan.TargetVersion, "success", "health_check: 新版本运行正常")
 		setAutoUpdateResult("success", "", plan.TargetVersion)
 		cleanupPanelUpdateBackups(cfg)
@@ -707,9 +737,20 @@ func restoreDBBackupForWatchdog(backupPath, liveDBPath string) error {
 }
 
 func waitForHealthy(url string, interval, timeout time.Duration) bool {
+	return waitForHealthyAt(url, "", interval, timeout)
+}
+
+func waitForHealthyAt(url, dialAddress string, interval, timeout time.Duration) bool {
+	transport := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	if dialAddress != "" {
+		dialer := &net.Dialer{Timeout: interval}
+		transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, dialAddress)
+		}
+	}
 	client := &http.Client{
 		Timeout:   interval,
-		Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}},
+		Transport: transport,
 	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
