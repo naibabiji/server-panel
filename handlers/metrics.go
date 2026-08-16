@@ -20,7 +20,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 	db := h.db()
 
 	rows, err := db.Query(
-		`SELECT s.id, s.name, s.ip_address, s.is_online, s.last_seen_at,
+		`SELECT s.id, s.name, s.ip_address, s.is_online, s.last_seen_at, s.cpu_cores,
 		 COALESCE(s.provider_id, 0), COALESCE(p.name, ''),
 		 COALESCE(s.agent_version,''), s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at,
 		 s.tcp_reachable,
@@ -57,6 +57,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		HTTPProbeHealthy *int    `json:"http_probe_healthy"`
 		HTTPProbeLastAt  string  `json:"http_probe_last_at"`
 		TCPReachable     *int    `json:"tcp_reachable"`
+		CPUCores         float64 `json:"cpu_cores"`
 		CPUPercent       float64 `json:"cpu_percent"`
 		MemoryPercent    float64 `json:"memory_percent"`
 		DiskPercent      float64 `json:"disk_percent"`
@@ -75,7 +76,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		var cpu, mem, disk, load sql.NullFloat64
 		var uptime sql.NullInt64
 		var netRX, netTX sql.NullInt64
-		err := rows.Scan(&item.ID, &item.Name, &item.IPAddress, &item.IsOnline, &lastSeen,
+		err := rows.Scan(&item.ID, &item.Name, &item.IPAddress, &item.IsOnline, &lastSeen, &item.CPUCores,
 			&item.ProviderID, &item.ProviderName, &agentVer, &item.HTTPProbeEnabled, &probeHealthy, &probeLast,
 			&tcpReachable,
 			&cpu, &mem, &disk, &load, &uptime, &recorded,

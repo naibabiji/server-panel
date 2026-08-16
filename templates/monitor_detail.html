@@ -27,19 +27,19 @@
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" x-show="!loading">
         <div class="card">
             <div class="text-xs text-gray-400">CPU</div>
-            <div class="text-xl font-bold mt-1 text-purple-400" x-text="(latest.cpu_percent||0).toFixed(1)+'%'"></div>
+            <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'cpu_percent', server.cpu_cores)" x-text="monitorMetricText(latest, 'cpu_percent')"></div>
         </div>
         <div class="card">
             <div class="text-xs text-gray-400">内存</div>
-            <div class="text-xl font-bold mt-1 text-green-400" x-text="(latest.memory_percent||0).toFixed(1)+'%'"></div>
+            <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'memory_percent', server.cpu_cores)" x-text="monitorMetricText(latest, 'memory_percent')"></div>
         </div>
         <div class="card">
             <div class="text-xs text-gray-400">磁盘</div>
-            <div class="text-xl font-bold mt-1 text-yellow-400" x-text="(latest.disk_percent||0).toFixed(1)+'%'"></div>
+            <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'disk_percent', server.cpu_cores)" x-text="monitorMetricText(latest, 'disk_percent')"></div>
         </div>
         <div class="card">
             <div class="text-xs text-gray-400">负载 (1m)</div>
-            <div class="text-xl font-bold mt-1 text-gray-200" x-text="(latest.load_avg_1||0).toFixed(2)"></div>
+            <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'load_avg_1', server.cpu_cores)" x-text="monitorMetricText(latest, 'load_avg_1')"></div>
         </div>
     </div>
 

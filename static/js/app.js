@@ -403,6 +403,51 @@ function formatUptime(seconds) {
     return parts.join(' ') || '<1m';
 }
 
+// Monitoring values use text color only: neutral below the warning threshold,
+// yellow when elevated, red at the danger threshold, and muted when no sample
+// has ever been reported. Load thresholds are normalized by configured cores.
+function monitorMetricText(sample, metric) {
+    if (!sample || !sample.recorded_at) return '--';
+    const value = Number(sample[metric]);
+    if (!Number.isFinite(value)) return '--';
+    return metric === 'load_avg_1' ? value.toFixed(2) : value.toFixed(1) + '%';
+}
+
+function monitorMetricClass(sample, metric, cpuCores) {
+    if (!sample || !sample.recorded_at) return 'text-gray-500';
+    const value = Number(sample[metric]);
+    if (!Number.isFinite(value)) return 'text-gray-500';
+
+    let warning;
+    let danger;
+    switch (metric) {
+    case 'cpu_percent':
+        warning = 70;
+        danger = 90;
+        break;
+    case 'memory_percent':
+        warning = 75;
+        danger = 90;
+        break;
+    case 'disk_percent':
+        warning = 80;
+        danger = 90;
+        break;
+    case 'load_avg_1': {
+        const cores = Math.max(Number(cpuCores) || 1, 1);
+        warning = cores * 0.7;
+        danger = cores;
+        break;
+    }
+    default:
+        return 'text-gray-200';
+    }
+
+    if (value >= danger) return 'text-red-400';
+    if (value >= warning) return 'text-yellow-400';
+    return 'text-gray-200';
+}
+
 // serverStatus() unifies the "在线/探针异常/离线/未知" reading of a server
 // row across monitor/server_list/server_detail: is_online alone can't tell
 // "the Agent stopped reporting" apart from "the server is actually down" -

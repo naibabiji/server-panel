@@ -18,6 +18,7 @@ type metricsOverviewResponse struct {
 		Name         string  `json:"name"`
 		IPAddress    string  `json:"ip_address"`
 		ProviderName string  `json:"provider_name"`
+		CPUCores     float64 `json:"cpu_cores"`
 		CPUPercent   float64 `json:"cpu_percent"`
 		RecordedAt   string  `json:"recorded_at"`
 	} `json:"data"`
@@ -28,9 +29,9 @@ func TestMetricsGetOverviewReturnsLatestMetricPerServer(t *testing.T) {
 	db := newMetricsTestDB(t)
 
 	mustExecMetrics(t, db, `INSERT INTO providers (id, name) VALUES (1, 'Zulu')`)
-	mustExecMetrics(t, db, `INSERT INTO servers (id, name, ip_address, provider_id, agent_version) VALUES
-		(1, 'alpha', '192.0.2.1', 1, '1.0'),
-		(2, 'beta', '192.0.2.2', NULL, '1.0')`)
+	mustExecMetrics(t, db, `INSERT INTO servers (id, name, ip_address, provider_id, agent_version, cpu_cores) VALUES
+		(1, 'alpha', '192.0.2.1', 1, '1.0', 4),
+		(2, 'beta', '192.0.2.2', NULL, '1.0', 2)`)
 	mustExecMetrics(t, db, `INSERT INTO metrics (server_id, cpu_percent, recorded_at) VALUES
 		(1, 10, '2026-08-08 10:00:00'),
 		(1, 20, '2026-08-08 11:00:00'),
@@ -47,6 +48,9 @@ func TestMetricsGetOverviewReturnsLatestMetricPerServer(t *testing.T) {
 	}
 	if byID[1] != 20 || byID[2] != 40 {
 		t.Fatalf("latest CPU values = %+v, want server 1=20 and server 2=40", byID)
+	}
+	if resp.Data[0].CPUCores != 4 || resp.Data[1].CPUCores != 2 {
+		t.Fatalf("overview CPU cores = [%v, %v], want [4, 2]", resp.Data[0].CPUCores, resp.Data[1].CPUCores)
 	}
 }
 
@@ -131,6 +135,7 @@ func newMetricsTestDB(t *testing.T) *sql.DB {
 			ip_address TEXT NOT NULL DEFAULT '',
 			is_online INTEGER NOT NULL DEFAULT 0,
 			last_seen_at DATETIME,
+			cpu_cores REAL NOT NULL DEFAULT 0,
 			provider_id INTEGER,
 			agent_version TEXT NOT NULL DEFAULT '',
 			http_probe_enabled INTEGER NOT NULL DEFAULT 0,
