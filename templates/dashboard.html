@@ -43,7 +43,7 @@
                         <div class="flex items-center justify-between gap-4">
                             <div class="min-w-0">
                                 <div class="text-sm text-gray-100" x-text="item.name"></div>
-                                <div class="text-xs text-gray-500" x-text="'到期日：' + item.expiry_date"></div>
+                                <div class="text-xs text-gray-500" x-text="serverMeta(item)"></div>
                             </div>
                             <div class="text-sm text-red-500" x-text="daysText(item.days_left)"></div>
                         </div>
@@ -83,7 +83,7 @@
                         <div class="flex items-center justify-between gap-4">
                             <div class="min-w-0">
                                 <div class="text-sm text-gray-100" x-text="item.name"></div>
-                                <div class="text-xs text-gray-500" x-text="'到期日：' + item.expiry_date"></div>
+                                <div class="text-xs text-gray-500" x-text="serverMeta(item)"></div>
                             </div>
                             <div class="text-sm text-yellow-400" x-text="daysText(item.days_left)"></div>
                         </div>
@@ -232,6 +232,11 @@ function dashboardPage() {
         websiteMeta(item) {
             let text = '到期日：' + item.expiry_date;
             if (item.server_name) text += ' · ' + item.server_name;
+            return text;
+        },
+        serverMeta(item) {
+            let text = '到期日：' + item.expiry_date;
+            if (item.auto_renewal) text += ' · 已开启自动续期';
             return text;
         },
         probeErrorSummary(msg) {

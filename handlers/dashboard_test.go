@@ -22,7 +22,7 @@ func TestDashboardGetExpiringSplitsOverdueFromUpcoming(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newDashboardTestDB(t)
 
-	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, status) VALUES (1, 'soon-server', date('now','+5 days'), 'active')")
+	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, auto_renewal, status) VALUES (1, 'soon-server', date('now','+5 days'), 1, 'active')")
 	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, status) VALUES (2, 'overdue-server', date('now','-40 days'), 'active')")
 	mustExecDashboard(t, db, "INSERT INTO websites (id, name, domain, server_id, expiry_date, status) VALUES (1, 'soon-site', 'soon.example', 1, date('now','+5 days'), 'active')")
 	mustExecDashboard(t, db, "INSERT INTO websites (id, name, domain, server_id, expiry_date, status) VALUES (2, 'overdue-site', 'overdue.example', 1, date('now','-40 days'), 'active')")
@@ -57,6 +57,9 @@ func TestDashboardGetExpiringSplitsOverdueFromUpcoming(t *testing.T) {
 	for _, s := range resp.Data.Servers {
 		if s["name"] == "soon-server" {
 			foundSoonServer = true
+			if s["auto_renewal"] != true {
+				t.Fatalf("soon-server auto_renewal = %#v, want true", s["auto_renewal"])
+			}
 		}
 		if days, ok := s["days_left"].(float64); ok && days < 0 {
 			t.Fatalf("expiring servers list contains an overdue item: %+v", s)
@@ -150,6 +153,7 @@ func newDashboardTestDB(t *testing.T) *sql.DB {
 			name          TEXT NOT NULL DEFAULT '',
 			expiry_date   TEXT NOT NULL DEFAULT '',
 			status        TEXT NOT NULL DEFAULT 'active',
+			auto_renewal  INTEGER NOT NULL DEFAULT 0,
 			is_online     INTEGER NOT NULL DEFAULT 0,
 			agent_version TEXT NOT NULL DEFAULT '',
 			last_seen_at  DATETIME

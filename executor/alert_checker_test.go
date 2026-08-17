@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -85,6 +86,51 @@ func TestServerExpiryAlertStaysOpenWhenOverdueAndUnrenewed(t *testing.T) {
 	}
 	if resolved != 0 {
 		t.Fatalf("resolved after re-run = %d, want 0", resolved)
+	}
+}
+
+func TestServerExpiryAlertMarksAutomaticRenewal(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, status, expiry_date, auto_renewal)
+		VALUES (10, 'auto-server', 'active', date('now','+3 days'), 1)`)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, enabled)
+		VALUES ('server_expiry', 7, 1)`)
+
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+
+	var message string
+	if err := db.QueryRow(`SELECT message FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&message); err != nil {
+		t.Fatalf("query alert: %v", err)
+	}
+	if !strings.Contains(message, "已开启自动续期") {
+		t.Fatalf("message = %q, want automatic-renewal marker", message)
+	}
+}
+
+func TestExpiryChecksRenewBeforeCreatingDueDateAlert(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, status, expiry_date, renewal_cycle, auto_renewal)
+		VALUES (10, 'auto-server', 'active', date('now'), 'monthly', 1)`)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, enabled)
+		VALUES ('server_expiry', 40, 1)`)
+
+	runExpiryChecks(db, time.Now().UTC())
+
+	var expiryDate, message string
+	if err := db.QueryRow(`SELECT expiry_date FROM servers WHERE id = 10`).Scan(&expiryDate); err != nil {
+		t.Fatalf("query renewed server: %v", err)
+	}
+	if expiryDate == time.Now().UTC().Format("2006-01-02") {
+		t.Fatalf("expiry_date remained %q, want it renewed before alerting", expiryDate)
+	}
+	if err := db.QueryRow(`SELECT message FROM alert_log WHERE alert_type = 'server_expiry' AND server_id = 10`).Scan(&message); err != nil {
+		t.Fatalf("query alert: %v", err)
+	}
+	if strings.Contains(message, "今天到期") || strings.Contains(message, "已过期") {
+		t.Fatalf("message = %q, want post-renewal future-date alert", message)
+	}
+	if !strings.Contains(message, "已开启自动续期") {
+		t.Fatalf("message = %q, want automatic-renewal marker", message)
 	}
 }
 
@@ -335,6 +381,9 @@ func newAlertTestDB(t *testing.T) *sql.DB {
 			customer_id INTEGER,
 			status TEXT NOT NULL DEFAULT 'active',
 			expiry_date TEXT NOT NULL DEFAULT '',
+			renewal_cycle TEXT NOT NULL DEFAULT '',
+			auto_renewal INTEGER NOT NULL DEFAULT 0,
+			updated_at DATETIME,
 			is_online INTEGER NOT NULL DEFAULT 0,
 			last_seen_at DATETIME,
 			http_probe_enabled INTEGER NOT NULL DEFAULT 0,

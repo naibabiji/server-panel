@@ -29,13 +29,33 @@ func runAlertCheck() {
 		return
 	}
 
-	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
-	checkExpiryAlerts(db, "website_expiry", "websites", "expiry_date")
 	checkHTTPProbeAlerts(db)
 	checkResourceAlerts(db, "cpu_high", "cpu_percent")
 	checkResourceAlerts(db, "memory_high", "memory_percent")
 	checkDiskAlerts(db)
 	checkOfflineAlerts(db)
+}
+
+// StartExpiryChecker handles date-based work separately from minute-level
+// health alerts. Renewal always runs first so an automatically renewed server
+// cannot briefly become overdue before its expiry alert is evaluated.
+func StartExpiryChecker(interval time.Duration) {
+	go func() {
+		time.Sleep(30 * time.Second)
+		for {
+			runExpiryChecks(database.GetDB(), time.Now())
+			time.Sleep(interval)
+		}
+	}()
+}
+
+func runExpiryChecks(db *sql.DB, now time.Time) {
+	if db == nil {
+		return
+	}
+	runAutoRenewals(db, now)
+	checkExpiryAlerts(db, "server_expiry", "servers", "expiry_date")
+	checkExpiryAlerts(db, "website_expiry", "websites", "expiry_date")
 }
 
 var allowedTables = map[string]bool{"servers": true, "websites": true}
@@ -98,13 +118,14 @@ func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 		id, serverID, websiteID int64
 		name                    string
 		daysLeft                int
+		autoRenewal             bool
 	}
 	var targets []expiryTarget
 	label := "服务器"
 
 	if table == "servers" {
 		itemRows, err := db.Query(
-			`SELECT id, name, CAST(julianday(expiry_date) - julianday(date('now')) AS INTEGER)
+			`SELECT id, name, CAST(julianday(expiry_date) - julianday(date('now')) AS INTEGER), auto_renewal
 			 FROM servers
 			 WHERE expiry_date != '' AND expiry_date <= date('now', ?) AND status = 'active'`,
 			dateModifier)
@@ -113,7 +134,7 @@ func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 		}
 		for itemRows.Next() {
 			var t expiryTarget
-			if err := itemRows.Scan(&t.id, &t.name, &t.daysLeft); err != nil {
+			if err := itemRows.Scan(&t.id, &t.name, &t.daysLeft, &t.autoRenewal); err != nil {
 				itemRows.Close()
 				return
 			}
@@ -175,6 +196,9 @@ func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 		default:
 			level = "warning"
 			message = fmt.Sprintf("%s %s 将在 %d 天后到期", label, t.name, t.daysLeft)
+		}
+		if t.autoRenewal {
+			message += "（已开启自动续期）"
 		}
 		upsertAlert(db, alertType, serverID, websiteID, level, message)
 	}

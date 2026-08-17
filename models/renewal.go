@@ -7,13 +7,14 @@ func RenewedExpiryDate(expiryDate, renewalCycle string, autoRenewal int, now tim
 		return expiryDate
 	}
 
-	expiry, err := time.ParseInLocation("2006-01-02", expiryDate[:min(len(expiryDate), 10)], time.Local)
+	expiry, err := time.ParseInLocation("2006-01-02", expiryDate[:min(len(expiryDate), 10)], time.UTC)
 	if err != nil {
 		return expiryDate
 	}
 
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
-	for expiry.Before(today) {
+	now = now.UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	for !expiry.After(today) {
 		next, ok := addRenewalCycle(expiry, renewalCycle)
 		if !ok {
 			return expiryDate

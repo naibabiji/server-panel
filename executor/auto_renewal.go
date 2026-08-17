@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/naibabiji/server-panel/database"
 	"github.com/naibabiji/server-panel/models"
 	sqlitedriver "modernc.org/sqlite"
 )
@@ -17,20 +16,6 @@ import (
 // change, so hardcoding it here (rather than importing the generated
 // modernc.org/sqlite/lib bindings just for one constant) is safe.
 const sqliteBusy = 5
-
-func StartAutoRenewalChecker(interval time.Duration) {
-	go func() {
-		// Stagger the first run so it doesn't land in the burst of writes
-		// every other Start* background job fires at process startup.
-		time.Sleep(30 * time.Second)
-		runAutoRenewals(database.GetDB(), time.Now())
-
-		for {
-			time.Sleep(interval)
-			runAutoRenewals(database.GetDB(), time.Now())
-		}
-	}()
-}
 
 func runAutoRenewals(db *sql.DB, now time.Time) {
 	if db == nil {
@@ -65,7 +50,7 @@ func runAutoRenewals(db *sql.DB, now time.Time) {
 	if rowsErr != nil {
 		// Iteration broke partway through: candidates only holds a partial
 		// result set. Renewing just those would silently skip the rest
-		// until the next scheduled run picks them up 24h later - abort
+		// until the next scheduled run picks them up - abort
 		// instead and let the next run retry the query from scratch.
 		log.Printf("auto renewal row iteration failed: %v", rowsErr)
 		return

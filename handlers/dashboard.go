@@ -44,17 +44,19 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 }
 
 type ExpiringItem struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	ExpiryDate string `json:"expiry_date"`
-	DaysLeft   int    `json:"days_left"`
-	DetailPath string `json:"detail_path"`
-	ServerName string `json:"server_name,omitempty"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	ExpiryDate  string `json:"expiry_date"`
+	DaysLeft    int    `json:"days_left"`
+	DetailPath  string `json:"detail_path"`
+	ServerName  string `json:"server_name,omitempty"`
+	AutoRenewal bool   `json:"auto_renewal,omitempty"`
 }
 
 func queryExpiringServers(db *sql.DB, extraWhere string) ([]ExpiringItem, error) {
 	rows, err := db.Query(
 		`SELECT id, name, expiry_date,
+		 auto_renewal,
 		 CAST(julianday(expiry_date) - julianday(date('now')) AS INTEGER) AS days_left
 		 FROM servers
 		 WHERE expiry_date != '' AND status = 'active' AND ` + extraWhere + `
@@ -67,7 +69,7 @@ func queryExpiringServers(db *sql.DB, extraWhere string) ([]ExpiringItem, error)
 	items := []ExpiringItem{}
 	for rows.Next() {
 		var item ExpiringItem
-		if err := rows.Scan(&item.ID, &item.Name, &item.ExpiryDate, &item.DaysLeft); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.ExpiryDate, &item.AutoRenewal, &item.DaysLeft); err != nil {
 			return nil, err
 		}
 		item.DetailPath = "/servers/" + strconv.FormatInt(item.ID, 10)
