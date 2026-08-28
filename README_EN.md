@@ -20,7 +20,7 @@ Server Panel addresses two separate questions: **How difficult is it to break in
 
 | Attack stage | Defenses an attacker must cross | Limits that remain after a breach |
 |---|---|---|
-| Discover and enter the panel | Randomized URL path, HTTPS, optional BasicAuth, independent panel login, failed-attempt bans, malicious scan detection, and nftables integration | Entry-point access or a normal dashboard session still cannot directly read stored secrets |
+| Discover and enter the panel | Randomized URL path, HTTPS, optional BasicAuth, independent panel login, failed-attempt bans, malicious scan detection, and conditional IPv4 nftables integration | Entry-point access or a normal dashboard session still cannot directly read stored secrets |
 | Read sensitive data | Independent view password, bcrypt verification, AES-256-GCM encryption, single-use tokens bound to the session and source IP, and a two-minute lifetime | Five consecutive failures erase stored server and website password copies instead of allowing unlimited guessing |
 
 In other words, **dashboard access is not secret-access permission**. An attacker who obtains a login password, browser session, or ordinary dashboard access must still defeat a second independent authorization layer before sensitive-data endpoints will return credentials. See the full [Security Model](#security-model) below.
@@ -119,11 +119,13 @@ Server Panel does not place its entire security boundary behind a single login f
 1. **Discover the entry point:** installation generates a randomized URL path, so common `/admin`, `/login`, and vulnerability-scanner paths do not expose the panel directly.
 2. **Pass entry authentication:** optional BasicAuth sits in front of the panel login and uses separate credentials.
 3. **Avoid automatic bans:** repeated entry or panel login failures are recorded by source IP and trigger bans; malicious unknown-path scans also activate the defense.
-4. **Bypass network blocking:** with nftables available, banned sources are blocked by the system firewall on the panel port. Application-level rejection remains active without nftables.
+4. **Bypass ban enforcement:** ban records are always stored in the panel database, and banned sources receive `403` when accessing management-panel paths. If a working `nft` command is present, the panel process has firewall-management privileges, and the `sp_filter` table, IPv4 set, and drop rule are all created successfully, banned IPv4 sources are additionally dropped by nftables on the panel TCP port.
 5. **Forge a valid session:** authenticated operations use server-side sessions, HttpOnly/Secure cookies, a 30-minute sliding lifetime, and CSRF validation.
 6. **Defeat client-IP validation:** only explicitly trusted reverse proxies or verified Cloudflare networks may supply the real client IP, reducing forwarded-header spoofing opportunities.
 
 No Internet service can be promised to be “impossible to breach,” but these controls materially increase the cost of automated scanning, credential guessing, session abuse, and sustained brute-force attacks.
+
+> **nftables deployment boundary:** Debian 13 provides nftables in its package repository and it may already be present on a conventional full installation, but minimal systems, containers, and some cloud images do not guarantee it. The current Server Panel one-click installer does not install or enable nftables; it only opens the panel port in an already active UFW or firewalld configuration. Network-level nftables blocking must therefore not be treated as a default capability in every installation. The panel currently creates an IPv4 ban set; IPv6 access still depends on external firewall policy and the panel's own authentication/application checks.
 
 ### 2. Why dashboard access still does not reveal stored secrets
 
