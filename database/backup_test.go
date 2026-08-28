@@ -6,8 +6,54 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestBackupDatabaseCreatesVerifiableCompressedSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	livePath := filepath.Join(dir, "live.db")
+	liveDB, err := sql.Open("sqlite", livePath)
+	if err != nil {
+		t.Fatalf("open live db: %v", err)
+	}
+	t.Cleanup(func() { _ = liveDB.Close() })
+	if _, err := liveDB.Exec("CREATE TABLE metrics (id INTEGER PRIMARY KEY, value TEXT); INSERT INTO metrics VALUES (1, 'history')"); err != nil {
+		t.Fatalf("seed live db: %v", err)
+	}
+
+	oldDB := DB
+	DB = liveDB
+	t.Cleanup(func() { DB = oldDB })
+
+	backupPath, err := BackupDatabase(filepath.Join(dir, "backups"))
+	if err != nil {
+		t.Fatalf("BackupDatabase: %v", err)
+	}
+	if !strings.HasSuffix(backupPath, ".gz") {
+		t.Fatalf("backup path = %q, want .gz suffix", backupPath)
+	}
+	if err := VerifyDBBackup(backupPath); err != nil {
+		t.Fatalf("VerifyDBBackup: %v", err)
+	}
+
+	restoredPath := filepath.Join(dir, "restored.db")
+	if err := RestoreDatabaseFile(backupPath, restoredPath); err != nil {
+		t.Fatalf("RestoreDatabaseFile: %v", err)
+	}
+	restoredDB, err := sql.Open("sqlite", restoredPath)
+	if err != nil {
+		t.Fatalf("open restored db: %v", err)
+	}
+	defer restoredDB.Close()
+	var value string
+	if err := restoredDB.QueryRow("SELECT value FROM metrics WHERE id = 1").Scan(&value); err != nil {
+		t.Fatalf("read restored monitoring history: %v", err)
+	}
+	if value != "history" {
+		t.Fatalf("restored value = %q, want history", value)
+	}
+}
 
 func TestBackupDatabaseForUserArchiveExcludesMonitoringHistory(t *testing.T) {
 	dir := t.TempDir()

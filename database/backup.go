@@ -20,17 +20,48 @@ const (
 )
 
 // BackupDatabase writes a consistent online snapshot of the live database into
-// dir using SQLite's VACUUM INTO, and returns the backup file's path.
+// dir using SQLite's VACUUM INTO, compresses it with gzip, and returns the
+// backup file's path.
 func BackupDatabase(dir string) (string, error) {
+	rawPath, err := backupDatabaseFile(dir)
+	if err != nil {
+		return "", err
+	}
+	backupPath := rawPath + ".gz"
+	if err := gzipFile(rawPath, backupPath); err != nil {
+		_ = os.Remove(rawPath)
+		return "", fmt.Errorf("failed to compress database backup: %w", err)
+	}
+	if err := os.Remove(rawPath); err != nil {
+		_ = os.Remove(backupPath)
+		return "", fmt.Errorf("failed to remove uncompressed database backup: %w", err)
+	}
+	return backupPath, nil
+}
+
+func backupDatabaseFile(dir string) (string, error) {
 	if DB == nil {
 		return "", fmt.Errorf("database not open")
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", fmt.Errorf("failed to create backup directory: %w", err)
 	}
-	backupPath := filepath.Join(dir, fmt.Sprintf("server-panel.db.bak.%s", time.Now().UTC().Format("20060102-150405")))
+	now := time.Now().UTC()
+	reserved, err := os.CreateTemp(dir, fmt.Sprintf("server-panel.db.bak.%s.*", now.Format("20060102-150405")))
+	if err != nil {
+		return "", fmt.Errorf("failed to reserve backup path: %w", err)
+	}
+	backupPath := reserved.Name()
+	if err := reserved.Close(); err != nil {
+		_ = os.Remove(backupPath)
+		return "", fmt.Errorf("failed to reserve backup path: %w", err)
+	}
+	if err := os.Remove(backupPath); err != nil {
+		return "", fmt.Errorf("failed to prepare backup path: %w", err)
+	}
 	quotedPath := strings.ReplaceAll(backupPath, "'", "''")
 	if _, err := DB.Exec(fmt.Sprintf("VACUUM INTO '%s'", quotedPath)); err != nil {
+		_ = os.Remove(backupPath)
 		return "", fmt.Errorf("vacuum into backup failed: %w", err)
 	}
 	return backupPath, nil
@@ -41,7 +72,7 @@ func BackupDatabase(dir string) (string, error) {
 // the metrics tables remain present in the snapshot so collection resumes
 // normally after a restore.
 func BackupDatabaseForUserArchive(dir string) (string, error) {
-	backupPath, err := BackupDatabase(dir)
+	backupPath, err := backupDatabaseFile(dir)
 	if err != nil {
 		return "", err
 	}
@@ -87,7 +118,12 @@ func VerifyDBBackup(path string) error {
 	// Read-only single-connection integrity check - no WAL/pragma tuning
 	// needed here (and modernc.org/sqlite doesn't recognize the mattn-style
 	// _journal_mode= DSN param anyway, see database.Open).
-	db, err := sql.Open("sqlite", path)
+	verifyPath, cleanup, err := materializeDBBackup(path)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	db, err := sql.Open("sqlite", verifyPath)
 	if err != nil {
 		return fmt.Errorf("failed to open backup: %w", err)
 	}
@@ -108,16 +144,27 @@ func VerifyDBBackup(path string) error {
 // re-Open() it afterward. Any stale WAL/SHM files next to the live path are
 // removed so the restored file isn't merged with leftover write-ahead state.
 func RestoreDatabaseFile(backupPath, liveDBPath string) error {
-	data, err := os.ReadFile(backupPath)
+	in, err := openDBBackup(backupPath)
 	if err != nil {
 		return fmt.Errorf("failed to read backup: %w", err)
 	}
+	defer in.Close()
+	tmpPath := fmt.Sprintf("%s.restore.%d", liveDBPath, time.Now().UnixNano())
+	out, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write live database: %w", err)
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to write live database: %w", err)
+	}
+	if err := out.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("failed to write live database: %w", err)
+	}
 	for _, suffix := range []string{"-wal", "-shm"} {
 		_ = os.Remove(liveDBPath + suffix)
-	}
-	tmpPath := fmt.Sprintf("%s.restore.%d", liveDBPath, time.Now().UnixNano())
-	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write live database: %w", err)
 	}
 	if err := os.Rename(tmpPath, liveDBPath); err != nil {
 		_ = os.Remove(tmpPath)
@@ -127,6 +174,100 @@ func RestoreDatabaseFile(backupPath, liveDBPath string) error {
 		_ = os.Remove(liveDBPath + suffix)
 	}
 	return nil
+}
+
+type backupReadCloser struct {
+	io.Reader
+	closers []io.Closer
+}
+
+func (r *backupReadCloser) Close() error {
+	for _, closer := range r.closers {
+		if err := closer.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func openDBBackup(path string) (io.ReadCloser, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.HasSuffix(path, ".gz") {
+		return f, nil
+	}
+	gr, err := gzip.NewReader(f)
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	return &backupReadCloser{Reader: gr, closers: []io.Closer{gr, f}}, nil
+}
+
+func gzipFile(srcPath, destPath string) error {
+	in, err := os.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(destPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	ok := false
+	defer func() {
+		out.Close()
+		if !ok {
+			_ = os.Remove(destPath)
+		}
+	}()
+	gw := gzip.NewWriter(out)
+	if _, err := io.Copy(gw, in); err != nil {
+		gw.Close()
+		return err
+	}
+	if err := gw.Close(); err != nil {
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	ok = true
+	return nil
+}
+
+func materializeDBBackup(path string) (string, func(), error) {
+	if !strings.HasSuffix(path, ".gz") {
+		return path, func() {}, nil
+	}
+	in, err := openDBBackup(path)
+	if err != nil {
+		return "", func() {}, fmt.Errorf("failed to decompress backup: %w", err)
+	}
+	defer in.Close()
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".server-panel-db-verify-*")
+	if err != nil {
+		return "", func() {}, fmt.Errorf("failed to create verification file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	cleanup := func() { _ = os.Remove(tmpPath) }
+	if err := tmp.Chmod(0600); err != nil {
+		tmp.Close()
+		cleanup()
+		return "", func() {}, err
+	}
+	if _, err := io.Copy(tmp, in); err != nil {
+		tmp.Close()
+		cleanup()
+		return "", func() {}, fmt.Errorf("failed to decompress backup: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		cleanup()
+		return "", func() {}, err
+	}
+	return tmpPath, cleanup, nil
 }
 
 // CreateFullBackupArchive bundles a database snapshot and the at-rest secret

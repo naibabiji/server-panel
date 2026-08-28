@@ -244,7 +244,7 @@ func checkResourceAlerts(db *sql.DB, alertType, metricCol string) {
 	activeTargets := make(map[alertTarget]bool)
 
 	rows, err := db.Query(
-		"SELECT threshold_value, threshold_count FROM alert_rules WHERE alert_type = ? AND enabled = 1",
+		"SELECT threshold_value, threshold_count, server_id FROM alert_rules WHERE alert_type = ? AND enabled = 1",
 		alertType)
 	if err != nil {
 		return
@@ -253,11 +253,12 @@ func checkResourceAlerts(db *sql.DB, alertType, metricCol string) {
 	type resourceRule struct {
 		threshold float64
 		count     float64
+		serverID  sql.NullInt64
 	}
 	var rules []resourceRule
 	for rows.Next() {
 		var r resourceRule
-		if err := rows.Scan(&r.threshold, &r.count); err == nil {
+		if err := rows.Scan(&r.threshold, &r.count, &r.serverID); err == nil {
 			rules = append(rules, r)
 		}
 	}
@@ -291,27 +292,46 @@ func checkResourceAlerts(db *sql.DB, alertType, metricCol string) {
 				fmt.Sprintf("服务器 %s %s 连续 %d 次超标 (阈值: %.0f%%)", name, alertTypeToLabel(alertType), checkCount, r.threshold))
 		}
 		sRows.Close()
+
+		// A rule without a server target is the global rule and also covers the
+		// machine running the panel, which has no servers row/server_id.
+		if !r.serverID.Valid {
+			var exceeded int
+			err := db.QueryRow(fmt.Sprintf(`SELECT COUNT(*) FROM (
+				SELECT %s FROM host_metrics ORDER BY recorded_at DESC LIMIT %d
+			) WHERE %s > ?`, metricCol, checkCount, metricCol), r.threshold).Scan(&exceeded)
+			if err == nil && exceeded == checkCount {
+				activeTargets[alertTarget{}] = true
+				createAlert(db, alertType, nil, nil, "warning",
+					fmt.Sprintf("面板服务器 %s 连续 %d 次超标 (阈值: %.0f%%)", alertTypeToLabel(alertType), checkCount, r.threshold))
+			}
+		}
 	}
 	resolveInactiveAlerts(db, alertType, activeTargets)
 }
 
 func checkDiskAlerts(db *sql.DB) {
-	rows, err := db.Query("SELECT threshold_value FROM alert_rules WHERE alert_type = 'disk_high' AND enabled = 1")
+	rows, err := db.Query("SELECT threshold_value, server_id FROM alert_rules WHERE alert_type = 'disk_high' AND enabled = 1")
 	if err != nil {
 		return
 	}
 	activeTargets := make(map[alertTarget]bool)
 
-	var thresholds []float64
+	type diskRule struct {
+		threshold float64
+		serverID  sql.NullInt64
+	}
+	var rules []diskRule
 	for rows.Next() {
-		var threshold float64
-		if err := rows.Scan(&threshold); err == nil {
-			thresholds = append(thresholds, threshold)
+		var r diskRule
+		if err := rows.Scan(&r.threshold, &r.serverID); err == nil {
+			rules = append(rules, r)
 		}
 	}
 	rows.Close()
 
-	for _, threshold := range thresholds {
+	for _, r := range rules {
+		threshold := r.threshold
 		if threshold <= 0 {
 			continue
 		}
@@ -333,6 +353,16 @@ func checkDiskAlerts(db *sql.DB) {
 				fmt.Sprintf("服务器 %s 磁盘使用率 %.1f%% 超过阈值 %.0f%%", name, disk, threshold))
 		}
 		sRows.Close()
+
+		if !r.serverID.Valid {
+			var disk float64
+			err := db.QueryRow(`SELECT disk_percent FROM host_metrics ORDER BY recorded_at DESC LIMIT 1`).Scan(&disk)
+			if err == nil && disk > threshold {
+				activeTargets[alertTarget{}] = true
+				createAlert(db, "disk_high", nil, nil, "warning",
+					fmt.Sprintf("面板服务器磁盘使用率 %.1f%% 超过阈值 %.0f%%", disk, threshold))
+			}
+		}
 	}
 	resolveInactiveAlerts(db, "disk_high", activeTargets)
 }

@@ -59,6 +59,51 @@ func TestWebsiteExpiryAlertUsesWebsiteIDAndResolves(t *testing.T) {
 	}
 }
 
+func TestHostResourceAndDiskAlertsUseNilServerID(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, threshold_count, enabled)
+		VALUES ('cpu_high', 80, 3, 1), ('memory_high', 85, 2, 1), ('disk_high', 90, 3, 1)`)
+	for i := 0; i < 3; i++ {
+		execAlertSQL(t, db, `INSERT INTO host_metrics (cpu_percent, memory_percent, disk_percent, recorded_at)
+			VALUES (95, 92, 96, datetime('now', ? || ' seconds'))`, i)
+	}
+
+	checkResourceAlerts(db, "cpu_high", "cpu_percent")
+	checkResourceAlerts(db, "memory_high", "memory_percent")
+	checkDiskAlerts(db)
+
+	for _, alertType := range []string{"cpu_high", "memory_high", "disk_high"} {
+		var serverID sql.NullInt64
+		var message string
+		if err := db.QueryRow(`SELECT server_id, message FROM alert_log WHERE alert_type = ? AND resolved = 0`, alertType).
+			Scan(&serverID, &message); err != nil {
+			t.Fatalf("query %s host alert: %v", alertType, err)
+		}
+		if serverID.Valid {
+			t.Errorf("%s server_id = %d, want NULL", alertType, serverID.Int64)
+		}
+		if !strings.Contains(message, "面板服务器") {
+			t.Errorf("%s message = %q, want panel host label", alertType, message)
+		}
+	}
+
+	for i := 10; i < 13; i++ {
+		execAlertSQL(t, db, `INSERT INTO host_metrics (cpu_percent, memory_percent, disk_percent, recorded_at)
+			VALUES (10, 10, 10, datetime('now', ? || ' seconds'))`, i)
+	}
+	checkResourceAlerts(db, "cpu_high", "cpu_percent")
+	checkResourceAlerts(db, "memory_high", "memory_percent")
+	checkDiskAlerts(db)
+
+	var unresolved int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM alert_log WHERE resolved = 0`).Scan(&unresolved); err != nil {
+		t.Fatalf("count unresolved host alerts: %v", err)
+	}
+	if unresolved != 0 {
+		t.Fatalf("unresolved host alerts = %d, want 0 after recovery", unresolved)
+	}
+}
+
 // Regression test: an item that goes overdue without ever being renewed must
 // keep its expiry alert open, not have it silently auto-resolved just
 // because it fell out of the "next N days" window.
@@ -402,6 +447,12 @@ func newAlertTestDB(t *testing.T) *sql.DB {
 		)`,
 		`CREATE TABLE metrics (
 			server_id INTEGER NOT NULL,
+			cpu_percent REAL,
+			memory_percent REAL,
+			disk_percent REAL,
+			recorded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE host_metrics (
 			cpu_percent REAL,
 			memory_percent REAL,
 			disk_percent REAL,
