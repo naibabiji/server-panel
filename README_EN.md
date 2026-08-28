@@ -14,6 +14,17 @@ Built with Go and SQLite, Server Panel deploys as a single binary and includes a
 
 > Debian 13 is the primary development and test platform. Other Debian/Ubuntu systems using systemd may work, but are not guaranteed to be fully compatible.
 
+## Security Is a Core Design Goal
+
+Server Panel addresses two separate questions: **How difficult is it to break into the panel, and how difficult is it to obtain stored credentials even after gaining dashboard access?**
+
+| Attack stage | Defenses an attacker must cross | Limits that remain after a breach |
+|---|---|---|
+| Discover and enter the panel | Randomized URL path, HTTPS, optional BasicAuth, independent panel login, failed-attempt bans, malicious scan detection, and nftables integration | Entry-point access or a normal dashboard session still cannot directly read stored secrets |
+| Read sensitive data | Independent view password, bcrypt verification, AES-256-GCM encryption, single-use tokens bound to the session and source IP, and a two-minute lifetime | Five consecutive failures erase stored server and website password copies instead of allowing unlimited guessing |
+
+In other words, **dashboard access is not secret-access permission**. An attacker who obtains a login password, browser session, or ordinary dashboard access must still defeat a second independent authorization layer before sensitive-data endpoints will return credentials. See the full [Security Model](#security-model) below.
+
 ## Highlights
 
 - **Centralized asset inventory:** manage servers, websites, customers, and providers, including ownership, location, pricing, currency, purchase dates, and expiry dates.
@@ -101,17 +112,37 @@ Credentials are printed in the installation log. The installer opens the HTTPS p
 
 ## Security Model
 
-Server Panel may hold infrastructure access details and customer data, so it uses several layers of protection:
+### 1. What an attacker must defeat to enter the panel
 
-1. A randomized URL path reduces discovery by generic scanners.
-2. Optional BasicAuth protects the entry point in addition to the independent panel login.
-3. Failed entry/login attempts and malicious path scans trigger automatic bans. nftables integration, allowlisting, and manual unbanning are available.
-4. Sensitive credentials are encrypted and require a separate view password even after panel login.
-5. Five consecutive incorrect view-password attempts erase stored secrets, but do not delete servers, websites, customers, monitoring history, or expiry records.
-6. Each Agent has an independent key. Regenerating its installation command invalidates the previous key, and the Agent only reports monitoring data.
-7. Trusted reverse proxies and Cloudflare real-client IP handling are configurable; Cloudflare network ranges are refreshed periodically.
+Server Panel does not place its entire security boundary behind a single login form. An attacker encounters multiple layers:
 
-A usable disaster-recovery backup must contain both the database and the encryption key. Full backups generated from Settings include both.
+1. **Discover the entry point:** installation generates a randomized URL path, so common `/admin`, `/login`, and vulnerability-scanner paths do not expose the panel directly.
+2. **Pass entry authentication:** optional BasicAuth sits in front of the panel login and uses separate credentials.
+3. **Avoid automatic bans:** repeated entry or panel login failures are recorded by source IP and trigger bans; malicious unknown-path scans also activate the defense.
+4. **Bypass network blocking:** with nftables available, banned sources are blocked by the system firewall on the panel port. Application-level rejection remains active without nftables.
+5. **Forge a valid session:** authenticated operations use server-side sessions, HttpOnly/Secure cookies, a 30-minute sliding lifetime, and CSRF validation.
+6. **Defeat client-IP validation:** only explicitly trusted reverse proxies or verified Cloudflare networks may supply the real client IP, reducing forwarded-header spoofing opportunities.
+
+No Internet service can be promised to be “impossible to breach,” but these controls materially increase the cost of automated scanning, credential guessing, session abuse, and sustained brute-force attacks.
+
+### 2. Why dashboard access still does not reveal stored secrets
+
+Server SSH passwords, server/website control-panel passwords, and private provider notes are not returned merely because a user logged in:
+
+1. **Independent view password:** it is separate from the entry and panel login credentials, and its hash is stored with bcrypt cost 12.
+2. **Encryption at rest:** sensitive values use AES-256-GCM. The database stores randomized-nonce ciphertext rather than directly readable plaintext.
+3. **Short-lived single-use authorization:** successful view-password verification creates a one-time token bound to the current server-side session and source IP. It expires after two minutes and is consumed on first use.
+4. **Endpoint-level enforcement:** sensitive-data endpoints require and consume a valid view token in addition to checking the login session.
+5. **Brute-force damage control:** five consecutive incorrect view-password attempts from a source erase stored server SSH, server control-panel, and website control-panel password copies and revoke view tokens. Server, website, customer, monitoring, and expiry records remain intact.
+6. **Agent isolation:** every Agent has an independent key, old keys become invalid after regeneration, and Agents only submit monitoring data—they do not read stored passwords.
+
+This means **stealing a normal panel account or authenticated browser session does not directly enable a credential export**. The attacker must also obtain the independent view password before triggering erasure and satisfy the token, session, source-IP, and expiration constraints.
+
+### The security boundary that must be understood
+
+If an attacker gains `root` on the panel host, can read arbitrary panel process memory, or can replace the running binary, the host is fully compromised. Because the panel must decrypt credentials for legitimate users, no software can honestly promise secrecy at that privilege level. Isolate the host immediately, rotate every credential, and rebuild from a trusted backup.
+
+Backups are also sensitive assets. A full backup contains both the database and encryption key so credentials remain recoverable after disaster restoration. Restrict backup file permissions and keep off-site copies in a separate trusted location.
 
 > Self-hosting does not make a service automatically secure. Use strong passwords and HTTPS, and place the panel behind a cloud firewall, VPN, Tailscale, WireGuard, Cloudflare, or a trusted reverse proxy when appropriate.
 
