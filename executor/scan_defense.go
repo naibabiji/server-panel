@@ -12,12 +12,19 @@ import (
 	"github.com/naibabiji/server-panel/database"
 )
 
-const nftTable = "sp_filter"
-const nftSet = "banned_ips"
+const (
+	nftTable = "sp_filter"
+	nftSet4  = "banned_ipv4"
+	nftSet6  = "banned_ipv6"
+)
 
 var (
 	nftPorts       = "8444"
 	nftInitialized bool
+	lookPath       = exec.LookPath
+	runNftCommand  = func(args ...string) ([]byte, error) {
+		return exec.Command("nft", args...).CombinedOutput()
+	}
 )
 
 func SetNFTablesPorts(ports string) {
@@ -26,38 +33,55 @@ func SetNFTablesPorts(ports string) {
 
 // InitNFTables creates the sp_filter table, set, chain, and rules if not exists.
 func InitNFTables(tlsPort int) {
+	nftInitialized = false
 	ports := nftPortSet(tlsPort)
 	if ports == "" {
 		log.Printf("nftables scan defense disabled: no panel ports configured")
 		return
 	}
 	SetNFTablesPorts(ports)
-	if _, err := exec.LookPath("nft"); err != nil {
+	if _, err := lookPath("nft"); err != nil {
 		log.Printf("nftables not found, scan defense disabled")
 		return
 	}
-
-	// Create table (idempotent)
-	runNft("add", "table", "inet", nftTable)
-
-	// Create set
-	runNft("add", "set", "inet", nftTable, nftSet, "{ type ipv4_addr; }")
-
-	// Create chain
-	runNft("add", "chain", "inet", nftTable, "input",
-		"{ type filter hook input priority 0; policy accept; }")
-
-	// Add drop rule (idempotent — will error if exists, ignore)
-	_ = exec.Command("nft", "add", "rule", "inet", nftTable, "input",
-		"ip", "saddr", "@"+nftSet, "tcp", "dport", ports, "drop").Run()
+	if err := initNFTablesRules(ports); err != nil {
+		log.Printf("nftables scan defense disabled: %v", err)
+		return
+	}
 
 	nftInitialized = true
 	log.Printf("nftables scan defense initialized (ports %s)", ports)
 	restoreActiveBans()
 }
 
-func runNft(args ...string) {
-	_ = exec.Command("nft", args...).Run()
+func initNFTablesRules(ports string) error {
+	// This table belongs exclusively to Server Panel. Recreating it avoids
+	// duplicate rules and removes the legacy IPv4-only banned_ips set during
+	// upgrades; active database bans are restored immediately afterwards.
+	_, _ = runNftCommand("delete", "table", "inet", nftTable)
+	commands := [][]string{
+		{"add", "table", "inet", nftTable},
+		{"add", "set", "inet", nftTable, nftSet4, "{ type ipv4_addr; }"},
+		{"add", "set", "inet", nftTable, nftSet6, "{ type ipv6_addr; }"},
+		{"add", "chain", "inet", nftTable, "input", "{ type filter hook input priority 0; policy accept; }"},
+		{"add", "rule", "inet", nftTable, "input", "ip", "saddr", "@" + nftSet4, "tcp", "dport", ports, "drop"},
+		{"add", "rule", "inet", nftTable, "input", "ip6", "saddr", "@" + nftSet6, "tcp", "dport", ports, "drop"},
+	}
+	for _, args := range commands {
+		if output, err := runNftCommand(args...); err != nil {
+			return fmt.Errorf("nft %s failed: %s: %w", strings.Join(args, " "), strings.TrimSpace(string(output)), err)
+		}
+	}
+	ruleset, err := runNftCommand("list", "table", "inet", nftTable)
+	if err != nil {
+		return fmt.Errorf("verify nftables table: %w", err)
+	}
+	for _, required := range []string{nftSet4, nftSet6, "hook input", "drop"} {
+		if !strings.Contains(string(ruleset), required) {
+			return fmt.Errorf("verify nftables table: missing %s", required)
+		}
+	}
+	return nil
 }
 
 func nftPortSet(tlsPort int) string {
@@ -83,8 +107,12 @@ func BanIP(ip, reason, source string, durationHours int) {
 	if !nftInitialized {
 		return
 	}
-	if err := exec.Command("nft", "add", "element", "inet", nftTable, nftSet,
-		"{ "+ip+" }").Run(); err != nil {
+	setName, ok := nftSetForIP(ip)
+	if !ok {
+		return
+	}
+	if _, err := runNftCommand("add", "element", "inet", nftTable, setName,
+		"{ "+ip+" }"); err != nil {
 		log.Printf("failed to add %s to nftables banned set: %v", ip, err)
 		return
 	}
@@ -127,7 +155,8 @@ func UnbanIP(ip string) {
 // UnbanAllIPs flushes all banned IPs from nftables and marks all active bans as unbanned.
 func UnbanAllIPs() {
 	if nftInitialized {
-		_ = exec.Command("nft", "flush", "set", "inet", nftTable, nftSet).Run()
+		_, _ = runNftCommand("flush", "set", "inet", nftTable, nftSet4)
+		_, _ = runNftCommand("flush", "set", "inet", nftTable, nftSet6)
 	}
 	db := database.GetDB()
 	if db != nil {
@@ -179,7 +208,23 @@ func cleanExpiredBans() {
 }
 
 func deleteNftElement(ip string) bool {
-	return exec.Command("nft", "delete", "element", "inet", nftTable, nftSet, "{ "+ip+" }").Run() == nil
+	setName, ok := nftSetForIP(ip)
+	if !ok {
+		return false
+	}
+	_, err := runNftCommand("delete", "element", "inet", nftTable, setName, "{ "+ip+" }")
+	return err == nil
+}
+
+func nftSetForIP(ip string) (string, bool) {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return "", false
+	}
+	if parsed.To4() != nil {
+		return nftSet4, true
+	}
+	return nftSet6, true
 }
 
 func restoreActiveBans() {
@@ -204,7 +249,11 @@ func restoreActiveBans() {
 		if IsWhitelisted(ip) {
 			continue
 		}
-		if err := exec.Command("nft", "add", "element", "inet", nftTable, nftSet, "{ "+ip+" }").Run(); err == nil {
+		setName, ok := nftSetForIP(ip)
+		if !ok {
+			continue
+		}
+		if _, err := runNftCommand("add", "element", "inet", nftTable, setName, "{ "+ip+" }"); err == nil {
 			restored++
 		}
 	}

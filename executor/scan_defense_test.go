@@ -2,6 +2,8 @@ package executor
 
 import (
 	"database/sql"
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/naibabiji/server-panel/database"
@@ -30,6 +32,72 @@ func TestNFTPortSetUsesOnlyTLSPort(t *testing.T) {
 	}
 	if got := nftPortSet(8444); got != "{ 8444 }" {
 		t.Fatalf("nftPortSet(8444) = %q, want { 8444 }", got)
+	}
+}
+
+func TestNFTSetForIPSupportsIPv4AndIPv6(t *testing.T) {
+	tests := []struct {
+		ip      string
+		wantSet string
+		wantOK  bool
+	}{
+		{ip: "203.0.113.10", wantSet: nftSet4, wantOK: true},
+		{ip: "2001:db8::10", wantSet: nftSet6, wantOK: true},
+		{ip: "not-an-ip", wantOK: false},
+	}
+	for _, tt := range tests {
+		gotSet, gotOK := nftSetForIP(tt.ip)
+		if gotSet != tt.wantSet || gotOK != tt.wantOK {
+			t.Errorf("nftSetForIP(%q) = (%q, %v), want (%q, %v)", tt.ip, gotSet, gotOK, tt.wantSet, tt.wantOK)
+		}
+	}
+}
+
+func TestInitNFTablesStaysDisabledWhenRuleSetupFails(t *testing.T) {
+	oldLookPath := lookPath
+	oldRun := runNftCommand
+	oldInitialized := nftInitialized
+	lookPath = func(string) (string, error) { return "/usr/sbin/nft", nil }
+	runNftCommand = func(...string) ([]byte, error) { return []byte("permission denied"), errors.New("exit status 1") }
+	nftInitialized = true
+	t.Cleanup(func() {
+		lookPath = oldLookPath
+		runNftCommand = oldRun
+		nftInitialized = oldInitialized
+	})
+
+	InitNFTables(8444)
+
+	if nftInitialized {
+		t.Fatal("nftInitialized = true after rule setup failure, want false")
+	}
+}
+
+func TestInitNFTablesRulesCreatesIPv4AndIPv6Drops(t *testing.T) {
+	oldRun := runNftCommand
+	var calls []string
+	runNftCommand = func(args ...string) ([]byte, error) {
+		call := strings.Join(args, " ")
+		calls = append(calls, call)
+		if call == "list table inet "+nftTable {
+			return []byte("set " + nftSet4 + "\nset " + nftSet6 + "\nchain input { hook input; drop; }"), nil
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() { runNftCommand = oldRun })
+
+	if err := initNFTablesRules("{ 8444 }"); err != nil {
+		t.Fatalf("initNFTablesRules() error = %v", err)
+	}
+
+	joined := strings.Join(calls, "\n")
+	for _, want := range []string{
+		"ip saddr @" + nftSet4 + " tcp dport { 8444 } drop",
+		"ip6 saddr @" + nftSet6 + " tcp dport { 8444 } drop",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("nft calls missing %q:\n%s", want, joined)
+		}
 	}
 }
 

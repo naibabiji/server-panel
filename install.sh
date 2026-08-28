@@ -39,7 +39,7 @@ prompt() {
     local default="${3:-}"
     local value=""
 
-    if [ -r /dev/tty ] && [ -w /dev/tty ]; then
+    if [ -r /dev/tty ] && [ -w /dev/tty ] && tty -s 2>/dev/null </dev/tty; then
         printf "%s" "$message" >/dev/tty
         IFS= read -r value </dev/tty || value="$default"
     elif [ -t 0 ]; then
@@ -66,17 +66,28 @@ install_dependencies() {
     if command -v apt-get >/dev/null 2>&1; then
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -y
-        apt-get install -y ca-certificates curl openssl util-linux e2fsprogs parted
+        apt-get install -y ca-certificates curl openssl util-linux e2fsprogs parted nftables
     elif command -v dnf >/dev/null 2>&1; then
         dnf install -y ca-certificates curl openssl util-linux e2fsprogs parted
+        if ! command -v nft >/dev/null 2>&1 && ! dnf install -y nftables; then
+            warn "当前系统无法安装 nftables，将保留应用层封禁；建议手动配置系统防火墙"
+        fi
     elif command -v yum >/dev/null 2>&1; then
         yum install -y ca-certificates curl openssl util-linux e2fsprogs parted
+        if ! command -v nft >/dev/null 2>&1 && ! yum install -y nftables; then
+            warn "当前系统无法安装 nftables，将保留应用层封禁；建议手动配置系统防火墙"
+        fi
     else
         for bin in curl openssl lsblk findmnt wipefs mkfs.ext4 parted partprobe; do
             command -v "$bin" >/dev/null 2>&1 || err "缺少依赖: $bin，请先安装磁盘管理依赖"
         done
     fi
     command -v systemctl >/dev/null 2>&1 || err "当前系统缺少 systemd/systemctl，暂不支持一键安装"
+    if command -v nft >/dev/null 2>&1; then
+        log "nftables 命令可用，将由面板初始化 IPv4/IPv6 自动封禁规则"
+    else
+        warn "未检测到 nft 命令，网络层自动封禁不可用；面板仍保留认证和应用层封禁"
+    fi
 }
 
 detect_arch() {
@@ -243,8 +254,8 @@ upgrade_existing() {
     load_existing_tls_port
     download_binary
     write_service
-    restart_service
     configure_firewall
+    restart_service
     echo ""
     log "升级完成，配置和数据库已保留: $CONFIG_FILE"
     echo "  systemctl status server-panel"
@@ -433,8 +444,8 @@ main() {
     generate_tls_cert
     write_config
     write_service
-    restart_service
     configure_firewall
+    restart_service
     print_summary
 }
 
