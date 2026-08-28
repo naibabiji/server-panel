@@ -1,6 +1,8 @@
 # Server Panel — Self-Hosted VPS Asset Management & Server Monitoring
 
-**English** | [简体中文](README.md)
+> 🌐 **中文文档：**[阅读完整简体中文说明 →](README.md)
+
+**English documentation**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-single%20binary-00ADD8?logo=go)](go.mod)

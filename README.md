@@ -1,6 +1,8 @@
 # Server Panel — 自托管 VPS 资产管理与服务器监控面板
 
-[English](README_EN.md) | **简体中文**
+> 🌐 **English documentation:** [Read the full English README →](README_EN.md)
+
+**简体中文说明**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Go](https://img.shields.io/badge/Go-single%20binary-00ADD8?logo=go)](go.mod)
