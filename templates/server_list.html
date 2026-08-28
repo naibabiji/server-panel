@@ -3,33 +3,33 @@
 <div x-data="serverList()" x-init="fetch(); loadProviders(); loadCustomers()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <div class="flex flex-wrap gap-2">
-            <input type="text" x-model="search" @input="resetAndFetch()" placeholder="搜索名称/IP/机房..." class="input-field w-48">
+            <input type="text" x-model="search" @input="resetAndFetch()" placeholder="{{t .Lang "server.search_placeholder"}}" class="input-field w-48">
             <select x-model="filterStatus" @change="resetAndFetch()" class="input-field w-32">
-                <option value="">全部状态</option>
-                <option value="active">活跃</option>
-                <option value="expired">过期</option>
+                <option value="">{{t .Lang "common.status_all"}}</option>
+                <option value="active">{{t .Lang "common.status_active"}}</option>
+                <option value="expired">{{t .Lang "common.status_expired"}}</option>
             </select>
             <select x-model="filterProvider" @change="resetAndFetch()" class="input-field w-36">
-                <option value="">全部服务商</option>
+                <option value="">{{t .Lang "server.provider_all"}}</option>
                 <template x-for="p in providers" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
             </select>
             <select x-model="filterCustomer" @change="resetAndFetch()" class="input-field w-36">
-                <option value="">全部客户</option>
+                <option value="">{{t .Lang "server.customer_all"}}</option>
                 <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
             </select>
         </div>
-        <a href="servers/new" class="btn-primary text-sm">添加服务器</a>
+        <a href="servers/new" class="btn-primary text-sm">{{t .Lang "server.add"}}</a>
     </div>
 
     <div class="card overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">名称</th><th class="table-header">IP</th><th class="table-header">服务商</th><th class="table-header">类型</th>
-                <th class="table-header">面板</th><th class="table-header">状态</th><th class="table-header">在线</th>
+                <th class="table-header">{{t .Lang "server.col_name"}}</th><th class="table-header">{{t .Lang "server.col_ip"}}</th><th class="table-header">{{t .Lang "server.col_provider"}}</th><th class="table-header">{{t .Lang "server.col_type"}}</th>
+                <th class="table-header">{{t .Lang "server.col_panel"}}</th><th class="table-header">{{t .Lang "server.col_status"}}</th><th class="table-header">{{t .Lang "server.col_online"}}</th>
                 <th class="table-header cursor-pointer select-none hover:text-gray-200" @click="toggleSort('expiry_date')">
-                    到期日<span x-text="sortIndicator('expiry_date')"></span>
+                    {{t .Lang "server.col_expiry"}}<span x-text="sortIndicator('expiry_date')"></span>
                 </th>
-                <th class="table-header">操作</th>
+                <th class="table-header">{{t .Lang "server.col_actions"}}</th>
             </tr></thead>
             <tbody>
             <template x-for="s in items" :key="s.id">
@@ -39,30 +39,30 @@
                     <td class="table-cell text-gray-400" x-text="s.provider_name || '--'"></td>
                     <td class="table-cell"><span class="badge-info" x-text="s.server_type"></span></td>
                     <td class="table-cell text-gray-400" x-text="s.panel_type == 'none' ? '--' : s.panel_type"></td>
-                    <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></td>
+                    <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?t('common.status_active'):t('common.status_expired')"></span></td>
                     <td class="table-cell"><span :class="serverStatus(s).cls" x-text="serverStatus(s).label"></span></td>
                     <td class="table-cell" :class="expiryClass(s.expiry_date)" x-text="s.expiry_date || '--'"></td>
                     <td class="table-cell">
                         <div class="flex gap-2">
-                            <a :href="'servers/'+s.id" class="text-sm text-purple-300 hover:text-purple-200">详情</a>
-                            <a :href="'servers/'+s.id+'/edit'" class="text-sm text-gray-300 hover:text-white">编辑</a>
-                            <a href="#" @click.prevent="renew(s)" class="text-sm text-green-400 hover:text-green-300">续费</a>
-                            <a href="#" @click.prevent="del(s.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
+                            <a :href="'servers/'+s.id" class="text-sm text-purple-300 hover:text-purple-200">{{t .Lang "common.detail"}}</a>
+                            <a :href="'servers/'+s.id+'/edit'" class="text-sm text-gray-300 hover:text-white">{{t .Lang "common.edit"}}</a>
+                            <a href="#" @click.prevent="renew(s)" class="text-sm text-green-400 hover:text-green-300">{{t .Lang "common.renew"}}</a>
+                            <a href="#" @click.prevent="del(s.id)" class="text-sm text-red-400 hover:text-red-300">{{t .Lang "common.delete"}}</a>
                         </div>
                     </td>
                 </tr>
             </template>
             </tbody>
         </table>
-        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无服务器，点击右上角添加</div>
+        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">{{t .Lang "server.empty"}}</div>
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#252c35] px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
-            <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
+            <div x-text="t('common.pagination_summary', {start: pageStart, end: pageEnd, total: total})"></div>
             <div class="flex items-center gap-2">
-                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
-                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.first_page')"></button>
+                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.prev_page')"></button>
                 <span class="px-2" x-text="page + ' / ' + totalPages"></span>
-                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
-                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.next_page')"></button>
+                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.last_page')"></button>
             </div>
         </div>
     </div>
@@ -123,8 +123,8 @@ function serverList() {
         expiryClass,
         async renew(s) {
             const newDate = await inputModal({
-                title: '续费 ' + s.name,
-                label: '新到期日',
+                title: t('server.renew_title', {name: s.name}),
+                label: t('common.new_expiry_date'),
                 type: 'date',
                 defaultValue: s.expiry_date || new Date().toISOString().slice(0, 10),
             });
@@ -135,12 +135,12 @@ function serverList() {
                 full.expiry_date = newDate;
                 full.status = 'active';
                 await api('/api/servers/' + s.id, { method: 'PUT', body: full });
-                showToast('续费成功', 'success');
+                showToast(t('common.renew_success'), 'success');
                 await this.fetch();
             } catch (e) { showToast(e.message, 'error'); }
         },
         async del(id) {
-            if (!await confirmModal('确认删除此服务器？')) return;
+            if (!await confirmModal(t('server.delete_confirm'))) return;
             try { await api('/api/servers/'+id, {method:'DELETE'}); await this.fetch(); }
             catch(e) { showToast(e.message, 'error'); }
         }

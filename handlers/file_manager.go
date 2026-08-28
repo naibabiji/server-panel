@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/executor"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -36,7 +37,7 @@ func (h *FileManagerHandler) Roots(c *gin.Context) {
 func (h *FileManagerHandler) AddRoot(c *gin.Context) {
 	var req struct{ Path, Name string }
 	if c.ShouldBindJSON(&req) != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请求参数无效"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.invalid_params")))
 		return
 	}
 	root, err := executor.AddCustomFileRoot(h.DB, req.Path, req.Name, h.dataDir())
@@ -44,7 +45,7 @@ func (h *FileManagerHandler) AddRoot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
-	executor.RecordOperationLog("file_root_add", root.Path, "success", "添加文件管理目录")
+	executor.RecordOperationLog("file_root_add", root.Path, "success", i18n.TE(c.Request, "errors.files.log_add_root"))
 	c.JSON(http.StatusOK, models.SuccessResponse(root))
 }
 
@@ -54,8 +55,8 @@ func (h *FileManagerHandler) RemoveRoot(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
-	executor.RecordOperationLog("file_root_remove", path, "success", "移除文件管理目录（未删除目录文件）")
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "已移除管理入口，服务器文件没有被删除"}))
+	executor.RecordOperationLog("file_root_remove", path, "success", i18n.TE(c.Request, "errors.files.log_remove_root"))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": i18n.TE(c.Request, "errors.files.root_removed_note")}))
 }
 
 func (h *FileManagerHandler) List(c *gin.Context) {
@@ -76,7 +77,7 @@ func (h *FileManagerHandler) Download(c *gin.Context) {
 	}
 	info, err := os.Stat(target)
 	if err != nil || !info.Mode().IsRegular() {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("只能下载普通文件"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.download_regular_only")))
 		return
 	}
 	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(target)))
@@ -87,7 +88,7 @@ func (h *FileManagerHandler) Upload(c *gin.Context) {
 	root, path := c.PostForm("root"), c.DefaultPostForm("path", "/")
 	header, err := c.FormFile("file")
 	if err != nil || filepath.Base(header.Filename) != header.Filename {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("上传文件无效"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.invalid_upload")))
 		return
 	}
 	dest, err := executor.ManagedFilePath(h.DB, h.dataDir(), root, filepath.Join(path, header.Filename), true)
@@ -96,16 +97,16 @@ func (h *FileManagerHandler) Upload(c *gin.Context) {
 		return
 	}
 	if _, err := os.Lstat(dest); err == nil {
-		c.JSON(http.StatusConflict, models.ErrorResponse("同名文件已经存在"))
+		c.JSON(http.StatusConflict, models.ErrorResponse(i18n.TE(c.Request, "errors.files.name_exists")))
 		return
 	}
 	if err := c.SaveUploadedFile(header, dest); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("上传失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.files.upload_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	_ = os.Chmod(dest, 0644)
-	executor.RecordOperationLog("file_upload", dest, "success", fmt.Sprintf("上传 %d 字节", header.Size))
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "文件上传完成"}))
+	executor.RecordOperationLog("file_upload", dest, "success", i18n.TE(c.Request, "errors.files.uploaded_bytes", i18n.P{"bytes": fmt.Sprintf("%d", header.Size)}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": i18n.TE(c.Request, "errors.files.upload_done")}))
 }
 
 func (h *FileManagerHandler) Mkdir(c *gin.Context) {
@@ -115,15 +116,15 @@ func (h *FileManagerHandler) Mkdir(c *gin.Context) {
 		Name string `json:"name"`
 	}
 	if c.ShouldBindJSON(&req) != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请求参数无效"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.invalid_params")))
 		return
 	}
 	if err := executor.CreateManagedDirectory(h.DB, h.dataDir(), req.Root, req.Path, req.Name); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
-	executor.RecordOperationLog("file_mkdir", filepath.Join(req.Root, req.Path, req.Name), "success", "新建目录")
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "目录已创建"}))
+	executor.RecordOperationLog("file_mkdir", filepath.Join(req.Root, req.Path, req.Name), "success", i18n.TE(c.Request, "errors.files.log_mkdir"))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": i18n.TE(c.Request, "errors.files.mkdir_done")}))
 }
 
 func (h *FileManagerHandler) Rename(c *gin.Context) {
@@ -133,15 +134,15 @@ func (h *FileManagerHandler) Rename(c *gin.Context) {
 		NewName string `json:"new_name"`
 	}
 	if c.ShouldBindJSON(&req) != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请求参数无效"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.invalid_params")))
 		return
 	}
 	if err := executor.RenameManagedFile(h.DB, h.dataDir(), req.Root, req.Path, req.NewName); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
-	executor.RecordOperationLog("file_rename", filepath.Join(req.Root, req.Path), "success", "重命名为 "+req.NewName)
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "重命名完成"}))
+	executor.RecordOperationLog("file_rename", filepath.Join(req.Root, req.Path), "success", i18n.TE(c.Request, "errors.files.log_renamed_to", i18n.P{"name": req.NewName}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": i18n.TE(c.Request, "errors.files.rename_done")}))
 }
 
 func (h *FileManagerHandler) Delete(c *gin.Context) {
@@ -150,8 +151,8 @@ func (h *FileManagerHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
-	executor.RecordOperationLog("file_delete", filepath.Join(root, path), "success", "删除文件或目录")
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "删除完成"}))
+	executor.RecordOperationLog("file_delete", filepath.Join(root, path), "success", i18n.TE(c.Request, "errors.files.log_deleted"))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": i18n.TE(c.Request, "errors.files.delete_done")}))
 }
 
 func (h *FileManagerHandler) Transfer(c *gin.Context) {
@@ -162,11 +163,11 @@ func (h *FileManagerHandler) Transfer(c *gin.Context) {
 		Move        bool   `json:"move"`
 	}
 	if c.ShouldBindJSON(&req) != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请求参数无效"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.invalid_params")))
 		return
 	}
 	if filepath.Clean(req.Source) == "/" || filepath.Clean(req.Source) == "." {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("不能复制或移动管理根目录"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.cannot_copy_root")))
 		return
 	}
 	src, err := executor.ManagedFilePath(h.DB, h.dataDir(), req.Root, req.Source, false)
@@ -180,11 +181,11 @@ func (h *FileManagerHandler) Transfer(c *gin.Context) {
 		return
 	}
 	if info, statErr := os.Stat(src); statErr == nil && info.IsDir() && (dst == src || strings.HasPrefix(dst, src+string(os.PathSeparator))) {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("不能将目录复制或移动到它自己的子目录"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.cannot_copy_into_self")))
 		return
 	}
 	if _, err := os.Lstat(dst); !errors.Is(err, os.ErrNotExist) {
-		c.JSON(http.StatusConflict, models.ErrorResponse("目标中存在同名项目"))
+		c.JSON(http.StatusConflict, models.ErrorResponse(i18n.TE(c.Request, "errors.files.target_name_exists")))
 		return
 	}
 	if req.Move {
@@ -193,15 +194,15 @@ func (h *FileManagerHandler) Transfer(c *gin.Context) {
 		err = executor.CopyManagedFile(src, dst)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("操作失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.files.operation_failed", i18n.P{"error": err.Error()})))
 		return
 	}
-	action := "复制"
+	actionDone := i18n.TE(c.Request, "errors.files.copy_done")
 	if req.Move {
-		action = "移动"
+		actionDone = i18n.TE(c.Request, "errors.files.move_done")
 	}
-	executor.RecordOperationLog("file_transfer", src, "success", action+"到 "+dst)
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": action + "完成"}))
+	executor.RecordOperationLog("file_transfer", src, "success", actionDone+" -> "+dst)
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": actionDone}))
 }
 
 func (h *FileManagerHandler) Compress(c *gin.Context) {
@@ -210,7 +211,7 @@ func (h *FileManagerHandler) Compress(c *gin.Context) {
 		Path string `json:"path"`
 	}
 	if c.ShouldBindJSON(&req) != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请求参数无效"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.invalid_params")))
 		return
 	}
 	dest, err := executor.CompressManagedFile(h.DB, h.dataDir(), req.Root, req.Path)
@@ -218,8 +219,8 @@ func (h *FileManagerHandler) Compress(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
-	executor.RecordOperationLog("file_compress", filepath.Join(req.Root, req.Path), "success", "创建 "+dest)
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "压缩完成"}))
+	executor.RecordOperationLog("file_compress", filepath.Join(req.Root, req.Path), "success", i18n.TE(c.Request, "errors.files.log_created", i18n.P{"path": dest}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": i18n.TE(c.Request, "errors.files.compress_done")}))
 }
 
 func (h *FileManagerHandler) Extract(c *gin.Context) {
@@ -228,7 +229,7 @@ func (h *FileManagerHandler) Extract(c *gin.Context) {
 		Path string `json:"path"`
 	}
 	if c.ShouldBindJSON(&req) != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请求参数无效"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.invalid_params")))
 		return
 	}
 	dest, err := executor.ExtractManagedZip(h.DB, h.dataDir(), req.Root, req.Path)
@@ -236,6 +237,6 @@ func (h *FileManagerHandler) Extract(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return
 	}
-	executor.RecordOperationLog("file_extract", filepath.Join(req.Root, req.Path), "success", "解压到 "+dest)
-	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": "解压完成"}))
+	executor.RecordOperationLog("file_extract", filepath.Join(req.Root, req.Path), "success", i18n.TE(c.Request, "errors.files.log_extracted_to", i18n.P{"path": dest}))
+	c.JSON(http.StatusOK, models.SuccessResponse(gin.H{"message": i18n.TE(c.Request, "errors.files.extract_done")}))
 }

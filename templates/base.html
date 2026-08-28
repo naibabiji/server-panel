@@ -1,5 +1,5 @@
 {{define "base"}}<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{.Lang}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,11 +7,12 @@
     <title>{{.Title}}</title>
     <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css?v={{.PanelVersion}}">
     <style>[x-cloak]{display:none!important}</style>
+    <script>window.SERVER_PANEL_I18N = { lang: "{{.Lang}}", messages: {{.MessagesJSON}} };</script>
     <script defer src="{{.AssetPrefix}}/js/alpine.min.js?v={{.PanelVersion}}"></script>
     <script src="{{.AssetPrefix}}/js/app.js?v={{.PanelVersion}}"></script>
     <script defer src="{{.AssetPrefix}}/js/chart.min.js?v={{.PanelVersion}}"></script>
 </head>
-<body class="bg-[#0d1117] text-gray-200" data-panel-prefix="/{{.RandomSuffix}}">
+<body class="bg-[#0d1117] text-gray-200" data-panel-prefix="/{{.RandomSuffix}}" data-lang="{{.Lang}}">
 <div x-data="layout()" @resize.window="onResize()" class="flex h-screen overflow-hidden">
     <!-- 移动端遮罩 -->
     <div x-show="sidebarOpen" @click="sidebarOpen=false" class="fixed inset-0 bg-black/50 z-40 lg:hidden" x-cloak></div>
@@ -25,57 +26,57 @@
         <nav class="flex-1 py-3 px-3 space-y-1 overflow-y-auto" id="sidebar-nav">
             <a href="/{{.RandomSuffix}}/" class="sidebar-link {{if eq .Active "dashboard"}}active{{end}}" data-prefetch-page>
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                仪表盘
+                {{t .Lang "nav.dashboard"}}
             </a>
             <a href="/{{.RandomSuffix}}/monitor" class="sidebar-link {{if eq .Active "monitor"}}active{{end}}" data-prefetch-page data-prefetch-api="monitor-overview">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                性能监控
+                {{t .Lang "nav.monitor"}}
             </a>
             <a href="/{{.RandomSuffix}}/servers" class="sidebar-link {{if eq .Active "server_list"}}active{{end}}" data-prefetch-page data-prefetch-api="servers-list">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/></svg>
-                服务器管理
+                {{t .Lang "nav.server_list"}}
             </a>
             <a href="/{{.RandomSuffix}}/websites" class="sidebar-link {{if eq .Active "website_list"}}active{{end}}" data-prefetch-page data-prefetch-api="websites-list,servers-dropdown">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
-                网站管理
+                {{t .Lang "nav.website_list"}}
             </a>
             <a href="/{{.RandomSuffix}}/customers" class="sidebar-link {{if eq .Active "customer_list"}}active{{end}}" data-prefetch-page data-prefetch-api="customers-list">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                客户管理
+                {{t .Lang "nav.customer_list"}}
             </a>
             <a href="/{{.RandomSuffix}}/providers" class="sidebar-link {{if eq .Active "provider_list"}}active{{end}}" data-prefetch-page data-prefetch-api="providers-list">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                服务商管理
+                {{t .Lang "nav.provider_list"}}
             </a>
             <a href="/{{.RandomSuffix}}/firewall" class="sidebar-link {{if eq .Active "firewall"}}active{{end}}">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                安全防御
+                {{t .Lang "nav.firewall"}}
             </a>
             <a href="/{{.RandomSuffix}}/alerts" class="sidebar-link {{if eq .Active "alert_rules"}}active{{end}}">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
-                告警管理
+                {{t .Lang "nav.alert_rules"}}
             </a>
             <a href="/{{.RandomSuffix}}/alerts/log" class="sidebar-link {{if eq .Active "alert_log"}}active{{end}}">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                告警日志
+                {{t .Lang "nav.alert_log"}}
             </a>
             <a href="/{{.RandomSuffix}}/local-storage" class="sidebar-link {{if eq .Active "local_storage"}}active{{end}}">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6c0-1.105 3.582-2 8-2s8 .895 8 2-3.582 2-8 2-8-.895-8-2zm0 0v6c0 1.105 3.582 2 8 2s8-.895 8-2V6m-16 6v6c0 1.105 3.582 2 8 2s8-.895 8-2v-6"/></svg>
-                本机存储
+                {{t .Lang "nav.local_storage"}}
             </a>
             <a href="/{{.RandomSuffix}}/files" class="sidebar-link {{if eq .Active "files"}}active{{end}}">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
-                文件管理
+                {{t .Lang "nav.files"}}
             </a>
             <a href="/{{.RandomSuffix}}/settings" class="sidebar-link {{if eq .Active "settings"}}active{{end}}" data-prefetch-page>
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.46 2.37a1.724 1.724 0 001.065 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.46a1.724 1.724 0 00-2.573 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.46-2.37a1.724 1.724 0 00-1.065-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.46.996.608 2.296.07 2.573-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                系统设置
+                {{t .Lang "nav.settings"}}
             </a>
         </nav>
         <div class="px-3 py-3 border-t border-[#252c35]">
             <a href="#" @click.prevent="logout()" class="sidebar-link text-gray-400 hover:text-red-400">
                 <svg class="w-5 h-5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                退出登录
+                {{t .Lang "nav.logout"}}
             </a>
         </div>
     </aside>
@@ -85,12 +86,12 @@
             <button @click="sidebarOpen=!sidebarOpen" class="lg:hidden text-gray-400 hover:text-white">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
-            <div class="flex-1 min-w-0 truncate text-base font-medium text-gray-200">{{if eq .Active "dashboard"}}仪表盘{{else if eq .Active "monitor"}}性能监控{{else if eq .Active "server_list"}}服务器管理{{else if eq .Active "server_detail"}}服务器管理{{else if eq .Active "server_form"}}服务器管理{{else if eq .Active "customer_list"}}客户管理{{else if eq .Active "customer_detail"}}客户管理{{else if eq .Active "customer_form"}}客户管理{{else if eq .Active "website_list"}}网站管理{{else if eq .Active "website_detail"}}网站管理{{else if eq .Active "website_form"}}网站管理{{else if eq .Active "provider_list"}}服务商管理{{else if eq .Active "provider_detail"}}服务商管理{{else if eq .Active "provider_form"}}服务商管理{{else if eq .Active "firewall"}}安全防御{{else if eq .Active "alert_rules"}}告警管理{{else if eq .Active "alert_log"}}告警日志{{else if eq .Active "settings"}}系统设置{{else if eq .Active "local_storage"}}本机存储{{else if eq .Active "files"}}文件管理{{end}}</div>
+            <div class="flex-1 min-w-0 truncate text-base font-medium text-gray-200">{{if eq .Active "dashboard"}}{{t .Lang "nav.dashboard"}}{{else if eq .Active "monitor"}}{{t .Lang "nav.monitor"}}{{else if eq .Active "server_list"}}{{t .Lang "nav.server_list"}}{{else if eq .Active "server_detail"}}{{t .Lang "nav.server_list"}}{{else if eq .Active "server_form"}}{{t .Lang "nav.server_list"}}{{else if eq .Active "customer_list"}}{{t .Lang "nav.customer_list"}}{{else if eq .Active "customer_detail"}}{{t .Lang "nav.customer_list"}}{{else if eq .Active "customer_form"}}{{t .Lang "nav.customer_list"}}{{else if eq .Active "website_list"}}{{t .Lang "nav.website_list"}}{{else if eq .Active "website_detail"}}{{t .Lang "nav.website_list"}}{{else if eq .Active "website_form"}}{{t .Lang "nav.website_list"}}{{else if eq .Active "provider_list"}}{{t .Lang "nav.provider_list"}}{{else if eq .Active "provider_detail"}}{{t .Lang "nav.provider_list"}}{{else if eq .Active "provider_form"}}{{t .Lang "nav.provider_list"}}{{else if eq .Active "firewall"}}{{t .Lang "nav.firewall"}}{{else if eq .Active "alert_rules"}}{{t .Lang "nav.alert_rules"}}{{else if eq .Active "alert_log"}}{{t .Lang "nav.alert_log"}}{{else if eq .Active "settings"}}{{t .Lang "nav.settings"}}{{else if eq .Active "local_storage"}}{{t .Lang "nav.local_storage"}}{{else if eq .Active "files"}}{{t .Lang "nav.files"}}{{end}}</div>
             <div x-data="globalSearch()" @keydown.escape.window="close()" class="relative w-56 sm:w-64 lg:w-72 shrink-0">
                 <div class="relative">
                     <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 10a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     <input type="text" x-model="q" @input="onInput()" @focus="open = q.trim().length > 0"
-                           placeholder="搜索服务器、网站..."
+                           placeholder="{{t .Lang "search.placeholder"}}"
                            class="input-field w-full pl-9 pr-8 text-sm">
                     <button x-show="q" @click="clear()" x-cloak type="button" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -99,14 +100,14 @@
                 <div x-show="open" @click.outside="close()" x-cloak
                      class="absolute right-0 mt-1 w-80 max-w-[90vw] max-h-96 overflow-y-auto bg-[#171b21] border border-[#2a3038] shadow-lg z-40">
                     <template x-if="loading">
-                        <div class="px-4 py-3 text-sm text-gray-500">搜索中...</div>
+                        <div class="px-4 py-3 text-sm text-gray-500">{{t .Lang "search.searching"}}</div>
                     </template>
                     <template x-if="!loading && q.trim() && servers.length === 0 && websites.length === 0">
-                        <div class="px-4 py-3 text-sm text-gray-500">未找到相关服务器或网站</div>
+                        <div class="px-4 py-3 text-sm text-gray-500">{{t .Lang "search.no_results"}}</div>
                     </template>
                     <template x-if="!loading && servers.length > 0">
                         <div>
-                            <div class="px-4 pt-3 pb-1 text-xs text-gray-500">服务器</div>
+                            <div class="px-4 pt-3 pb-1 text-xs text-gray-500">{{t .Lang "search.servers_group"}}</div>
                             <template x-for="s in servers" :key="'s'+s.id">
                                 <a :href="serverHref(s)" class="block px-4 py-2 hover:bg-[#1d232b]">
                                     <div class="text-sm text-purple-300" x-text="s.name"></div>
@@ -117,7 +118,7 @@
                     </template>
                     <template x-if="!loading && websites.length > 0">
                         <div>
-                            <div class="px-4 pt-3 pb-1 text-xs text-gray-500">网站</div>
+                            <div class="px-4 pt-3 pb-1 text-xs text-gray-500">{{t .Lang "search.websites_group"}}</div>
                             <template x-for="w in websites" :key="'w'+w.id">
                                 <a :href="websiteHref(w)" class="block px-4 py-2 hover:bg-[#1d232b]">
                                     <div class="text-sm text-blue-300" x-text="w.name || w.domain"></div>
@@ -127,6 +128,11 @@
                         </div>
                     </template>
                 </div>
+            </div>
+            <div class="flex items-center gap-1 text-xs shrink-0">
+                <a href="?lang=zh-CN" class="px-1.5 py-1 rounded {{if eq .Lang "zh-CN"}}text-purple-300{{else}}text-gray-500 hover:text-gray-300{{end}}">{{t .Lang "language.chinese"}}</a>
+                <span class="text-gray-700">/</span>
+                <a href="?lang=en-US" class="px-1.5 py-1 rounded {{if eq .Lang "en-US"}}text-purple-300{{else}}text-gray-500 hover:text-gray-300{{end}}">{{t .Lang "language.english"}}</a>
             </div>
         </div>
         {{if eq .ContentTemplate "dashboard_content"}}{{template "dashboard_content" .}}{{end}}

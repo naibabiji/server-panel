@@ -1,11 +1,12 @@
 {{define "login.html"}}<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{.Lang}}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="">
-    <title>{{.PanelTitle}} - 登录</title>
+    <title>{{.PanelTitle}} - {{t .Lang "auth.login"}}</title>
     <link rel="stylesheet" href="{{.AssetPrefix}}/css/main.css?v={{.PanelVersion}}">
+    <script>window.SERVER_PANEL_I18N = { lang: "{{.Lang}}", messages: {{.MessagesJSON}} };</script>
     <script defer src="{{.AssetPrefix}}/js/alpine.min.js?v={{.PanelVersion}}"></script>
     <script src="{{.AssetPrefix}}/js/app.js?v={{.PanelVersion}}"></script>
     <style>
@@ -25,37 +26,55 @@
         .error-msg { color: #fca5a5; font-size: 13px; text-align: center; margin-top: 12px; }
     </style>
 </head>
-<body>
+<body data-lang="{{.Lang}}">
 <div x-data="loginForm()" class="login-card">
     <div class="login-title">{{.PanelTitle}}</div>
     <div class="login-sub" id="motto"></div>
+    <div class="flex justify-center gap-1 text-xs mb-5" style="margin-top:-16px;">
+        <a href="?lang=zh-CN" style="color:{{if eq .Lang "zh-CN"}}#c4b5fd{{else}}#71717a{{end}};text-decoration:none;">{{t .Lang "language.chinese"}}</a>
+        <span style="color:#3f3f46;">/</span>
+        <a href="?lang=en-US" style="color:{{if eq .Lang "en-US"}}#c4b5fd{{else}}#71717a{{end}};text-decoration:none;">{{t .Lang "language.english"}}</a>
+    </div>
     <form @submit.prevent="login">
         <div class="input-group">
-            <label>用户名</label>
-            <input type="text" x-model="username" placeholder="请输入用户名" autocomplete="username">
+            <label>{{t .Lang "auth.username"}}</label>
+            <input type="text" x-model="username" placeholder="{{t .Lang "auth.username_placeholder"}}" autocomplete="username">
         </div>
         <div class="input-group">
-            <label>密码</label>
-            <input type="password" x-model="password" placeholder="请输入密码" autocomplete="current-password">
+            <label>{{t .Lang "auth.password"}}</label>
+            <input type="password" x-model="password" placeholder="{{t .Lang "auth.password_placeholder"}}" autocomplete="current-password">
         </div>
         <button class="btn-login" type="submit" :disabled="loading">
-            <span x-text="loading ? '登录中...' : '登录'"></span>
+            <span x-text="loading ? t('auth.logging_in') : t('auth.login_button')"></span>
         </button>
         <div class="error-msg" x-show="error" x-text="error"></div>
     </form>
 </div>
 
 <script>
-const mottos = [
-    "代码是写给人看的，顺便给机器运行。",
-    "简单是可靠的前提。",
-    "一个好的系统应该像一把瑞士军刀。",
-    "问题不在于你能做什么，而在于你选择做什么。",
-    "优秀的软件设计源于对细节的关注。",
-    "最好的代码是没有代码。",
-    "简洁是智慧的灵魂。",
-    "完美不在于无以复加，而在于无从删减。",
-];
+const mottosByLang = {
+    'zh-CN': [
+        "代码是写给人看的，顺便给机器运行。",
+        "简单是可靠的前提。",
+        "一个好的系统应该像一把瑞士军刀。",
+        "问题不在于你能做什么，而在于你选择做什么。",
+        "优秀的软件设计源于对细节的关注。",
+        "最好的代码是没有代码。",
+        "简洁是智慧的灵魂。",
+        "完美不在于无以复加，而在于无从删减。",
+    ],
+    'en-US': [
+        "Code is written for people to read, and incidentally for machines to run.",
+        "Simplicity is the prerequisite for reliability.",
+        "A good system should be like a Swiss Army knife.",
+        "It's not about what you can do, it's about what you choose to do.",
+        "Great software design comes from attention to detail.",
+        "The best code is no code at all.",
+        "Simplicity is the soul of wisdom.",
+        "Perfection is achieved not when there's nothing left to add, but when there's nothing left to remove.",
+    ],
+};
+const mottos = mottosByLang[currentLocale()] || mottosByLang['zh-CN'];
 let mottoIdx = 0;
 function cycleMotto() {
     const el = document.getElementById('motto');
@@ -74,7 +93,7 @@ function loginForm() {
             try {
                 const data = await api('/api/auth/login', { method: 'POST', body: { username: this.username, password: this.password } });
                 window.location.href = (document.body.dataset.panelPrefix || '') + '/';
-            } catch(e) { this.error = e.message || '登录失败'; }
+            } catch(e) { this.error = e.message || t('auth.login_failed'); }
             finally { this.loading = false; }
         }
     }

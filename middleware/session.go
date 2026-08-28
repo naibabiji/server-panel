@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/naibabiji/server-panel/i18n"
 )
 
 type Session struct {
@@ -78,13 +79,13 @@ func SessionRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := c.Cookie("sp_session")
 		if err != nil || token == "" {
-			abortSession(c, "请先登录")
+			abortSession(c, i18n.TE(c.Request, "session.please_login"))
 			return
 		}
 
 		session := GlobalSessionStore.Get(token)
 		if session == nil {
-			abortSession(c, "会话已过期，请重新登录")
+			abortSession(c, i18n.TE(c.Request, "session.session_expired"))
 			return
 		}
 

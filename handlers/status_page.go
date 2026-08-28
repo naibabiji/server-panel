@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 	"golang.org/x/crypto/bcrypt"
@@ -39,7 +40,7 @@ func (h *StatusPageHandler) GetInfo(c *gin.Context) {
 		 FROM servers WHERE status_page_enabled = 1 AND status_page_token = ? AND status_page_token <> ''`, token,
 	).Scan(&s.Name, &s.IsOnline, &probeHealthy, &probeLast)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("状态页不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.status_page.not_found")))
 		return
 	}
 	if probeHealthy.Valid {
@@ -70,7 +71,7 @@ func (h *StatusPageHandler) GetMetrics(c *gin.Context) {
 		`SELECT recorded_at, cpu_percent, memory_percent, disk_percent, load_avg_1
 		 FROM metrics WHERE server_id = ? ORDER BY recorded_at DESC LIMIT 288`, serverID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -87,7 +88,7 @@ func (h *StatusPageHandler) GetMetrics(c *gin.Context) {
 		var p point
 		var cpu, mem, disk, load sql.NullFloat64
 		if err := rows.Scan(&p.Time, &cpu, &mem, &disk, &load); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取指标失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.status_page.read_metrics_failed")))
 			return
 		}
 		if cpu.Valid {
@@ -119,7 +120,7 @@ func (h *StatusPageHandler) GetWebsites(c *gin.Context) {
 		 WHERE s.status_page_enabled = 1 AND s.status_page_token = ? AND s.status_page_token <> ''
 		 AND w.status = 'active'`, token)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -134,7 +135,7 @@ func (h *StatusPageHandler) GetWebsites(c *gin.Context) {
 		var w webInfo
 		var expiryDate sql.NullString
 		if err := rows.Scan(&w.Domain, &w.Status, &expiryDate); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取网站失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.status_page.read_websites_failed")))
 			return
 		}
 		if expiryDate.Valid {
@@ -154,7 +155,7 @@ func (h *StatusPageHandler) VerifyPassword(c *gin.Context) {
 		token,
 	).Scan(&serverID, &pwHash)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("状态页不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.status_page.not_found")))
 		return
 	}
 	if pwHash == "" {
@@ -166,12 +167,12 @@ func (h *StatusPageHandler) VerifyPassword(c *gin.Context) {
 		Password string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.status_page.invalid_request")))
 		return
 	}
 
 	if bcrypt.CompareHashAndPassword([]byte(pwHash), []byte(req.Password)) != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.status_page.wrong_password")))
 		return
 	}
 
@@ -195,7 +196,7 @@ func (h *StatusPageHandler) authorizeStatusToken(c *gin.Context, token string) (
 		token,
 	).Scan(&serverID, &pwHash)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("状态页不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.status_page.not_found")))
 		return 0, false
 	}
 	if pwHash == "" {
@@ -204,7 +205,7 @@ func (h *StatusPageHandler) authorizeStatusToken(c *gin.Context, token string) (
 
 	cookieValue, err := c.Cookie(statusCookieName(token))
 	if err != nil || !hmac.Equal([]byte(cookieValue), []byte(statusCookieValue(token, pwHash))) {
-		c.JSON(http.StatusForbidden, models.ErrorResponse("需要密码"))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.status_page.password_required")))
 		return 0, false
 	}
 	return serverID, true

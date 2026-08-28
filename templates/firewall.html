@@ -4,33 +4,33 @@
     <!-- 白名单 -->
     <div class="card mb-6">
         <div class="flex items-center justify-between mb-3">
-            <div class="text-sm font-medium text-gray-300">IP 白名单</div>
-            <button @click="showWhitelistModal=true" class="btn-primary text-sm">+ 添加 IP</button>
+            <div class="text-sm font-medium text-gray-300">{{t .Lang "firewall.whitelist_title"}}</div>
+            <button @click="showWhitelistModal=true" class="btn-primary text-sm">{{t .Lang "firewall.add_ip"}}</button>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full">
-                <thead><tr><th class="table-header">IP 地址</th><th class="table-header">备注</th><th class="table-header">添加时间</th><th class="table-header">操作</th></tr></thead>
+                <thead><tr><th class="table-header">{{t .Lang "firewall.col_ip"}}</th><th class="table-header">{{t .Lang "server_form.notes_label"}}</th><th class="table-header">{{t .Lang "firewall.col_added_at"}}</th><th class="table-header">{{t .Lang "server.col_actions"}}</th></tr></thead>
                 <tbody>
                 <template x-for="w in whitelist" :key="w.id">
                     <tr class="border-t border-gray-700/50">
                         <td class="table-cell text-white font-mono" x-text="w.ip_address"></td>
                         <td class="table-cell text-gray-400 whitespace-pre-wrap" x-text="w.notes||'--'"></td>
                         <td class="table-cell text-gray-500 text-xs" x-text="fmtTime(w.created_at)"></td>
-                        <td class="table-cell"><a href="#" @click.prevent="delWhitelist(w.id)" class="text-sm text-red-400">删除</a></td>
+                        <td class="table-cell"><a href="#" @click.prevent="delWhitelist(w.id)" class="text-sm text-red-400">{{t .Lang "common.delete"}}</a></td>
                     </tr>
                 </template>
                 </tbody>
             </table>
-            <div class="text-gray-500 text-sm py-4 text-center" x-show="whitelist.length==0">暂无白名单</div>
+            <div class="text-gray-500 text-sm py-4 text-center" x-show="whitelist.length==0">{{t .Lang "firewall.whitelist_empty"}}</div>
         </div>
     </div>
 
     <!-- 当前封禁 -->
     <div class="card">
-        <div class="text-sm font-medium text-gray-300 mb-3">当前封禁</div>
+        <div class="text-sm font-medium text-gray-300 mb-3">{{t .Lang "firewall.bans_title"}}</div>
         <div class="overflow-x-auto">
             <table class="w-full">
-                <thead><tr><th class="table-header">IP</th><th class="table-header">原因</th><th class="table-header">来源</th><th class="table-header">到期时间</th><th class="table-header">封禁时间</th><th class="table-header">操作</th></tr></thead>
+                <thead><tr><th class="table-header">{{t .Lang "firewall.col_ip_short"}}</th><th class="table-header">{{t .Lang "firewall.col_reason"}}</th><th class="table-header">{{t .Lang "firewall.col_source"}}</th><th class="table-header">{{t .Lang "firewall.col_expires_at"}}</th><th class="table-header">{{t .Lang "firewall.col_banned_at"}}</th><th class="table-header">{{t .Lang "server.col_actions"}}</th></tr></thead>
                 <tbody>
                 <template x-for="b in bans.items" :key="b.id">
                     <tr class="border-t border-gray-700/50">
@@ -39,20 +39,20 @@
                         <td class="table-cell text-gray-400 text-xs" x-text="b.source"></td>
                         <td class="table-cell text-gray-400 text-xs" x-text="b.expires_at||'--'"></td>
                         <td class="table-cell text-gray-500 text-xs" x-text="fmtTime(b.created_at)"></td>
-                        <td class="table-cell"><a href="#" @click.prevent="unban(b.id)" class="text-sm text-green-400">解封</a></td>
+                        <td class="table-cell"><a href="#" @click.prevent="unban(b.id)" class="text-sm text-green-400">{{t .Lang "firewall.unban"}}</a></td>
                     </tr>
                 </template>
                 </tbody>
             </table>
-            <div class="text-gray-500 text-sm py-4 text-center" x-show="!bans.items||bans.items.length==0">暂无当前封禁</div>
+            <div class="text-gray-500 text-sm py-4 text-center" x-show="!bans.items||bans.items.length==0">{{t .Lang "firewall.bans_empty"}}</div>
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-700/50 px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
-                <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
+                <div x-text="t('common.pagination_summary', {start: pageStart, end: pageEnd, total: total})"></div>
                 <div class="flex items-center gap-2">
-                    <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
-                    <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                    <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.first_page')"></button>
+                    <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.prev_page')"></button>
                     <span class="px-2" x-text="page + ' / ' + totalPages"></span>
-                    <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
-                    <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+                    <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.next_page')"></button>
+                    <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.last_page')"></button>
                 </div>
             </div>
         </div>
@@ -61,14 +61,14 @@
     <!-- Add Whitelist Modal -->
     <div class="modal-overlay" x-show="showWhitelistModal" @click.self="showWhitelistModal=false">
         <div class="modal-content">
-            <h3 class="text-lg font-semibold text-purple-300 mb-4">添加白名单 IP</h3>
+            <h3 class="text-lg font-semibold text-purple-300 mb-4">{{t .Lang "firewall.add_whitelist_title"}}</h3>
             <div class="space-y-3">
-                <div><label class="label">IP 地址</label><input type="text" x-model="wlForm.ip_address" class="input-field" placeholder="192.168.1.1"></div>
-                <div><label class="label">备注</label><textarea x-model="wlForm.notes" class="input-field" rows="3"></textarea></div>
+                <div><label class="label">{{t .Lang "firewall.col_ip"}}</label><input type="text" x-model="wlForm.ip_address" class="input-field" placeholder="192.168.1.1"></div>
+                <div><label class="label">{{t .Lang "server_form.notes_label"}}</label><textarea x-model="wlForm.notes" class="input-field" rows="3"></textarea></div>
             </div>
             <div class="flex gap-3 mt-5">
-                <button @click="addWhitelist()" class="btn-primary">添加</button>
-                <button @click="showWhitelistModal=false" class="btn-secondary">取消</button>
+                <button @click="addWhitelist()" class="btn-primary">{{t .Lang "firewall.add"}}</button>
+                <button @click="showWhitelistModal=false" class="btn-secondary">{{t .Lang "common.cancel"}}</button>
             </div>
         </div>
     </div>
@@ -94,14 +94,14 @@ function firewallPage() {
         },
         async fetchWhitelist() { try { const d = await api('/api/firewall/whitelist'); this.whitelist = d.data || []; } catch(e) {} },
         async unban(id) {
-            if (!await confirmModal('确认解封？')) return;
-            try { await api('/api/firewall/unban/'+id, {method:'POST'}); await this.fetchBans(); showToast('已解封','success'); } catch(e) { showToast(e.message,'error'); }
+            if (!await confirmModal(t('firewall.unban_confirm'))) return;
+            try { await api('/api/firewall/unban/'+id, {method:'POST'}); await this.fetchBans(); showToast(t('firewall.unbanned'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async addWhitelist() {
-            try { await api('/api/firewall/whitelist', {method:'POST', body: this.wlForm}); this.showWhitelistModal = false; await this.fetchWhitelist(); showToast('添加成功','success'); } catch(e) { showToast(e.message,'error'); }
+            try { await api('/api/firewall/whitelist', {method:'POST', body: this.wlForm}); this.showWhitelistModal = false; await this.fetchWhitelist(); showToast(t('firewall.add_success'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async delWhitelist(id) {
-            if (!await confirmModal('确认删除？')) return;
+            if (!await confirmModal(t('firewall.delete_confirm'))) return;
             try { await api('/api/firewall/whitelist/'+id, {method:'DELETE'}); await this.fetchWhitelist(); } catch(e) { showToast(e.message,'error'); }
         }
     }

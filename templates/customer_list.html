@@ -2,14 +2,14 @@
 {{define "customer_list_content"}}
 <div x-data="customerList()" x-init="fetch()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <input type="text" x-model="search" @input="resetAndFetch()" placeholder="搜索..." class="input-field w-48">
-        <a href="customers/new" class="btn-primary text-sm">添加客户</a>
+        <input type="text" x-model="search" @input="resetAndFetch()" placeholder="{{t .Lang "customer.search_placeholder"}}" class="input-field w-48">
+        <a href="customers/new" class="btn-primary text-sm">{{t .Lang "customer.add"}}</a>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">名称</th><th class="table-header">联系人</th><th class="table-header">邮箱</th>
-                <th class="table-header">公司</th><th class="table-header">服务器数量</th><th class="table-header">网站数量</th><th class="table-header">操作</th>
+                <th class="table-header">{{t .Lang "server.col_name"}}</th><th class="table-header">{{t .Lang "customer.col_contact"}}</th><th class="table-header">{{t .Lang "customer.col_email"}}</th>
+                <th class="table-header">{{t .Lang "customer.col_company"}}</th><th class="table-header">{{t .Lang "customer.col_server_count"}}</th><th class="table-header">{{t .Lang "customer.col_website_count"}}</th><th class="table-header">{{t .Lang "server.col_actions"}}</th>
             </tr></thead>
             <tbody>
             <template x-for="u in items" :key="u.id">
@@ -21,23 +21,23 @@
                     <td class="table-cell text-gray-400" x-text="u.server_count || 0"></td>
                     <td class="table-cell text-gray-400" x-text="u.website_count || 0"></td>
                     <td class="table-cell">
-                        <a :href="'customers/'+u.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">详情</a>
-                        <a :href="'customers/'+u.id+'/edit'" class="text-sm text-purple-300 hover:text-purple-200 mr-2">编辑</a>
-                        <a href="#" @click.prevent="del(u.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
+                        <a :href="'customers/'+u.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">{{t .Lang "common.detail"}}</a>
+                        <a :href="'customers/'+u.id+'/edit'" class="text-sm text-purple-300 hover:text-purple-200 mr-2">{{t .Lang "common.edit"}}</a>
+                        <a href="#" @click.prevent="del(u.id)" class="text-sm text-red-400 hover:text-red-300">{{t .Lang "common.delete"}}</a>
                     </td>
                 </tr>
             </template>
             </tbody>
         </table>
-        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无客户</div>
+        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">{{t .Lang "customer.empty"}}</div>
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#202833] px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
-            <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
+            <div x-text="t('common.pagination_summary', {start: pageStart, end: pageEnd, total: total})"></div>
             <div class="flex items-center gap-2">
-                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
-                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.first_page')"></button>
+                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.prev_page')"></button>
                 <span class="px-2" x-text="page + ' / ' + totalPages"></span>
-                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
-                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.next_page')"></button>
+                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.last_page')"></button>
             </div>
         </div>
     </div>
@@ -66,7 +66,7 @@ function customerList() {
             this.loading=false;
         },
         async del(id) {
-            if(!await confirmModal('确认删除此客户？')) return;
+            if(!await confirmModal(t('customer.delete_confirm'))) return;
             try { await api('/api/customers/'+id,{method:'DELETE'}); await this.fetch(); } catch(e) { showToast(e.message,'error'); }
         }
     }

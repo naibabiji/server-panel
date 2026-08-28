@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/models"
 	"github.com/naibabiji/server-panel/timeutil"
 )
@@ -38,7 +39,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 		 WHERE s.agent_version != '' OR s.last_seen_at IS NOT NULL OR m.recorded_at IS NOT NULL
 		 ORDER BY COALESCE(p.name, '未设置'), s.name`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -82,7 +83,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 			&cpu, &mem, &disk, &load, &uptime, &recorded,
 			&netRX, &netTX)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取监控概览失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.metrics.overview_failed")))
 			return
 		}
 		if probeHealthy.Valid {
@@ -136,7 +137,7 @@ func (h *MetricsHandler) GetOverview(c *gin.Context) {
 func (h *MetricsHandler) GetServerMetrics(c *gin.Context) {
 	serverID := c.Param("id")
 	if _, err := strconv.ParseInt(serverID, 10, 64); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的服务器 ID"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.metrics.invalid_server_id")))
 		return
 	}
 
@@ -161,7 +162,7 @@ func (h *MetricsHandler) GetServerMetrics(c *gin.Context) {
 		 FROM metrics WHERE server_id = ? AND recorded_at >= ? ORDER BY recorded_at`,
 		serverID, timeutil.Display(since))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -172,7 +173,7 @@ func (h *MetricsHandler) GetServerMetrics(c *gin.Context) {
 		var netRX, netTX sql.NullInt64
 		var timeStr string
 		if err := rows.Scan(&timeStr, &p.CPU, &p.Memory, &p.Disk, &p.Load1, &p.Load5, &p.Load15, &netRX, &netTX); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取性能数据失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.read_perf_data_failed")))
 			return
 		}
 		p.Time = timeStr
@@ -196,7 +197,7 @@ func (h *MetricsHandler) GetLatest(c *gin.Context) {
 	serverID := c.Param("id")
 	parsedServerID, err := strconv.ParseInt(serverID, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的服务器 ID"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.metrics.invalid_server_id")))
 		return
 	}
 
@@ -210,7 +211,7 @@ func (h *MetricsHandler) GetLatest(c *gin.Context) {
 		&m.DiskPercent, &m.DiskUsed, &m.DiskTotal, &m.NetRXBytes, &m.NetTXBytes,
 		&m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.UptimeSeconds, &m.RecordedAt)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("暂无性能数据"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.no_perf_data")))
 		return
 	}
 	m.ServerID = parsedServerID

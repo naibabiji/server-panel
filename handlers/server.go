@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 )
@@ -83,7 +84,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 
 	rows, err := h.DB.Query(query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -103,7 +104,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 			&s.StatusPageEnabled, &s.Notes, &s.CreatedAt, &s.UpdatedAt)
 		if err != nil {
 			log.Printf("read server list row failed: %v", err)
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取服务器列表失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.server.list_failed")))
 			return
 		}
 		if probeHealthy.Valid {
@@ -179,7 +180,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 		&s.StatusPageEnabled, &s.StatusPageToken, &s.Notes, &s.CreatedAt, &s.UpdatedAt)
 	if err != nil {
 		log.Printf("read server detail failed: id=%s: %v", id, err)
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务器不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.server.not_found")))
 		return
 	}
 	if probeHealthy.Valid {
@@ -206,11 +207,11 @@ func (h *ServerHandler) Get(c *gin.Context) {
 func (h *ServerHandler) Create(c *gin.Context) {
 	var s models.Server
 	if err := c.ShouldBindJSON(&s); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if s.Name == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("服务器名称不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.server.name_required")))
 		return
 	}
 
@@ -239,14 +240,14 @@ func (h *ServerHandler) Create(c *gin.Context) {
 		s.AutoRenewal, s.PurchasePrice, s.Currency, s.Status, "", "", s.HTTPProbeEnabled, s.Notes,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.server.create_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 
 	id, _ := result.LastInsertId()
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
 		"id":      id,
-		"message": "服务器已创建",
+		"message": i18n.TE(c.Request, "errors.server.created"),
 	}))
 }
 
@@ -254,7 +255,7 @@ func (h *ServerHandler) RegenerateAgentKey(c *gin.Context) {
 	id := c.Param("id")
 	agentKeyStr, agentKeyHashStr, err := generateAgentKey()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("生成 Agent Key 失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.server.generate_agent_key_failed")))
 		return
 	}
 	result, err := h.DB.Exec(
@@ -267,16 +268,16 @@ func (h *ServerHandler) RegenerateAgentKey(c *gin.Context) {
 		agentKeyHashStr, id,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("重新生成 Agent Key 失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.server.regen_agent_key_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务器不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.server.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
 		"agent_key": agentKeyStr,
-		"message":   "Agent 安装 Key 已生成，旧 Agent 需要重新安装或更新配置",
+		"message":   i18n.TE(c.Request, "errors.server.agent_key_regenerated"),
 	}))
 }
 
@@ -292,15 +293,15 @@ func (h *ServerHandler) PrepareAgentUninstall(c *gin.Context) {
 		id,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("准备卸载 Agent 失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.server.prepare_uninstall_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务器不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.server.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message": "Agent 状态已关闭，请在目标服务器执行卸载命令",
+		"message": i18n.TE(c.Request, "errors.server.agent_uninstall_ready"),
 	}))
 }
 
@@ -311,25 +312,25 @@ func (h *ServerHandler) GetSecret(c *gin.Context) {
 	setup, err := isViewPasswordSetup(h.DB)
 	if err != nil {
 		log.Printf("read view password setup status failed: %v", err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.view_password_status_failed")))
 		return
 	}
 	if !setup {
-		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先设置查看密码"))
+		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse(i18n.TE(c.Request, "common.view_password_required")))
 		return
 	}
 	sessionToken, ok := getSessionToken(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("会话已过期，请重新登录"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "session.session_expired")))
 		return
 	}
 	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
-		c.JSON(http.StatusForbidden, models.ErrorResponse("请重新输入查看密码"))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.reenter_view_password")))
 		return
 	}
 	key, err := GetSecretEncryptionKey(h.DB)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取加密密钥失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.read_encryption_key_failed")))
 		return
 	}
 
@@ -337,18 +338,18 @@ func (h *ServerHandler) GetSecret(c *gin.Context) {
 	switch field {
 	case "ssh-password":
 		column = "ssh_password_enc"
-		label = "SSH 密码"
+		label = i18n.TE(c.Request, "errors.server.label_ssh_password")
 	case "panel-password":
 		column = "panel_password_enc"
-		label = "面板密码"
+		label = i18n.TE(c.Request, "errors.server.label_panel_password")
 	default:
-		c.JSON(http.StatusNotFound, models.ErrorResponse("不支持的敏感字段"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.server.unsupported_secret_field")))
 		return
 	}
 
 	var encrypted string
 	if err := h.DB.QueryRow("SELECT "+column+" FROM servers WHERE id = ?", id).Scan(&encrypted); err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务器不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.server.not_found")))
 		return
 	}
 	if encrypted == "" {
@@ -362,7 +363,7 @@ func (h *ServerHandler) GetSecret(c *gin.Context) {
 
 	value, err := DecryptPassword(encrypted, key)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse(label+"解密失败，请确认查看密码是否正确"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.server.decrypt_failed", i18n.P{"label": label})))
 		return
 	}
 
@@ -378,11 +379,11 @@ func (h *ServerHandler) Update(c *gin.Context) {
 
 	var s models.Server
 	if err := c.ShouldBindJSON(&s); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if s.Name == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("服务器名称不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.server.name_required")))
 		return
 	}
 
@@ -424,11 +425,11 @@ func (h *ServerHandler) Update(c *gin.Context) {
 
 	result, err := h.DB.Exec(query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.update_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务器不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.server.not_found")))
 		return
 	}
 
@@ -441,17 +442,17 @@ func (h *ServerHandler) Delete(c *gin.Context) {
 	var count int
 	h.DB.QueryRow("SELECT COUNT(*) FROM websites WHERE server_id = ?", id).Scan(&count)
 	if count > 0 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请先删除该服务器下的所有网站"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.server.delete_websites_first")))
 		return
 	}
 
 	result, err := h.DB.Exec("DELETE FROM servers WHERE id = ?", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("删除失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.delete_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务器不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.server.not_found")))
 		return
 	}
 
@@ -491,7 +492,7 @@ func generateAgentKey() (string, string, error) {
 }
 
 func encryptOptionalPassword(c *gin.Context, db *sql.DB, plaintext string) (string, bool) {
-	return encryptOptionalSecret(c, db, plaintext, "请先设置查看密码，再保存 SSH/面板密码")
+	return encryptOptionalSecret(c, db, plaintext, i18n.TE(c.Request, "errors.server.setup_view_password_for_secret"))
 }
 
 func encryptOptionalSecret(c *gin.Context, db *sql.DB, plaintext string, setupMessage string) (string, bool) {
@@ -502,7 +503,7 @@ func encryptOptionalSecret(c *gin.Context, db *sql.DB, plaintext string, setupMe
 	setup, err := isViewPasswordSetup(db)
 	if err != nil {
 		log.Printf("read view password setup status failed: %v", err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.view_password_status_failed")))
 		return "", false
 	}
 	if !setup {
@@ -511,13 +512,13 @@ func encryptOptionalSecret(c *gin.Context, db *sql.DB, plaintext string, setupMe
 	}
 	key, err := GetSecretEncryptionKey(db)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取加密密钥失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.read_encryption_key_failed")))
 		return "", false
 	}
 
 	enc, err := EncryptPassword(plaintext, key)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("密码加密失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.server.encrypt_password_failed")))
 		return "", false
 	}
 	return enc, true

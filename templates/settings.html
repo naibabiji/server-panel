@@ -2,17 +2,17 @@
 {{define "settings_content"}}
 <div x-data="settingsPage()" class="p-6 max-w-6xl">
     <div class="pb-5 mb-5 border-b border-[#202833]">
-        <div class="text-sm text-gray-500">管理面板访问、安全凭据、通知发送和表单字典。</div>
+        <div class="text-sm text-gray-500">{{t .Lang "settings.subtitle"}}</div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] gap-6">
         <nav class="lg:sticky lg:top-20 self-start bg-[#10151c] border border-[#202833] p-2">
-            <button type="button" @click="setTab('basic')" :class="tabClass('basic')">基础设置</button>
-            <button type="button" @click="setTab('update')" :class="tabClass('update')">更新</button>
-            <button type="button" @click="setTab('backup')" :class="tabClass('backup')">备份</button>
-            <button type="button" @click="setTab('security')" :class="tabClass('security')">安全</button>
-            <button type="button" @click="setTab('notification')" :class="tabClass('notification')">通知</button>
-            <button type="button" @click="setTab('dictionary')" :class="tabClass('dictionary')" data-prefetch-api="settings-dictionary">字典</button>
+            <button type="button" @click="setTab('basic')" :class="tabClass('basic')">{{t .Lang "settings.tab_basic"}}</button>
+            <button type="button" @click="setTab('update')" :class="tabClass('update')">{{t .Lang "settings.tab_update"}}</button>
+            <button type="button" @click="setTab('backup')" :class="tabClass('backup')">{{t .Lang "settings.tab_backup"}}</button>
+            <button type="button" @click="setTab('security')" :class="tabClass('security')">{{t .Lang "settings.tab_security"}}</button>
+            <button type="button" @click="setTab('notification')" :class="tabClass('notification')">{{t .Lang "settings.tab_notification"}}</button>
+            <button type="button" @click="setTab('dictionary')" :class="tabClass('dictionary')" data-prefetch-api="settings-dictionary">{{t .Lang "settings.tab_dictionary"}}</button>
         </nav>
 
         <div class="min-w-0">
@@ -51,7 +51,7 @@
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
                     <div class="flex items-center gap-3">
                         <div class="skeleton-block h-5 w-24"></div>
-                        <div class="text-xs text-gray-500" x-text="activeTabTitle() + '加载中'"></div>
+                        <div class="text-xs text-gray-500" x-text="activeTabTitle() + t('settings.loading_suffix')"></div>
                     </div>
                     <div class="skeleton-block h-4 w-72 mt-2"></div>
                 </div>
@@ -71,87 +71,86 @@
 
             <section id="basic" x-show="activeTab === 'basic' && loaded.basic" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
-                    <div class="text-base font-semibold text-gray-100">基础设置</div>
-                    <div class="text-sm text-gray-500 mt-1">这些配置决定后台在浏览器中如何显示和访问。</div>
+                    <div class="text-base font-semibold text-gray-100">{{t .Lang "settings.basic_title"}}</div>
+                    <div class="text-sm text-gray-500 mt-1">{{t .Lang "settings.basic_desc"}}</div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">面板标题</div>
-                        <div class="text-sm text-gray-500 leading-6">显示在侧边栏顶部和浏览器标题中。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.panel_title_label"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.panel_title_desc"}}</div>
                     </div>
                     <div>
-                        <label class="label">标题</label>
+                        <label class="label">{{t .Lang "settings.title_label"}}</label>
                         <input type="text" x-model="panelTitle" class="input-field">
-                        <div class="flex gap-2 mt-3"><button @click="saveTitle()" class="btn-primary text-sm">保存标题</button></div>
+                        <div class="flex gap-2 mt-3"><button @click="saveTitle()" class="btn-primary text-sm">{{t .Lang "settings.save_title_button"}}</button></div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">面板访问</div>
-                        <div class="text-sm text-gray-500 leading-6">面板只监听 HTTPS。修改端口或随机路径后会自动重启服务生效，重启期间面板会短暂无法访问。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.panel_access_label"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.panel_access_desc"}}</div>
                     </div>
                     <div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div><label class="label">HTTPS 端口</label><input type="number" x-model="access.tls_port" class="input-field"></div>
-                            <div><label class="label">随机路径</label><input type="text" x-model="access.random_suffix" class="input-field" placeholder="AbC123"></div>
+                            <div><label class="label">{{t .Lang "settings.https_port_label"}}</label><input type="number" x-model="access.tls_port" class="input-field"></div>
+                            <div><label class="label">{{t .Lang "settings.random_path_label"}}</label><input type="text" x-model="access.random_suffix" class="input-field" placeholder="AbC123"></div>
                         </div>
-                        <div class="text-xs text-gray-500 mt-3" x-show="access.random_suffix">登录路径：<span class="text-purple-300">/<span x-text="access.random_suffix"></span>/login</span></div>
+                        <div class="text-xs text-gray-500 mt-3" x-show="access.random_suffix">{{t .Lang "settings.login_path_prefix"}}<span class="text-purple-300">/<span x-text="access.random_suffix"></span>/login</span></div>
                         <div class="mt-4 border-t border-[#202833] pt-4">
                             <label class="flex items-start gap-3 cursor-pointer">
                                 <input type="checkbox" x-model="access.trust_cloudflare" class="mt-1 h-4 w-4 rounded border-[#2a3441] bg-[#0b0f14] text-purple-500 focus:ring-purple-500">
                                 <span>
-                                    <span class="block text-sm font-semibold text-gray-200">启用 Cloudflare 真实 IP 识别</span>
-                                    <span class="block text-xs text-gray-500 leading-6">面板接入 Cloudflare 代理时开启。开启后会识别 Cloudflare 来源，并使用 CF-Connecting-IP 作为真实访客 IP。</span>
+                                    <span class="block text-sm font-semibold text-gray-200">{{t .Lang "settings.cloudflare_toggle_label"}}</span>
+                                    <span class="block text-xs text-gray-500 leading-6">{{t .Lang "settings.cloudflare_toggle_desc"}}</span>
                                 </span>
                             </label>
                             <label class="flex items-start gap-3 cursor-pointer mt-3">
                                 <input type="checkbox" x-model="access.trust_reverse_proxy" @change="ensureProxyDefaults()" class="mt-1 h-4 w-4 rounded border-[#2a3441] bg-[#0b0f14] text-purple-500 focus:ring-purple-500">
                                 <span>
-                                    <span class="block text-sm font-semibold text-gray-200">启用反向代理真实 IP 识别</span>
-                                    <span class="block text-xs text-gray-500 leading-6">面板放在 Nginx、Caddy 或其他反向代理后面时开启。关闭后不会信任 X-Forwarded-For。</span>
+                                    <span class="block text-sm font-semibold text-gray-200">{{t .Lang "settings.reverse_proxy_toggle_label"}}</span>
+                                    <span class="block text-xs text-gray-500 leading-6">{{t .Lang "settings.reverse_proxy_toggle_desc"}}</span>
                                 </span>
                             </label>
                             <div class="mt-3">
-                                <label class="label">可信反向代理 IP</label>
+                                <label class="label">{{t .Lang "settings.trusted_proxies_label"}}</label>
                                 <textarea x-model="access.trusted_proxies_text" rows="3" class="input-field w-full" :disabled="!access.trust_reverse_proxy" :class="!access.trust_reverse_proxy ? 'opacity-50 cursor-not-allowed' : ''" placeholder="127.0.0.1&#10;::1"></textarea>
-                                <div class="text-xs text-gray-500 leading-6 mt-2">每行一个 IP 或 CIDR。同机 Nginx/Caddy 通常保留 127.0.0.1 和 ::1；反向代理在另一台机器时填写那台机器的 IP。</div>
+                                <div class="text-xs text-gray-500 leading-6 mt-2">{{t .Lang "settings.trusted_proxies_hint"}}</div>
                             </div>
                         </div>
-                        <div class="flex gap-2 mt-3"><button @click="saveAccess()" class="btn-primary text-sm">保存访问设置</button></div>
+                        <div class="flex gap-2 mt-3"><button @click="saveAccess()" class="btn-primary text-sm">{{t .Lang "settings.save_access_button"}}</button></div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-t border-[#202833]">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">域名与 SSL</div>
-                        <div class="text-sm text-gray-500 leading-6">绑定面板域名，按部署场景选择证书模式：</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.domain_ssl_label"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.domain_ssl_desc"}}</div>
                         <div class="text-xs text-gray-500 leading-6 mt-2">
-                            自动申请（Let's Encrypt）→ 面板独占整机，无反代/CDN，需要 80 端口空闲<br>
-                            自签证书 / 上传证书 → 前面有 Caddy、Nginx 或 Cloudflare 时使用
+                            {{t .Lang "settings.ssl_mode_hint"}}
                         </div>
                         <div class="text-xs text-gray-500 leading-6 mt-3 border-t border-[#202833] pt-3">
-                            <span class="text-gray-400">用 Cloudflare 时：</span>不需要选自动申请，访客看到的证书是 Cloudflare 边缘证书。SSL/TLS 模式选 <b>Full</b> 配自签证书，或 <b>Full (strict)</b> 配上传 Cloudflare Origin CA 证书。Cloudflare 代理默认按访客端口原样转发到源站；想不带端口访问，443 要么在源站空闲，要么用 Cloudflare 的 Origin Rules 把端口转发到面板实际端口。
+                            <span class="text-gray-400">{{t .Lang "settings.cloudflare_note_label"}}</span>{{t .Lang "settings.cloudflare_note_body"}}
                         </div>
                     </div>
                     <div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div><label class="label">面板域名</label><input type="text" x-model="tls.domain" class="input-field" placeholder="panel.example.com"></div>
-                            <div><label class="label">证书模式</label><select x-model="tls.tls_mode" class="input-field"><option value="self_signed">自签证书</option><option value="uploaded">上传证书</option><option value="acme">自动申请（Let's Encrypt）</option></select></div>
-                            <div class="sm:col-span-2" x-show="tls.tls_mode === 'acme'"><label class="label">ACME 邮箱</label><input type="text" x-model="tls.acme_email" class="input-field" placeholder="用于接收证书到期提醒"></div>
-                            <div class="sm:col-span-2"><label class="label">公网访问地址</label><div class="input-field text-purple-300" x-text="accessPreview()"></div></div>
-                            <div class="sm:col-span-2"><label class="label">证书路径</label><input type="text" x-model="tls.tls_cert_path" class="input-field" disabled></div>
-                            <div class="sm:col-span-2"><label class="label">私钥路径</label><input type="text" x-model="tls.tls_key_path" class="input-field" disabled></div>
+                            <div><label class="label">{{t .Lang "settings.domain_label"}}</label><input type="text" x-model="tls.domain" class="input-field" placeholder="panel.example.com"></div>
+                            <div><label class="label">{{t .Lang "settings.cert_mode_label"}}</label><select x-model="tls.tls_mode" class="input-field"><option value="self_signed">{{t .Lang "settings.cert_mode_self_signed"}}</option><option value="uploaded">{{t .Lang "settings.cert_mode_uploaded"}}</option><option value="acme">{{t .Lang "settings.cert_mode_acme"}}</option></select></div>
+                            <div class="sm:col-span-2" x-show="tls.tls_mode === 'acme'"><label class="label">{{t .Lang "settings.acme_email_label"}}</label><input type="text" x-model="tls.acme_email" class="input-field" placeholder="{{t .Lang "settings.acme_email_placeholder"}}"></div>
+                            <div class="sm:col-span-2"><label class="label">{{t .Lang "settings.public_access_label"}}</label><div class="input-field text-purple-300" x-text="accessPreview()"></div></div>
+                            <div class="sm:col-span-2"><label class="label">{{t .Lang "settings.cert_path_label"}}</label><input type="text" x-model="tls.tls_cert_path" class="input-field" disabled></div>
+                            <div class="sm:col-span-2"><label class="label">{{t .Lang "settings.key_path_label"}}</label><input type="text" x-model="tls.tls_key_path" class="input-field" disabled></div>
                         </div>
                         <div class="flex flex-wrap gap-2 mt-3">
-                            <button @click="saveTLS()" class="btn-primary text-sm">保存域名与 TLS 配置</button>
-                            <button @click="issueSelfSigned()" class="btn-secondary text-sm">生成自签证书</button>
+                            <button @click="saveTLS()" class="btn-primary text-sm">{{t .Lang "settings.save_tls_button"}}</button>
+                            <button @click="issueSelfSigned()" class="btn-secondary text-sm">{{t .Lang "settings.issue_self_signed_button"}}</button>
                         </div>
                         <div class="mt-4 border border-[#202833] bg-[#11151a] p-3">
-                            <div class="text-sm font-semibold text-gray-200 mb-3">上传证书</div>
+                            <div class="text-sm font-semibold text-gray-200 mb-3">{{t .Lang "settings.upload_cert_title"}}</div>
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                                <div><label class="label">证书 PEM</label><textarea x-model="tlsUpload.cert_pem" rows="7" class="input-field" placeholder="-----BEGIN CERTIFICATE-----"></textarea></div>
-                                <div><label class="label">私钥 PEM</label><textarea x-model="tlsUpload.key_pem" rows="7" class="input-field" placeholder="-----BEGIN PRIVATE KEY-----"></textarea></div>
+                                <div><label class="label">{{t .Lang "settings.cert_pem_label"}}</label><textarea x-model="tlsUpload.cert_pem" rows="7" class="input-field" placeholder="-----BEGIN CERTIFICATE-----"></textarea></div>
+                                <div><label class="label">{{t .Lang "settings.key_pem_label"}}</label><textarea x-model="tlsUpload.key_pem" rows="7" class="input-field" placeholder="-----BEGIN PRIVATE KEY-----"></textarea></div>
                             </div>
-                            <div class="flex gap-2 mt-3"><button @click="uploadTLS()" class="btn-secondary text-sm">验证并上传证书</button></div>
+                            <div class="flex gap-2 mt-3"><button @click="uploadTLS()" class="btn-secondary text-sm">{{t .Lang "settings.upload_cert_button"}}</button></div>
                         </div>
                     </div>
                 </div>
@@ -159,21 +158,21 @@
 
             <section id="update" x-show="activeTab === 'update' && loaded.update" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
-                    <div class="text-base font-semibold text-gray-100">更新</div>
-                    <div class="text-sm text-gray-500 mt-1">面板版本检查/更新、自动更新策略，以及系统包更新。</div>
+                    <div class="text-base font-semibold text-gray-100">{{t .Lang "settings.update_title"}}</div>
+                    <div class="text-sm text-gray-500 mt-1">{{t .Lang "settings.update_desc"}}</div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">面板版本</div>
-                        <div class="text-sm text-gray-500 leading-6">当前版本：<span class="text-purple-300" x-text="update.current_version || '未知'"></span></div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.panel_version_label"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.current_version_prefix"}}<span class="text-purple-300" x-text="update.current_version || t('settings.unknown')"></span></div>
                     </div>
                     <div>
                         <div class="flex flex-wrap gap-2">
-                            <button @click="checkUpdate()" class="btn-secondary text-sm" :disabled="update.checking">检查更新</button>
-                            <button @click="doUpdate()" class="btn-primary text-sm" x-show="update.hasUpdate" :disabled="updateRun.running">立即更新到 <span x-text="update.latestVersion"></span></button>
+                            <button @click="checkUpdate()" class="btn-secondary text-sm" :disabled="update.checking">{{t .Lang "settings.check_update_button"}}</button>
+                            <button @click="doUpdate()" class="btn-primary text-sm" x-show="update.hasUpdate" :disabled="updateRun.running">{{t .Lang "settings.update_now_button"}}<span x-text="update.latestVersion"></span></button>
                         </div>
                         <div class="mt-3 border border-[#202833] bg-[#11151a] p-3" x-show="update.hasUpdate">
-                            <div class="text-sm text-gray-200 mb-2">发现新版本 <span class="text-purple-300" x-text="update.latestVersion"></span></div>
+                            <div class="text-sm text-gray-200 mb-2">{{t .Lang "settings.new_version_found"}}<span class="text-purple-300" x-text="update.latestVersion"></span></div>
                             <pre class="text-xs text-gray-400 whitespace-pre-wrap" x-text="update.releaseNotes"></pre>
                         </div>
                         <div class="mt-3 border border-[#202833] bg-[#11151a] p-3" x-show="updateRun.running || updateRun.completed || updateRun.error">
@@ -184,43 +183,43 @@
                             <div class="text-xs text-gray-500 mt-1" x-show="updateRun.running && updateRun.totalBytes">
                                 <span x-text="formatBytes(updateRun.downloadedBytes)"></span> / <span x-text="formatBytes(updateRun.totalBytes)"></span>
                             </div>
-                            <div class="text-xs text-yellow-400 mt-2" x-show="updateRun.running">更新进行中，请勿关闭本页面</div>
+                            <div class="text-xs text-yellow-400 mt-2" x-show="updateRun.running">{{t .Lang "settings.updating_in_progress"}}</div>
                             <div class="text-xs text-red-400 mt-2" x-show="updateRun.error" x-text="updateRun.error"></div>
                         </div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">自动更新</div>
-                        <div class="text-sm text-gray-500 leading-6">默认关闭。开启后仅在设定时间窗口内、且仅升级到稳定版才会自动更新。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.auto_update_title"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.auto_update_desc"}}</div>
                     </div>
                     <div>
                         <label class="flex items-center gap-2 text-sm text-gray-300 mb-3">
                             <input type="checkbox" x-model="autoUpdate.enabled" @change="saveAutoUpdate()">
-                            启用自动更新
+                            {{t .Lang "settings.enable_auto_update"}}
                         </label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div><label class="label">更新范围</label><select x-model="autoUpdate.mode" @change="saveAutoUpdate()" class="input-field"><option value="patch_only">仅 patch 版本</option><option value="all_stable">所有稳定版</option></select></div>
-                            <div><label class="label">时间窗口</label><input type="text" x-model="autoUpdate.window" @change="saveAutoUpdate()" class="input-field" placeholder="03:00-05:00"></div>
-                            <div><label class="label">发布成熟期（分钟）</label><input type="number" x-model="autoUpdate.release_delay_minutes" @change="saveAutoUpdate()" class="input-field"></div>
-                            <div><label class="label">签名等待超时（分钟）</label><input type="number" x-model="autoUpdate.signature_timeout_minutes" @change="saveAutoUpdate()" class="input-field"></div>
+                            <div><label class="label">{{t .Lang "settings.update_scope_label"}}</label><select x-model="autoUpdate.mode" @change="saveAutoUpdate()" class="input-field"><option value="patch_only">{{t .Lang "settings.scope_patch_only"}}</option><option value="all_stable">{{t .Lang "settings.scope_all_stable"}}</option></select></div>
+                            <div><label class="label">{{t .Lang "settings.time_window_label"}}</label><input type="text" x-model="autoUpdate.window" @change="saveAutoUpdate()" class="input-field" placeholder="03:00-05:00"></div>
+                            <div><label class="label">{{t .Lang "settings.release_delay_label"}}</label><input type="number" x-model="autoUpdate.release_delay_minutes" @change="saveAutoUpdate()" class="input-field"></div>
+                            <div><label class="label">{{t .Lang "settings.signature_timeout_label"}}</label><input type="number" x-model="autoUpdate.signature_timeout_minutes" @change="saveAutoUpdate()" class="input-field"></div>
                         </div>
                         <div class="text-xs text-gray-500 mt-3 space-y-1">
-                            <div x-show="autoUpdate.last_check_at">上次检查：<span x-text="fmtTime(autoUpdate.last_check_at)"></span></div>
-                            <div x-show="autoUpdate.last_status">上次状态：<span :class="autoUpdate.last_status === 'failed' ? 'text-red-400' : 'text-gray-400'" x-text="autoUpdate.last_status"></span></div>
-                            <div x-show="autoUpdate.last_error" class="text-red-400">上次错误：<span x-text="autoUpdate.last_error"></span></div>
-                            <div x-show="autoUpdate.last_success_version">上次成功版本：<span x-text="autoUpdate.last_success_version"></span>（<span x-text="fmtTime(autoUpdate.last_success_at)"></span>）</div>
+                            <div x-show="autoUpdate.last_check_at">{{t .Lang "settings.last_check_prefix"}}<span x-text="fmtTime(autoUpdate.last_check_at)"></span></div>
+                            <div x-show="autoUpdate.last_status">{{t .Lang "settings.last_status_prefix"}}<span :class="autoUpdate.last_status === 'failed' ? 'text-red-400' : 'text-gray-400'" x-text="autoUpdate.last_status"></span></div>
+                            <div x-show="autoUpdate.last_error" class="text-red-400">{{t .Lang "settings.last_error_prefix"}}<span x-text="autoUpdate.last_error"></span></div>
+                            <div x-show="autoUpdate.last_success_version">{{t .Lang "settings.last_success_version_prefix"}}<span x-text="autoUpdate.last_success_version"></span>（<span x-text="fmtTime(autoUpdate.last_success_at)"></span>）</div>
                         </div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">系统更新</div>
-                        <div class="text-sm text-gray-500 leading-6">检查 apt 可升级的系统包。一键更新会直接在服务器上执行 apt update && apt upgrade -y。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.system_update_title"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.system_update_desc"}}</div>
                     </div>
                     <div>
                         <div class="flex items-center justify-between gap-3 mb-3">
-                            <span :class="sysUpdate.count > 0 ? 'badge-warning' : 'badge-success'" x-text="sysUpdate.count > 0 ? (sysUpdate.count + ' 个包可更新') : '系统已是最新'"></span>
+                            <span :class="sysUpdate.count > 0 ? 'badge-warning' : 'badge-success'" x-text="sysUpdate.count > 0 ? t('settings.packages_updatable', {count: sysUpdate.count}) : t('settings.system_up_to_date')"></span>
                         </div>
                         <div class="max-h-64 overflow-y-auto border border-[#202833]" x-show="sysUpdate.count > 0">
                             <table class="w-full text-xs">
@@ -236,97 +235,97 @@
                             </table>
                         </div>
                         <div class="flex flex-wrap gap-2 mt-3">
-                            <button @click="checkSysUpdate()" class="btn-secondary text-sm" :disabled="sysUpdate.checking">刷新</button>
-                            <button @click="doSysUpdate()" class="btn-danger text-sm" x-show="sysUpdate.count > 0" :disabled="sysUpdate.updating">一键更新</button>
+                            <button @click="checkSysUpdate()" class="btn-secondary text-sm" :disabled="sysUpdate.checking">{{t .Lang "local_storage.refresh"}}</button>
+                            <button @click="doSysUpdate()" class="btn-danger text-sm" x-show="sysUpdate.count > 0" :disabled="sysUpdate.updating">{{t .Lang "settings.one_click_update"}}</button>
                         </div>
                         <pre class="text-xs text-gray-400 whitespace-pre-wrap mt-3 max-h-64 overflow-y-auto" x-show="sysUpdate.output" x-text="sysUpdate.output"></pre>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">操作日志</div>
-                        <div class="text-sm text-gray-500 leading-6">最近的更新/系统操作记录。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.oplog_title"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.oplog_desc"}}</div>
                     </div>
                     <div>
-                        <button @click="openOpLogs()" class="btn-secondary text-sm">查看操作日志</button>
+                        <button @click="openOpLogs()" class="btn-secondary text-sm">{{t .Lang "settings.view_oplog_button"}}</button>
                     </div>
                 </div>
             </section>
 
             <section id="backup" x-show="activeTab === 'backup' && loaded.backup" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
-                    <div class="text-base font-semibold text-gray-100">备份</div>
-                    <div class="text-sm text-gray-500 mt-1">生成数据库和密钥的打包备份（.tar.gz），可选发送到管理员邮箱。密钥用于解密已保存的服务器/网站密码，不包含在内的话恢复后这些密码将无法解密。</div>
+                    <div class="text-base font-semibold text-gray-100">{{t .Lang "settings.backup_title"}}</div>
+                    <div class="text-sm text-gray-500 mt-1">{{t .Lang "settings.backup_desc"}}</div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">自动备份</div>
-                        <div class="text-sm text-gray-500 leading-6">默认关闭。开启后按固定频率生成本地备份，保留最近若干份。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.auto_backup_title"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.auto_backup_desc"}}</div>
                     </div>
                     <div>
                         <label class="flex items-center gap-2 text-sm text-gray-300 mb-3">
                             <input type="checkbox" x-model="backup.auto_enabled">
-                            启用自动备份
+                            {{t .Lang "settings.enable_auto_backup"}}
                         </label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div><label class="label">备份频率</label><select x-model="backup.frequency" class="input-field"><option value="weekly">每周</option><option value="daily">每天</option></select></div>
-                            <div><label class="label">本地保留份数</label><input type="number" x-model="backup.keep_count" class="input-field" min="1" max="365"></div>
-                            <div><label class="label">邮件附件上限（MB）</label><input type="number" x-model="backup.max_email_mb" class="input-field" min="1" max="100"></div>
-                            <div><label class="label">管理员邮箱</label><div class="input-field text-gray-300" x-text="backup.admin_email || '未设置'"></div></div>
+                            <div><label class="label">{{t .Lang "settings.backup_frequency_label"}}</label><select x-model="backup.frequency" class="input-field"><option value="weekly">{{t .Lang "settings.freq_weekly"}}</option><option value="daily">{{t .Lang "settings.freq_daily"}}</option></select></div>
+                            <div><label class="label">{{t .Lang "settings.keep_count_label"}}</label><input type="number" x-model="backup.keep_count" class="input-field" min="1" max="365"></div>
+                            <div><label class="label">{{t .Lang "settings.max_email_mb_label"}}</label><input type="number" x-model="backup.max_email_mb" class="input-field" min="1" max="100"></div>
+                            <div><label class="label">{{t .Lang "settings.admin_email_label"}}</label><div class="input-field text-gray-300" x-text="backup.admin_email || t('settings.not_set')"></div></div>
                         </div>
                         <label class="flex items-center gap-2 text-sm text-gray-300 mt-3">
                             <input type="checkbox" x-model="backup.email_enabled">
-                            备份后发送到管理员邮箱
+                            {{t .Lang "settings.send_to_admin_email"}}
                         </label>
                         <div class="text-xs text-gray-500 mt-3 space-y-1">
-                            <div x-show="backup.last_run_at">上次备份：<span x-text="formatBackupTime(backup.last_run_at)"></span></div>
-                            <div x-show="backup.last_status">上次状态：<span :class="backup.last_status === 'failed' ? 'text-red-400' : (backup.last_status === 'warning' ? 'text-yellow-400' : 'text-gray-400')" x-text="backup.last_status"></span></div>
-                            <div x-show="backup.last_error" class="text-yellow-400">提示：<span x-text="backup.last_error"></span></div>
+                            <div x-show="backup.last_run_at">{{t .Lang "settings.last_backup_prefix"}}<span x-text="formatBackupTime(backup.last_run_at)"></span></div>
+                            <div x-show="backup.last_status">{{t .Lang "settings.last_status_prefix"}}<span :class="backup.last_status === 'failed' ? 'text-red-400' : (backup.last_status === 'warning' ? 'text-yellow-400' : 'text-gray-400')" x-text="backup.last_status"></span></div>
+                            <div x-show="backup.last_error" class="text-yellow-400">{{t .Lang "settings.backup_hint_prefix"}}<span x-text="backup.last_error"></span></div>
                         </div>
                         <div class="flex flex-wrap gap-2 mt-3">
-                            <button @click="saveBackup()" class="btn-primary text-sm">保存备份设置</button>
-                            <button @click="runBackup()" class="btn-secondary text-sm" :disabled="backupRun.running">立即备份</button>
-                            <button @click="openBackupList()" class="btn-secondary text-sm">备份列表</button>
+                            <button @click="saveBackup()" class="btn-primary text-sm">{{t .Lang "settings.save_backup_button"}}</button>
+                            <button @click="runBackup()" class="btn-secondary text-sm" :disabled="backupRun.running">{{t .Lang "settings.backup_now_button"}}</button>
+                            <button @click="openBackupList()" class="btn-secondary text-sm">{{t .Lang "settings.backup_list_button"}}</button>
                         </div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5" x-show="backupRun.running || backupRun.message">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">本次结果</div>
-                        <div class="text-sm text-gray-500 leading-6">手动备份执行状态。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.this_run_result_title"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.this_run_result_desc"}}</div>
                     </div>
                     <div class="border border-[#202833] bg-[#11151a] p-3">
-                        <div class="text-sm" :class="backupRun.status === 'warning' ? 'text-yellow-400' : (backupRun.status === 'success' ? 'text-green-400' : 'text-gray-300')" x-text="backupRun.running ? '正在生成备份...' : backupRun.message"></div>
+                        <div class="text-sm" :class="backupRun.status === 'warning' ? 'text-yellow-400' : (backupRun.status === 'success' ? 'text-green-400' : 'text-gray-300')" x-text="backupRun.running ? t('settings.generating_backup') : backupRun.message"></div>
                         <div class="text-xs text-gray-500 mt-2 space-y-1" x-show="backupRun.filename">
-                            <div>文件：<span x-text="backupRun.filename"></span></div>
-                            <div>大小：<span x-text="backupRun.size_human"></span></div>
-                            <div>邮件：<span x-text="backupRun.email_sent ? '已发送' : (backupRun.email_skipped_reason || '未发送')"></span></div>
+                            <div>{{t .Lang "settings.file_label"}}<span x-text="backupRun.filename"></span></div>
+                            <div>{{t .Lang "settings.size_label"}}<span x-text="backupRun.size_human"></span></div>
+                            <div>{{t .Lang "settings.email_label"}}<span x-text="backupRun.email_sent ? t('settings.email_sent') : (backupRun.email_skipped_reason || t('settings.email_not_sent'))"></span></div>
                         </div>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-t border-[#202833]">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">恢复备份</div>
-                        <div class="text-sm text-gray-500 leading-6">可直接从已有本地备份或上传的备份文件（.tar.gz）恢复数据库和密钥。恢复前会自动把当前数据库和密钥另存为 <code class="text-gray-400">.pre-restore</code> 备份，恢复过程中面板会自动重启。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.restore_title"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.restore_desc"}}</div>
                     </div>
                     <div class="text-sm text-gray-400 leading-6">
-                        <div>从已有本地备份恢复：打开「<button type="button" @click="openBackupList()" class="text-purple-300 underline">备份列表</button>」，选择要恢复的文件。</div>
+                        <div>{{t .Lang "settings.restore_from_existing_prefix"}}<button type="button" @click="openBackupList()" class="text-purple-300 underline">{{t .Lang "settings.backup_list_button"}}</button>{{t .Lang "settings.restore_from_existing_suffix"}}</div>
                         <div class="border-t border-[#202833] pt-3 mt-3">
-                            <div class="mb-2">或上传备份文件恢复：</div>
+                            <div class="mb-2">{{t .Lang "settings.or_upload_restore"}}</div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <input type="file" accept=".gz,.tar.gz" @change="restoreUpload.file = $event.target.files[0]" class="input-field text-xs">
-                                <button @click="uploadRestore()" class="btn-danger text-sm" :disabled="restoreUpload.uploading">上传并恢复</button>
+                                <button @click="uploadRestore()" class="btn-danger text-sm" :disabled="restoreUpload.uploading">{{t .Lang "settings.upload_and_restore_button"}}</button>
                             </div>
                         </div>
                         <div class="border border-[#202833] bg-[#11151a] p-3 mt-3" x-show="restoreRun.running || restoreRun.message">
                             <div class="text-sm" :class="restoreRun.running ? 'text-gray-300' : 'text-green-400'" x-text="restoreRun.message"></div>
                         </div>
-                        <div class="text-xs text-gray-500 mt-3">如果面板服务本身无法启动（例如重装系统后的灾难恢复），可改用命令行：</div>
+                        <div class="text-xs text-gray-500 mt-3">{{t .Lang "settings.cli_fallback_hint"}}</div>
                         <ol class="list-decimal list-inside space-y-1 mt-1">
-                            <li>把备份文件（.tar.gz）传到新服务器上</li>
-                            <li>停止面板服务：<code class="text-purple-300">systemctl stop server-panel</code></li>
-                            <li>执行恢复：<code class="text-purple-300">server-panel -config &lt;配置文件路径&gt; -restore-backup=&lt;备份文件路径&gt;</code></li>
-                            <li>重新启动服务：<code class="text-purple-300">systemctl start server-panel</code></li>
+                            <li>{{t .Lang "settings.cli_step1"}}</li>
+                            <li>{{t .Lang "settings.cli_step2_prefix"}}<code class="text-purple-300">systemctl stop server-panel</code></li>
+                            <li>{{t .Lang "settings.cli_step3_prefix"}}<code class="text-purple-300">{{t .Lang "settings.cli_step3_placeholder"}}</code></li>
+                            <li>{{t .Lang "settings.cli_step4_prefix"}}<code class="text-purple-300">systemctl start server-panel</code></li>
                         </ol>
                     </div>
                 </div>
@@ -336,12 +335,12 @@
                 <div class="modal-content max-w-3xl">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
-                            <div class="text-base font-semibold text-gray-100">备份列表</div>
-                            <div class="text-xs text-gray-500 mt-1" x-text="'共 ' + backupList.length + ' 份本地备份'"></div>
+                            <div class="text-base font-semibold text-gray-100">{{t .Lang "settings.backup_list_title"}}</div>
+                            <div class="text-xs text-gray-500 mt-1" x-text="t('settings.backup_count', {count: backupList.length})"></div>
                         </div>
                         <div class="flex gap-2">
-                            <button @click="loadBackupList()" class="btn-secondary text-sm">刷新</button>
-                            <button @click="backupListModalOpen=false" class="btn-secondary text-sm">关闭</button>
+                            <button @click="loadBackupList()" class="btn-secondary text-sm">{{t .Lang "local_storage.refresh"}}</button>
+                            <button @click="backupListModalOpen=false" class="btn-secondary text-sm">{{t .Lang "common.close"}}</button>
                         </div>
                     </div>
                     <div class="space-y-2 max-h-[60vh] overflow-y-auto">
@@ -352,12 +351,12 @@
                                     <div class="text-xs text-gray-500 mt-1" x-text="item.mod_time + ' · ' + item.size_human"></div>
                                 </div>
                                 <div class="flex gap-2 shrink-0">
-                                    <a :href="backupDownloadUrl(item.filename)" class="btn-secondary text-xs">下载</a>
-                                    <button @click="restoreExisting(item.filename)" class="btn-danger text-xs">恢复此备份</button>
+                                    <a :href="backupDownloadUrl(item.filename)" class="btn-secondary text-xs">{{t .Lang "files.download"}}</a>
+                                    <button @click="restoreExisting(item.filename)" class="btn-danger text-xs">{{t .Lang "settings.restore_this_backup"}}</button>
                                 </div>
                             </div>
                         </template>
-                        <div class="text-sm text-gray-500 py-8 text-center" x-show="backupList.length === 0">暂无本地备份</div>
+                        <div class="text-sm text-gray-500 py-8 text-center" x-show="backupList.length === 0">{{t .Lang "settings.no_local_backups"}}</div>
                     </div>
                 </div>
             </div>
@@ -366,12 +365,12 @@
                 <div class="modal-content max-w-5xl">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
-                            <div class="text-base font-semibold text-gray-100">操作日志</div>
-                            <div class="text-xs text-gray-500 mt-1" x-text="'共 ' + (opLogs.total || 0) + ' 条，显示最近 ' + (opLogs.items || []).length + ' 条'"></div>
+                            <div class="text-base font-semibold text-gray-100">{{t .Lang "settings.oplog_title"}}</div>
+                            <div class="text-xs text-gray-500 mt-1" x-text="t('settings.oplog_count', {total: opLogs.total || 0, shown: (opLogs.items || []).length})"></div>
                         </div>
                         <div class="flex gap-2">
-                            <button @click="loadOpLogs()" class="btn-secondary text-sm">刷新</button>
-                            <button @click="opLogModalOpen=false" class="btn-secondary text-sm">关闭</button>
+                            <button @click="loadOpLogs()" class="btn-secondary text-sm">{{t .Lang "local_storage.refresh"}}</button>
+                            <button @click="opLogModalOpen=false" class="btn-secondary text-sm">{{t .Lang "common.close"}}</button>
                         </div>
                     </div>
                     <div class="space-y-3 max-h-[65vh] overflow-y-auto">
@@ -386,16 +385,16 @@
                                 <div class="text-sm text-gray-300 whitespace-pre-wrap break-all" x-text="log.message || '--'"></div>
                             </div>
                         </template>
-                        <div class="text-sm text-gray-500 py-8 text-center" x-show="!opLogs.items || opLogs.items.length === 0">暂无记录</div>
+                        <div class="text-sm text-gray-500 py-8 text-center" x-show="!opLogs.items || opLogs.items.length === 0">{{t .Lang "settings.no_records"}}</div>
                     </div>
                     <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#202833] pt-3 mt-3 text-sm text-gray-400" x-show="opLogs.total > opLogs.page_size">
-                        <div x-text="'第 ' + opLogStart + '-' + opLogEnd + ' 条，共 ' + (opLogs.total || 0) + ' 条'"></div>
+                        <div x-text="t('common.pagination_summary', {start: opLogStart, end: opLogEnd, total: opLogs.total || 0})"></div>
                         <div class="flex items-center gap-2">
-                            <button @click="loadOpLogs(1)" :disabled="opLogs.page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
-                            <button @click="loadOpLogs(opLogs.page - 1)" :disabled="opLogs.page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                            <button @click="loadOpLogs(1)" :disabled="opLogs.page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.first_page')"></button>
+                            <button @click="loadOpLogs(opLogs.page - 1)" :disabled="opLogs.page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.prev_page')"></button>
                             <span class="px-2" x-text="opLogs.page + ' / ' + opLogTotalPages"></span>
-                            <button @click="loadOpLogs(opLogs.page + 1)" :disabled="opLogs.page >= opLogTotalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
-                            <button @click="loadOpLogs(opLogTotalPages)" :disabled="opLogs.page >= opLogTotalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+                            <button @click="loadOpLogs(opLogs.page + 1)" :disabled="opLogs.page >= opLogTotalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.next_page')"></button>
+                            <button @click="loadOpLogs(opLogTotalPages)" :disabled="opLogs.page >= opLogTotalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.last_page')"></button>
                         </div>
                     </div>
                 </div>
@@ -404,53 +403,53 @@
             <template x-if="loaded.security">
                 <section id="security" x-show="activeTab === 'security'" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                     <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
-                        <div class="text-base font-semibold text-gray-100">安全</div>
-                        <div class="text-sm text-gray-500 mt-1">BasicAuth、面板登录和查看密码都在这里管理。</div>
+                        <div class="text-base font-semibold text-gray-100">{{t .Lang "settings.security_title"}}</div>
+                        <div class="text-sm text-gray-500 mt-1">{{t .Lang "settings.security_desc"}}</div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                         <div>
-                            <div class="text-sm font-semibold text-gray-100 mb-1">查看密码</div>
-                            <div class="text-sm text-gray-500 leading-6">用于查看已保存的 SSH 密码、服务器面板密码和网站面板密码。每次查看都需要重新输入。</div>
+                            <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.view_password_title"}}</div>
+                            <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.view_password_desc"}}</div>
                         </div>
                         <div>
                             <div class="flex items-center justify-between gap-3 mb-3">
-                                <span :class="vpSetup ? 'badge-success' : 'badge-warning'" x-text="vpSetup ? '已设置' : '未设置'"></span>
-                                <span class="text-xs text-gray-500" x-show="vpSetup">错误 5 次后清空敏感凭据</span>
+                                <span :class="vpSetup ? 'badge-success' : 'badge-warning'" x-text="vpSetup ? t('settings.vp_set') : t('settings.vp_not_set')"></span>
+                                <span class="text-xs text-gray-500" x-show="vpSetup">{{t .Lang "settings.vp_clear_hint"}}</span>
                             </div>
                             <div class="flex flex-wrap gap-2">
-                                <button @click="setupVP()" class="btn-primary text-sm" x-show="!vpSetup">设置查看密码</button>
-                                <button @click="unlockVP()" class="btn-primary text-sm" x-show="vpSetup">验证查看密码</button>
-                                <button @click="changeVP()" class="btn-secondary text-sm" x-show="vpSetup">修改密码</button>
-                                <button @click="resetVP()" class="btn-danger text-sm" x-show="vpSetup">重置密码</button>
+                                <button @click="setupVP()" class="btn-primary text-sm" x-show="!vpSetup">{{t .Lang "settings.setup_vp_button"}}</button>
+                                <button @click="unlockVP()" class="btn-primary text-sm" x-show="vpSetup">{{t .Lang "settings.verify_vp_button"}}</button>
+                                <button @click="changeVP()" class="btn-secondary text-sm" x-show="vpSetup">{{t .Lang "settings.change_vp_button"}}</button>
+                                <button @click="resetVP()" class="btn-danger text-sm" x-show="vpSetup">{{t .Lang "settings.reset_vp_button"}}</button>
                             </div>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
                         <div>
-                            <div class="text-sm font-semibold text-gray-100 mb-1">账户安全</div>
-                            <div class="text-sm text-gray-500 leading-6">BasicAuth 为面板增加额外一层登录验证。修改面板登录信息后，需要重新登录。</div>
+                            <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.account_security_title"}}</div>
+                            <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.account_security_desc"}}</div>
                         </div>
                         <div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div class="sm:col-span-2">
                                     <label class="flex items-center gap-3 cursor-pointer select-none">
                                         <input type="checkbox" x-model="acct.basic_auth_enabled" class="w-4 h-4">
-                                        <span class="text-sm text-gray-200">启用 BasicAuth 二次验证</span>
+                                        <span class="text-sm text-gray-200">{{t .Lang "settings.enable_basic_auth"}}</span>
                                     </label>
                                     <template x-if="!acct.basic_auth_enabled">
                                         <div class="mt-2 p-3 rounded bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-sm leading-6">
-                                            关闭后，面板将少一层防护。如果只是为了省去输入麻烦，建议保留开启并设置一个简单的账号密码，也比完全关闭更安全。
+                                            {{t .Lang "settings.basic_auth_off_warning"}}
                                         </div>
                                     </template>
                                 </div>
-                                <div><label class="label">BasicAuth 用户名</label><input type="text" x-model="acct.basic_username" class="input-field" autocomplete="off"></div>
-                                <div><label class="label">BasicAuth 新密码</label><input type="password" x-model="acct.basic_password" class="input-field" placeholder="留空不修改" autocomplete="new-password"></div>
-                                <div><label class="label">面板登录用户名</label><input type="text" x-model="acct.web_username" class="input-field" autocomplete="off"></div>
-                                <div><label class="label">当前面板密码</label><input type="password" x-model="acct.old_password" class="input-field" autocomplete="current-password"></div>
-                                <div><label class="label">面板新密码</label><input type="password" x-model="acct.web_password" class="input-field" placeholder="留空不修改" autocomplete="new-password"></div>
-                                <div><label class="label">确认新密码</label><input type="password" x-model="acct.web_password2" class="input-field" autocomplete="new-password"></div>
+                                <div><label class="label">{{t .Lang "settings.basic_username_label"}}</label><input type="text" x-model="acct.basic_username" class="input-field" autocomplete="off"></div>
+                                <div><label class="label">{{t .Lang "settings.basic_password_label"}}</label><input type="password" x-model="acct.basic_password" class="input-field" placeholder="{{t .Lang "settings.leave_blank_no_change"}}" autocomplete="new-password"></div>
+                                <div><label class="label">{{t .Lang "settings.web_username_label"}}</label><input type="text" x-model="acct.web_username" class="input-field" autocomplete="off"></div>
+                                <div><label class="label">{{t .Lang "settings.current_password_label"}}</label><input type="password" x-model="acct.old_password" class="input-field" autocomplete="current-password"></div>
+                                <div><label class="label">{{t .Lang "settings.web_password_label"}}</label><input type="password" x-model="acct.web_password" class="input-field" placeholder="{{t .Lang "settings.leave_blank_no_change"}}" autocomplete="new-password"></div>
+                                <div><label class="label">{{t .Lang "settings.confirm_password_label"}}</label><input type="password" x-model="acct.web_password2" class="input-field" autocomplete="new-password"></div>
                             </div>
-                            <div class="flex gap-2 mt-3"><button @click="saveAccount()" class="btn-primary text-sm">保存并重新登录</button></div>
+                            <div class="flex gap-2 mt-3"><button @click="saveAccount()" class="btn-primary text-sm">{{t .Lang "settings.save_and_relogin_button"}}</button></div>
                         </div>
                     </div>
                 </section>
@@ -459,24 +458,24 @@
             <template x-if="loaded.notification">
                 <section id="notification" x-show="activeTab === 'notification'" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                     <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
-                        <div class="text-base font-semibold text-gray-100">通知</div>
-                        <div class="text-sm text-gray-500 mt-1">配置告警邮件发送方式。</div>
+                        <div class="text-base font-semibold text-gray-100">{{t .Lang "settings.notification_title"}}</div>
+                        <div class="text-sm text-gray-500 mt-1">{{t .Lang "settings.notification_desc"}}</div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
                         <div>
-                            <div class="text-sm font-semibold text-gray-100 mb-1">SMTP 邮件</div>
-                            <div class="text-sm text-gray-500 leading-6">用于到期提醒、探测异常和监控告警。</div>
+                            <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.smtp_title"}}</div>
+                            <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.smtp_desc"}}</div>
                         </div>
                         <div>
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div><label class="label">SMTP 主机</label><input type="text" x-model="smtp.smtp_host" class="input-field"></div>
-                                <div><label class="label">端口</label><input type="number" x-model="smtp.smtp_port" class="input-field"></div>
-                                <div><label class="label">加密方式</label><select x-model="smtp.smtp_encryption" class="input-field"><option value="starttls">STARTTLS</option><option value="ssl">SSL</option><option value="none">无</option></select></div>
-                                <div><label class="label">发件账号</label><input type="text" x-model="smtp.smtp_user" class="input-field" autocomplete="off"></div>
-                                <div><label class="label">密码/授权码</label><input type="password" x-model="smtp.smtp_pass" class="input-field" autocomplete="off"></div>
-                                <div><label class="label">管理员邮箱</label><input type="email" x-model="smtp.admin_email" class="input-field"></div>
+                                <div><label class="label">{{t .Lang "settings.smtp_host_label"}}</label><input type="text" x-model="smtp.smtp_host" class="input-field"></div>
+                                <div><label class="label">{{t .Lang "settings.port_label"}}</label><input type="number" x-model="smtp.smtp_port" class="input-field"></div>
+                                <div><label class="label">{{t .Lang "settings.encryption_label"}}</label><select x-model="smtp.smtp_encryption" class="input-field"><option value="starttls">STARTTLS</option><option value="ssl">SSL</option><option value="none">{{t .Lang "settings.enc_none"}}</option></select></div>
+                                <div><label class="label">{{t .Lang "settings.smtp_user_label"}}</label><input type="text" x-model="smtp.smtp_user" class="input-field" autocomplete="off"></div>
+                                <div><label class="label">{{t .Lang "settings.smtp_pass_label"}}</label><input type="password" x-model="smtp.smtp_pass" class="input-field" autocomplete="off"></div>
+                                <div><label class="label">{{t .Lang "settings.admin_email_label"}}</label><input type="email" x-model="smtp.admin_email" class="input-field"></div>
                             </div>
-                            <div class="flex gap-2 mt-3"><button @click="saveSMTP()" class="btn-primary text-sm">保存 SMTP</button><button @click="testSMTP()" class="btn-secondary text-sm">发送测试邮件</button></div>
+                            <div class="flex gap-2 mt-3"><button @click="saveSMTP()" class="btn-primary text-sm">{{t .Lang "settings.save_smtp_button"}}</button><button @click="testSMTP()" class="btn-secondary text-sm">{{t .Lang "settings.test_smtp_button"}}</button></div>
                         </div>
                     </div>
                 </section>
@@ -484,22 +483,22 @@
 
             <section id="dictionary" x-show="activeTab === 'dictionary' && loaded.dictionary" x-cloak class="border border-[#2a3038] bg-[#171b21] mb-5">
                 <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26]">
-                    <div class="text-base font-semibold text-gray-100">字典</div>
-                    <div class="text-sm text-gray-500 mt-1">这些列表会出现在添加或编辑服务器、网站的表单中。</div>
+                    <div class="text-base font-semibold text-gray-100">{{t .Lang "settings.dictionary_title"}}</div>
+                    <div class="text-sm text-gray-500 mt-1">{{t .Lang "settings.dictionary_desc"}}</div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5 border-b border-[#202833]">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">操作系统列表</div>
-                        <div class="text-sm text-gray-500 leading-6">每行一个系统名称。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.os_list_title"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.os_list_desc"}}</div>
                     </div>
-                    <div><textarea x-model="osList" rows="7" class="input-field w-full" placeholder="每行一个操作系统名称"></textarea><div class="flex gap-2 mt-3"><button @click="saveOSList()" class="btn-primary text-sm">保存操作系统列表</button></div></div>
+                    <div><textarea x-model="osList" rows="7" class="input-field w-full" placeholder="{{t .Lang "settings.os_list_placeholder"}}"></textarea><div class="flex gap-2 mt-3"><button @click="saveOSList()" class="btn-primary text-sm">{{t .Lang "settings.save_os_list_button"}}</button></div></div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-[minmax(220px,0.72fr)_minmax(320px,1fr)] gap-6 p-5">
                     <div>
-                        <div class="text-sm font-semibold text-gray-100 mb-1">网站类型列表</div>
-                        <div class="text-sm text-gray-500 leading-6">每行一个网站类型。</div>
+                        <div class="text-sm font-semibold text-gray-100 mb-1">{{t .Lang "settings.site_type_list_title"}}</div>
+                        <div class="text-sm text-gray-500 leading-6">{{t .Lang "settings.site_type_list_desc"}}</div>
                     </div>
-                    <div><textarea x-model="siteTypeList" rows="7" class="input-field w-full" placeholder="每行一个网站类型"></textarea><div class="flex gap-2 mt-3"><button @click="saveSiteTypeList()" class="btn-primary text-sm">保存网站类型列表</button></div></div>
+                    <div><textarea x-model="siteTypeList" rows="7" class="input-field w-full" placeholder="{{t .Lang "settings.site_type_list_placeholder"}}"></textarea><div class="flex gap-2 mt-3"><button @click="saveSiteTypeList()" class="btn-primary text-sm">{{t .Lang "settings.save_site_type_list_button"}}</button></div></div>
                 </div>
             </section>
 
@@ -558,7 +557,7 @@ function settingsPage() {
             ].join(' ');
         },
         activeTabTitle() {
-            return ({ basic:'基础设置', update:'更新', backup:'备份', security:'安全', notification:'通知', dictionary:'字典' })[this.activeTab] || '';
+            return ({ basic:t('settings.tab_basic'), update:t('settings.tab_update'), backup:t('settings.tab_backup'), security:t('settings.tab_security'), notification:t('settings.tab_notification'), dictionary:t('settings.tab_dictionary') })[this.activeTab] || '';
         },
         async setTab(tab, updateHash = true) {
             if (!this.loaded.hasOwnProperty(tab)) return;
@@ -668,7 +667,7 @@ function settingsPage() {
                 if (st.status === 'fulfilled') this.siteTypeList = JSON.parse(st.value.data.svalue || '[]').join('\n');
             } catch(e) {} finally { this.loaded.dictionary = true; }
         },
-        async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
+        async saveTitle() { try { await api('/api/settings', {method:'PUT', body:{panel_title:this.panelTitle}}); showToast(t('common.save_success'),'success'); } catch(e) { showToast(e.message,'error'); } },
         async saveAccess() {
             const trustedProxies = (this.access.trusted_proxies_text || '')
                 .split(/\r?\n|,/)
@@ -699,7 +698,7 @@ function settingsPage() {
                     trust_reverse_proxy: !!d.data.trust_reverse_proxy,
                     trusted_proxies_text: savedProxies.join('\n')
                 };
-                showToast(d.data.message || '保存成功','success');
+                showToast(d.data.message || t('common.save_success'),'success');
                 if (changed) {
                     const port = body.tls_port && body.tls_port !== 443 ? (':' + body.tls_port) : '';
                     const target = window.location.protocol + '//' + window.location.hostname + port + '/' + body.random_suffix + '/login';
@@ -713,7 +712,7 @@ function settingsPage() {
             }
         },
         accessPreview() {
-            if (!this.tls.domain) return '（先填写面板域名）';
+            if (!this.tls.domain) return t('settings.fill_domain_first');
             const port = parseInt(this.access.tls_port) || 0;
             const portPart = (port && port !== 443) ? (':' + port) : '';
             return 'https://' + this.tls.domain + portPart + '/' + (this.access.random_suffix || '') + '/login';
@@ -725,23 +724,20 @@ function settingsPage() {
                 acme_email: (this.tls.acme_email || '').trim()
             };
             if (body.tls_mode === 'acme') {
-                const ok = await confirmModal(
-                    "保存后面板会自动重启并向 Let's Encrypt 申请证书，期间可能短暂无法访问。" +
-                    "当前标签页可能继续显示旧的自签名证书；请等待约 30 秒后关闭当前标签页（必要时关闭浏览器），再重新打开面板地址检查新证书。确认继续？"
-                );
+                const ok = await confirmModal(t('settings.acme_confirm'));
                 if (!ok) return;
             }
-            try { const d = await api('/api/settings/tls', {method:'PUT', body}); showToast(d.data.message || '域名与 TLS 配置已保存','success'); } catch(e) { showToast(e.message,'error'); }
+            try { const d = await api('/api/settings/tls', {method:'PUT', body}); showToast(d.data.message || t('settings.tls_saved'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async issueSelfSigned() {
-            const ok = await confirmModal('生成新的自签证书后服务会自动重启生效，期间面板会短暂无法访问。确认继续？');
+            const ok = await confirmModal(t('settings.self_signed_confirm'));
             if (!ok) return;
             try {
                 const d = await api('/api/settings/tls/issue', {method:'POST'});
                 this.tls.tls_mode = 'self_signed';
                 this.tls.tls_cert_path = d.data.tls_cert_path || this.tls.tls_cert_path;
                 this.tls.tls_key_path = d.data.tls_key_path || this.tls.tls_key_path;
-                showToast(d.data.message || '自签证书已生成','success');
+                showToast(d.data.message || t('settings.self_signed_issued'),'success');
             } catch(e) { showToast(e.message,'error'); }
         },
         async uploadTLS() {
@@ -750,7 +746,7 @@ function settingsPage() {
                 cert_pem: (this.tlsUpload.cert_pem || '').trim(),
                 key_pem: (this.tlsUpload.key_pem || '').trim()
             };
-            if (!body.cert_pem || !body.key_pem) { showToast('证书和私钥不能为空','error'); return; }
+            if (!body.cert_pem || !body.key_pem) { showToast(t('settings.cert_key_required'),'error'); return; }
             try {
                 const d = await api('/api/settings/tls/upload', {method:'POST', body});
                 this.tls.tls_mode = 'uploaded';
@@ -758,7 +754,7 @@ function settingsPage() {
                 this.tls.tls_key_path = d.data.tls_key_path || this.tls.tls_key_path;
                 this.tlsUpload.cert_pem = '';
                 this.tlsUpload.key_pem = '';
-                showToast(d.data.message || '证书已上传','success');
+                showToast(d.data.message || t('settings.cert_uploaded'),'success');
             } catch(e) { showToast(e.message,'error'); }
         },
         async checkUpdate(silent = false) {
@@ -771,17 +767,17 @@ function settingsPage() {
                 this.update.latestVersion = d.data.latest_version;
                 this.update.releaseNotes = d.data.release_notes;
                 if (!silent && !this.update.hasUpdate) {
-                    showToast('已是最新版本 ' + this.update.current_version, 'success');
+                    showToast(t('settings.already_latest', {version: this.update.current_version}), 'success');
                 }
             } catch(e) { if (!e.silent) showToast(e.message,'error'); }
             this.update.checking = false;
         },
         async doUpdate() {
-            const ok = await confirmModal('确认更新到 ' + this.update.latestVersion + ' 吗？更新过程中面板会重启，请勿关闭本页面。');
+            const ok = await confirmModal(t('settings.update_confirm', {version: this.update.latestVersion}));
             if (!ok) return;
             try {
                 const d = await api('/api/update/do', {method:'POST'});
-                showToast(d.data.message || '更新已开始','success');
+                showToast(d.data.message || t('settings.update_started'),'success');
                 this.updateRun.running = true;
                 this._pollUpdateStatus();
             } catch(e) { showToast(e.message,'error'); }
@@ -821,7 +817,7 @@ function settingsPage() {
         _waitForRestart() {
             if (this._restartTimer) clearInterval(this._restartTimer);
             this.updateRun.running = true;
-            this.updateRun.message = '面板正在重启，等待服务恢复后将自动刷新...';
+            this.updateRun.message = t('settings.restarting_wait_refresh');
             let attempts = 0;
             this._restartTimer = setInterval(async () => {
                 attempts++;
@@ -836,7 +832,7 @@ function settingsPage() {
                 if (attempts >= 120) {
                     clearInterval(this._restartTimer);
                     this.updateRun.running = false;
-                    this.updateRun.message = '面板重启超时，请手动刷新页面确认状态';
+                    this.updateRun.message = t('settings.restart_timeout');
                 }
             }, 1000);
         },
@@ -855,7 +851,7 @@ function settingsPage() {
                 panel_auto_update_release_delay_minutes: String(parseInt(this.autoUpdate.release_delay_minutes) || 15),
                 panel_auto_update_signature_timeout_minutes: String(parseInt(this.autoUpdate.signature_timeout_minutes) || 120)
             };
-            try { await api('/api/update/auto-settings', {method:'PUT', body}); showToast('自动更新设置已保存','success'); } catch(e) { showToast(e.message,'error'); }
+            try { await api('/api/update/auto-settings', {method:'PUT', body}); showToast(t('settings.auto_update_saved'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async loadAutoUpdate() {
             const d = await api('/api/update/auto-settings');
@@ -898,19 +894,19 @@ function settingsPage() {
             };
             try {
                 const d = await api('/api/settings/backup', {method:'PUT', body});
-                showToast((d.data && d.data.message) || '备份设置已保存','success');
+                showToast((d.data && d.data.message) || t('settings.backup_settings_saved'),'success');
                 await this.loadBackup();
             } catch(e) { showToast(e.message,'error'); }
         },
         async runBackup() {
-            const ok = await confirmModal('立即生成备份（数据库 + 密钥）吗？');
+            const ok = await confirmModal(t('settings.backup_confirm'));
             if (!ok) return;
             this.backupRun = { running:true, message:'', status:'', filename:'', size_human:'', email_sent:false, email_skipped_reason:'' };
             try {
                 const d = await api('/api/settings/backup/run', {method:'POST', body:{email_enabled: !!this.backup.email_enabled}});
                 this.backupRun = Object.assign({running:false}, d.data || {});
                 const toastType = this.backupRun.status === 'warning' ? 'warning' : 'success';
-                showToast(this.backupRun.message || '备份已生成', toastType);
+                showToast(this.backupRun.message || t('settings.backup_generated'), toastType);
                 await this.loadBackup();
             } catch(e) {
                 this.backupRun.running = false;
@@ -935,26 +931,26 @@ function settingsPage() {
             this.backupList = d.data || [];
         },
         async restoreExisting(filename) {
-            const ok = await confirmModal(`确认从 ${filename} 恢复吗？这会覆盖当前数据库和已保存的加密凭据，恢复过程中面板会自动重启。确认继续？`);
+            const ok = await confirmModal(t('settings.restore_confirm', {filename}));
             if (!ok) return;
             try {
                 const d = await api('/api/settings/backup/restore', {method:'POST', body:{filename}});
-                showToast(d.data.message || '已安排恢复','success');
+                showToast(d.data.message || t('settings.restore_scheduled'),'success');
                 this.backupListModalOpen = false;
                 this._waitForRestoreRestart();
             } catch(e) { showToast(e.message,'error'); }
         },
         async uploadRestore() {
             const file = this.restoreUpload.file;
-            if (!file) { showToast('请选择备份文件','error'); return; }
-            const ok = await confirmModal(`确认上传并从 ${file.name} 恢复吗？这会覆盖当前数据库和已保存的加密凭据，恢复过程中面板会自动重启。确认继续？`);
+            if (!file) { showToast(t('settings.select_backup_file'),'error'); return; }
+            const ok = await confirmModal(t('settings.upload_restore_confirm', {filename: file.name}));
             if (!ok) return;
             const formData = new FormData();
             formData.append('file', file);
             this.restoreUpload.uploading = true;
             try {
                 const d = await api('/api/settings/backup/restore-upload', {method:'POST', body: formData});
-                showToast(d.data.message || '已安排恢复','success');
+                showToast(d.data.message || t('settings.restore_scheduled'),'success');
                 this.restoreUpload.file = null;
                 this._waitForRestoreRestart();
             } catch(e) {
@@ -965,7 +961,7 @@ function settingsPage() {
         },
         _waitForRestoreRestart() {
             if (this._restoreTimer) clearInterval(this._restoreTimer);
-            this.restoreRun = { running:true, message:'面板正在重启并恢复中，请稍候...' };
+            this.restoreRun = { running:true, message:t('settings.restoring_wait') };
             let attempts = 0;
             // 先等待一小段时间再开始轮询：调度恢复后面板会延迟 ~800ms 才真正
             // 重启，太早轮询 /healthz 会打到还没重启的旧进程，误判为已恢复。
@@ -983,7 +979,7 @@ function settingsPage() {
                     if (attempts >= 120) {
                         clearInterval(this._restoreTimer);
                         this.restoreRun.running = false;
-                        this.restoreRun.message = '面板重启超时，请手动刷新页面确认状态';
+                        this.restoreRun.message = t('settings.restart_timeout');
                     }
                 }, 1000);
             }, 2000);
@@ -998,13 +994,13 @@ function settingsPage() {
             this.sysUpdate.checking = false;
         },
         async doSysUpdate() {
-            const ok = await confirmModal('将在服务器上执行 apt update && apt upgrade -y，确认继续？');
+            const ok = await confirmModal(t('settings.sys_update_confirm'));
             if (!ok) return;
             this.sysUpdate.updating = true;
             try {
                 const d = await api('/api/system/updates/do', {method:'POST'});
                 this.sysUpdate.output = d.data.output || '';
-                showToast(d.data.message || '系统更新完成','success');
+                showToast(d.data.message || t('settings.sys_update_done'),'success');
                 await this.checkSysUpdate();
             } catch(e) { showToast(e.message,'error'); }
             this.sysUpdate.updating = false;
@@ -1025,24 +1021,24 @@ function settingsPage() {
         },
         async saveOSList() {
             const items = this.osList.split('\n').map(s => s.trim()).filter(s => s);
-            try { await api('/api/settings/os-list', {method:'PUT', body:{svalue: JSON.stringify(items)}}); showToast('操作系统列表已保存','success'); } catch(e) { showToast(e.message,'error'); }
+            try { await api('/api/settings/os-list', {method:'PUT', body:{svalue: JSON.stringify(items)}}); showToast(t('settings.os_list_saved'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async saveSiteTypeList() {
             const items = this.siteTypeList.split('\n').map(s => s.trim()).filter(s => s);
-            try { await api('/api/settings/site-type-list', {method:'PUT', body:{svalue: JSON.stringify(items)}}); showToast('网站类型列表已保存','success'); } catch(e) { showToast(e.message,'error'); }
+            try { await api('/api/settings/site-type-list', {method:'PUT', body:{svalue: JSON.stringify(items)}}); showToast(t('settings.site_type_list_saved'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
-        async saveSMTP() { try { await api('/api/settings/smtp', {method:'PUT', body:this.smtp}); showToast('保存成功','success'); } catch(e) { showToast(e.message,'error'); } },
+        async saveSMTP() { try { await api('/api/settings/smtp', {method:'PUT', body:this.smtp}); showToast(t('common.save_success'),'success'); } catch(e) { showToast(e.message,'error'); } },
         async testSMTP() {
-            const email = prompt('请输入测试接收邮箱:', this.smtp.admin_email || '');
+            const email = prompt(t('settings.test_email_prompt'), this.smtp.admin_email || '');
             if (!email) return;
-            try { await api('/api/alerts/test-smtp', {method:'POST', body:{email}}); showToast('测试邮件已发送','success'); } catch(e) { showToast(e.message,'error'); }
+            try { await api('/api/alerts/test-smtp', {method:'POST', body:{email}}); showToast(t('settings.test_email_sent'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async saveAccount() {
-            if (this.acct.web_password && this.acct.web_password.length < 8) { showToast('面板密码至少需要 8 个字符','error'); return; }
-            if (this.acct.web_password && this.acct.web_password !== this.acct.web_password2) { showToast('两次输入的新密码不一致','error'); return; }
+            if (this.acct.web_password && this.acct.web_password.length < 8) { showToast(t('settings.web_password_min_length'),'error'); return; }
+            if (this.acct.web_password && this.acct.web_password !== this.acct.web_password2) { showToast(t('settings.password_mismatch'),'error'); return; }
             // 关闭 BasicAuth 时给出明确风险提示，需二次确认
             if (this.acct.basic_auth_enabled === false) {
-                const ok = await confirmModal('确认关闭 BasicAuth？\n\nBasicAuth 为面板增加额外一层登录验证。关闭后防护会减弱。\n如果只是为了省去输入麻烦，建议保留开启并设置一个简单的账号密码，也比完全关闭更安全。');
+                const ok = await confirmModal(t('settings.basic_auth_off_confirm'));
                 if (!ok) return;
             }
             const body = {};
@@ -1054,11 +1050,11 @@ function settingsPage() {
             body.basic_auth_enabled = this.acct.basic_auth_enabled === true;
             const basicAuthChanged = this.acct.basic_auth_enabled !== this.originalBasicAuthEnabled;
             if (!body.web_username && !body.web_password && !body.basic_username && !body.basic_password && !basicAuthChanged) {
-                showToast('没有需要修改的内容','warning'); return;
+                showToast(t('settings.nothing_to_change'),'warning'); return;
             }
             try {
                 await api('/api/settings/account', {method:'PUT', body});
-                showToast('账户已更新，即将重新登录...','success');
+                showToast(t('settings.account_updated_relogin'),'success');
                 setTimeout(async () => {
                     try { await api('/api/auth/logout', {method:'POST'}); } catch(e) {}
                     window.location.href = (document.body.dataset.panelPrefix || '') + '/login';
@@ -1066,48 +1062,48 @@ function settingsPage() {
             } catch(e) { showToast(e.message,'error'); }
         },
         async setupVP() {
-            const pw = await passwordPromptModal('查看密码', {title:'设置查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'one-time-code'});
+            const pw = await passwordPromptModal(t('settings.vp_label'), {title:t('settings.setup_vp_title'), message:t('settings.vp_strength_hint'), autocomplete:'one-time-code'});
             if (!pw) return;
-            const pw2 = await passwordPromptModal('再次输入查看密码', {title:'确认查看密码', autocomplete:'one-time-code'});
+            const pw2 = await passwordPromptModal(t('settings.confirm_vp_label'), {title:t('settings.confirm_vp_title'), autocomplete:'one-time-code'});
             if (!pw2) return;
-            if (pw !== pw2) { showToast('两次输入的查看密码不一致','error'); return; }
-            try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2}}); this.vpSetup = true; this.vpUnlocked = false; showToast('查看密码已设置','success'); } catch(e) { showToast(e.message,'error'); }
+            if (pw !== pw2) { showToast(t('settings.vp_mismatch'),'error'); return; }
+            try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2}}); this.vpSetup = true; this.vpUnlocked = false; showToast(t('settings.vp_set_success'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async changeVP() {
-            const oldPw = await passwordPromptModal('当前查看密码', {title:'修改查看密码'});
+            const oldPw = await passwordPromptModal(t('settings.current_vp_label'), {title:t('settings.change_vp_title')});
             if (!oldPw) return;
-            const newPw = await passwordPromptModal('新的查看密码', {title:'设置新查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'one-time-code'});
+            const newPw = await passwordPromptModal(t('settings.new_vp_label'), {title:t('settings.set_new_vp_title'), message:t('settings.vp_strength_hint'), autocomplete:'one-time-code'});
             if (!newPw) return;
-            const newPw2 = await passwordPromptModal('再次输入新的查看密码', {title:'确认新查看密码', autocomplete:'one-time-code'});
+            const newPw2 = await passwordPromptModal(t('settings.confirm_new_vp_label'), {title:t('settings.confirm_new_vp_title'), autocomplete:'one-time-code'});
             if (!newPw2) return;
-            if (newPw !== newPw2) { showToast('两次输入的新查看密码不一致','error'); return; }
+            if (newPw !== newPw2) { showToast(t('settings.new_vp_mismatch'),'error'); return; }
             try {
                 await api('/api/view-password/change', {method:'POST', body:{old_password:oldPw, new_password:newPw, new_password_confirm:newPw2}});
                 this.vpUnlocked = false;
-                showToast('查看密码已修改','success');
+                showToast(t('settings.vp_changed'),'success');
             } catch(e) { showToast(e.message,'error'); }
         },
         async resetVP() {
-            const ok = await confirmModal('重置查看密码会清空所有已保存的服务器/网站敏感凭据，且不可恢复。确认继续？');
+            const ok = await confirmModal(t('settings.reset_vp_confirm'));
             if (!ok) return;
             const confirm = await inputModal({
-                title: '确认重置查看密码',
-                label: '输入 DELETE_SAVED_PASSWORDS',
-                message: '该操作会删除所有已保存的服务器/网站敏感凭据。',
-                confirmText: '继续'
+                title: t('settings.reset_vp_title'),
+                label: t('settings.reset_vp_confirm_label'),
+                message: t('settings.reset_vp_confirm_message'),
+                confirmText: t('settings.continue_button')
             }) || '';
-            if (confirm !== 'DELETE_SAVED_PASSWORDS') { showToast('确认短语不匹配，已取消','error'); return; }
-            const pw = await passwordPromptModal('新的查看密码', {title:'重置查看密码', message:'建议使用较长且不重复的密码。', autocomplete:'one-time-code'});
+            if (confirm !== 'DELETE_SAVED_PASSWORDS') { showToast(t('settings.confirm_phrase_mismatch'),'error'); return; }
+            const pw = await passwordPromptModal(t('settings.new_vp_label'), {title:t('settings.reset_new_vp_title'), message:t('settings.vp_strength_hint'), autocomplete:'one-time-code'});
             if (!pw) return;
-            const pw2 = await passwordPromptModal('再次输入新的查看密码', {title:'确认新查看密码', autocomplete:'one-time-code'});
+            const pw2 = await passwordPromptModal(t('settings.confirm_new_vp_label'), {title:t('settings.confirm_new_vp_title'), autocomplete:'one-time-code'});
             if (!pw2) return;
-            if (pw !== pw2) { showToast('两次输入的新查看密码不一致','error'); return; }
-            try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2, force:true, confirm}}); this.vpSetup = true; this.vpUnlocked = false; showToast('查看密码已重置，已保存密码已清空','success'); } catch(e) { showToast(e.message,'error'); }
+            if (pw !== pw2) { showToast(t('settings.new_vp_mismatch'),'error'); return; }
+            try { await api('/api/view-password/setup', {method:'POST', body:{password:pw, password_confirm:pw2, force:true, confirm}}); this.vpSetup = true; this.vpUnlocked = false; showToast(t('settings.vp_reset_success'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async unlockVP() {
-            const pw = await passwordPromptModal('查看密码');
+            const pw = await passwordPromptModal(t('settings.vp_label'));
             if (!pw) return;
-            try { await api('/api/view-password/unlock', {method:'POST', body:{password:pw}}); this.vpUnlocked = false; showToast('查看密码验证通过','success'); } catch(e) { showToast(e.message,'error'); }
+            try { await api('/api/view-password/unlock', {method:'POST', body:{password:pw}}); this.vpUnlocked = false; showToast(t('settings.vp_verify_success'),'success'); } catch(e) { showToast(e.message,'error'); }
         },
         async lockVP() { this.vpUnlocked = false; }
     }

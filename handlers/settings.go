@@ -24,6 +24,7 @@ import (
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/database"
 	"github.com/naibabiji/server-panel/executor"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 	"golang.org/x/crypto/bcrypt"
@@ -55,7 +56,7 @@ func (h *SettingsHandler) getSetting(c *gin.Context, key string) {
 	var value string
 	err := h.db().QueryRow("SELECT svalue FROM settings WHERE skey = ?", key).Scan(&value)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("设置不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.setting_not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"skey": key, "svalue": value}))
@@ -72,7 +73,7 @@ func (h *SettingsHandler) UpdatePanelTitle(c *gin.Context) {
 		PanelTitle string `json:"panel_title"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('panel_title', ?)", req.PanelTitle)
@@ -86,7 +87,7 @@ func (h *SettingsHandler) UpdatePanelTitle(c *gin.Context) {
 func (h *SettingsHandler) GetPanelAccess(c *gin.Context) {
 	cfg := config.AppConfig
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("配置未加载"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_not_loaded")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
@@ -95,7 +96,7 @@ func (h *SettingsHandler) GetPanelAccess(c *gin.Context) {
 		"trusted_proxies":     cfg.Panel.TrustedProxies,
 		"trust_reverse_proxy": len(cfg.Panel.TrustedProxies) > 0,
 		"trust_cloudflare":    cfg.Panel.TrustCloudflare,
-		"restart_note":        "修改后台端口、随机路径、Cloudflare 或反向代理设置后会自动重启服务生效",
+		"restart_note":        i18n.TE(c.Request, "errors.settings.restart_note"),
 	}))
 }
 
@@ -108,29 +109,29 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 		TrustCloudflare   *bool     `json:"trust_cloudflare"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 
 	cfg := config.AppConfig
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("配置未加载"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_not_loaded")))
 		return
 	}
 
 	if req.TLSPort < 1 || req.TLSPort > 65535 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("后台 HTTPS 端口必须在 1-65535 之间"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.https_port_range")))
 		return
 	}
 	if !panelSuffixPattern.MatchString(req.RandomSuffix) {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("随机路径只能包含英文大小写和数字，且至少 4 位"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.random_path_format")))
 		return
 	}
 
 	portChanged := req.TLSPort != cfg.Panel.TLSPort
 	if portChanged {
 		if err := checkPortAvailable(req.TLSPort); err != nil {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("后台 HTTPS 端口不可用: "+err.Error()))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.https_port_unavailable", i18n.P{"error": err.Error()})))
 			return
 		}
 	}
@@ -151,7 +152,7 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 				input = *req.TrustedProxies
 			}
 			var err error
-			trustedProxies, err = normalizeTrustedProxies(input)
+			trustedProxies, err = normalizeTrustedProxies(c, input)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 				return
@@ -165,7 +166,7 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 	}
 	if portChanged {
 		if _, err := executor.AllowPanelPort(req.TLSPort); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("系统防火墙放行新端口失败，设置未保存: "+err.Error()))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.firewall_open_failed", i18n.P{"error": err.Error()})))
 			return
 		}
 	}
@@ -179,16 +180,16 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 	cfg.Panel.TrustedProxies = trustedProxies
 	cfg.Panel.TrustCloudflare = trustCloudflare
 	if err := config.SaveConfig(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存配置失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.save_config_failed")))
 		return
 	}
 	if changed {
 		executor.RestartPanelService()
 	}
 
-	message := "面板访问设置已保存"
+	message := i18n.TE(c.Request, "errors.settings.access_saved")
 	if changed {
-		message = "面板访问设置已保存，服务将在几秒内自动重启生效"
+		message = i18n.TE(c.Request, "errors.settings.access_saved_restarting")
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
 		"message":             message,
@@ -200,7 +201,7 @@ func (h *SettingsHandler) UpdatePanelAccess(c *gin.Context) {
 	}))
 }
 
-func normalizeTrustedProxies(values []string) ([]string, error) {
+func normalizeTrustedProxies(c *gin.Context, values []string) ([]string, error) {
 	out := make([]string, 0, len(values))
 	seen := make(map[string]bool, len(values))
 	for _, raw := range values {
@@ -210,7 +211,7 @@ func normalizeTrustedProxies(values []string) ([]string, error) {
 		}
 		if net.ParseIP(value) == nil {
 			if _, _, err := net.ParseCIDR(value); err != nil {
-				return nil, fmt.Errorf("可信代理 IP/CIDR 无效: %s", value)
+				return nil, fmt.Errorf("%s", i18n.TE(c.Request, "errors.settings.trusted_proxy_invalid", i18n.P{"value": value}))
 			}
 		}
 		if seen[value] {
@@ -271,12 +272,12 @@ var allowedSMTPKeys = map[string]bool{
 func (h *SettingsHandler) UpdateSMTPConfig(c *gin.Context) {
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	for k, v := range req {
 		if !allowedSMTPKeys[k] {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("不允许的配置项: "+k))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_key_not_allowed", i18n.P{"key": k})))
 			return
 		}
 		h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES (?, ?)", k, v)
@@ -329,43 +330,43 @@ func (h *SettingsHandler) GetBackupSettings(c *gin.Context) {
 func (h *SettingsHandler) UpdateBackupSettings(c *gin.Context) {
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 
 	for k, v := range req {
 		if !backupEditableKeys[k] {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("不允许的配置项: "+k))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_key_not_allowed", i18n.P{"key": k})))
 			return
 		}
 		switch k {
 		case "backup_auto_enabled", "backup_email_enabled":
 			if v != "true" && v != "false" {
-				c.JSON(http.StatusBadRequest, models.ErrorResponse(k+" 只能为 true 或 false"))
+				c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.bool_only", i18n.P{"key": k})))
 				return
 			}
 		case "backup_frequency":
 			if v != "daily" && v != "weekly" {
-				c.JSON(http.StatusBadRequest, models.ErrorResponse("备份频率仅支持 daily 或 weekly"))
+				c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.backup_freq_invalid")))
 				return
 			}
 		case "backup_keep_count":
 			n, err := strconv.Atoi(v)
 			if err != nil || n < 1 || n > 365 {
-				c.JSON(http.StatusBadRequest, models.ErrorResponse("本地保留份数必须在 1-365 之间"))
+				c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.keep_count_range")))
 				return
 			}
 		case "backup_max_email_mb":
 			n, err := strconv.Atoi(v)
 			if err != nil || n < 1 || n > 100 {
-				c.JSON(http.StatusBadRequest, models.ErrorResponse("邮件附件上限必须在 1-100 MB 之间"))
+				c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.email_mb_range")))
 				return
 			}
 		}
 		h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES (?, ?)", k, v)
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "备份设置已保存"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": i18n.TE(c.Request, "settings.backup_settings_saved")}))
 }
 
 func (h *SettingsHandler) RunDatabaseBackup(c *gin.Context) {
@@ -385,7 +386,7 @@ func (h *SettingsHandler) RunDatabaseBackup(c *gin.Context) {
 
 	result, err := executor.RunDatabaseBackup("manual", emailEnabled)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("备份失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.backup_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(result))
@@ -394,7 +395,7 @@ func (h *SettingsHandler) RunDatabaseBackup(c *gin.Context) {
 func (h *SettingsHandler) ListBackups(c *gin.Context) {
 	items, err := executor.ListDatabaseBackups()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取备份列表失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.list_backups_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(items))
@@ -404,7 +405,7 @@ func (h *SettingsHandler) DownloadBackup(c *gin.Context) {
 	filename := c.Query("file")
 	path, err := executor.ResolveBackupPath(filename)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的备份文件"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.invalid_backup_file")))
 		return
 	}
 	c.FileAttachment(path, filepath.Base(path))
@@ -415,46 +416,46 @@ func (h *SettingsHandler) RestoreBackup(c *gin.Context) {
 		Filename string `json:"filename"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Filename) == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请提供备份文件名"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.provide_backup_filename")))
 		return
 	}
 	if err := executor.ScheduleRestore(strings.TrimSpace(req.Filename)); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("恢复失败: "+err.Error()))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.restore_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	if h.AfterRestoreScheduled != nil {
 		h.AfterRestoreScheduled()
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message": "校验通过，面板将在数秒内自动重启并完成恢复，请勿关闭本页面",
+		"message": i18n.TE(c.Request, "errors.settings.restore_verified"),
 	}))
 }
 
 func (h *SettingsHandler) RestoreBackupUpload(c *gin.Context) {
 	fileHeader, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请选择要上传的备份文件"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.select_backup_file")))
 		return
 	}
 	if !strings.HasSuffix(strings.ToLower(fileHeader.Filename), ".tar.gz") {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("仅支持 .tar.gz 备份文件"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.backup_ext_only")))
 		return
 	}
 	filename, err := executor.SaveUploadedBackup(fileHeader)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("保存上传文件失败: "+err.Error()))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.save_upload_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	if err := executor.ScheduleRestore(filename); err != nil {
 		_ = executor.RemoveBackupFile(filename)
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("恢复失败: "+err.Error()))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.restore_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	if h.AfterRestoreScheduled != nil {
 		h.AfterRestoreScheduled()
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message": "上传校验通过，面板将在数秒内自动重启并完成恢复，请勿关闭本页面",
+		"message": i18n.TE(c.Request, "errors.settings.restore_upload_verified"),
 	}))
 }
 
@@ -496,13 +497,13 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 		BasicAuthEnabled *bool  `json:"basic_auth_enabled"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 
 	needOldPwd := req.WebUsername != "" || req.WebPassword != ""
 	if needOldPwd && req.OldPassword == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("修改面板账户需要输入旧密码"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_required")))
 		return
 	}
 
@@ -512,7 +513,7 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 		var currentHash string
 		err := h.db().QueryRow("SELECT password_hash FROM admin_users WHERE username = ?", currentUser).Scan(&currentHash)
 		if err != nil || bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.OldPassword)) != nil {
-			c.JSON(http.StatusUnauthorized, models.ErrorResponse("旧密码错误"))
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 			return
 		}
 		newUser := req.WebUsername
@@ -521,12 +522,12 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 		}
 		if req.WebPassword != "" {
 			if len(req.WebPassword) < 8 {
-				c.JSON(http.StatusBadRequest, models.ErrorResponse("密码至少需要 8 个字符"))
+				c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.password_min_length")))
 				return
 			}
 			newHash, err := bcrypt.GenerateFromPassword([]byte(req.WebPassword), 12)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, models.ErrorResponse("密码处理失败"))
+				c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.password_processing_failed")))
 				return
 			}
 			h.db().Exec("UPDATE admin_users SET username = ?, password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE username = ?",
@@ -547,7 +548,7 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 		if req.BasicPassword != "" {
 			hash, err := bcrypt.GenerateFromPassword([]byte(req.BasicPassword), 12)
 			if err != nil {
-				c.JSON(http.StatusInternalServerError, models.ErrorResponse("密码处理失败"))
+				c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.password_processing_failed")))
 				return
 			}
 			cfg.BasicAuth.PasswordHash = string(hash)
@@ -558,24 +559,24 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 		}
 		configChanged = true
 		if err := config.SaveConfig(cfg); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存配置失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.save_config_failed")))
 			return
 		}
 	}
 
 	if !needOldPwd && !configChanged {
-		c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "没有需要修改的内容"}))
+		c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": i18n.TE(c.Request, "settings.nothing_to_change")}))
 		return
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "账户已更新"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": i18n.TE(c.Request, "errors.settings.account_updated")}))
 }
 
 // BasicAuth 账户（保留兼容旧 API）
 func (h *SettingsHandler) GetBasicAuthConfig(c *gin.Context) {
 	cfg := config.AppConfig
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("配置未加载"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_not_loaded")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
@@ -589,13 +590,13 @@ func (h *SettingsHandler) UpdateBasicAuthConfig(c *gin.Context) {
 		Password string `json:"password"` // 留空表示不修改密码
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.Username == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("用户名不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.username_required")))
 		return
 	}
 
 	cfg := config.AppConfig
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("配置未加载"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_not_loaded")))
 		return
 	}
 
@@ -603,17 +604,17 @@ func (h *SettingsHandler) UpdateBasicAuthConfig(c *gin.Context) {
 	if req.Password != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("密码处理失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.password_processing_failed")))
 			return
 		}
 		cfg.BasicAuth.PasswordHash = string(hash)
 	}
 
 	if err := config.SaveConfig(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存配置失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.save_config_failed")))
 		return
 	}
-	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "BasicAuth 已更新"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": i18n.TE(c.Request, "errors.settings.basic_auth_updated")}))
 }
 
 // 面板登录账户（兼容旧 API，当前 UI 使用 GetAccount/UpdateAccount）
@@ -629,24 +630,24 @@ func (h *SettingsHandler) UpdateWebAccount(c *gin.Context) {
 		NewPassword string `json:"new_password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.Username == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("用户名不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.username_required")))
 		return
 	}
 
 	currentUser := h.sessionUser(c)
 	var currentHash string
 	if err := h.db().QueryRow("SELECT password_hash FROM admin_users WHERE username = ?", currentUser).Scan(&currentHash); err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("旧密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.OldPassword)) != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("旧密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 		return
 	}
 
 	if req.NewPassword != "" {
 		if len(req.NewPassword) < 8 {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("密码至少需要 8 个字符"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.password_min_length")))
 			return
 		}
 		newHash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
@@ -655,7 +656,7 @@ func (h *SettingsHandler) UpdateWebAccount(c *gin.Context) {
 		h.db().Exec("UPDATE admin_users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE username = ?", req.Username, currentUser)
 	}
 
-	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "账户已更新"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": i18n.TE(c.Request, "errors.settings.account_updated")}))
 }
 
 func (h *SettingsHandler) ChangePassword(c *gin.Context) {
@@ -664,28 +665,28 @@ func (h *SettingsHandler) ChangePassword(c *gin.Context) {
 		NewPassword string `json:"new_password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || req.NewPassword == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请输入新密码"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.new_password_required")))
 		return
 	}
 	if len(req.NewPassword) < 8 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("密码至少需要 8 个字符"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.password_min_length")))
 		return
 	}
 
 	currentUser := h.sessionUser(c)
 	var currentHash string
 	if err := h.db().QueryRow("SELECT password_hash FROM admin_users WHERE username = ?", currentUser).Scan(&currentHash); err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("旧密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.OldPassword)) != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("旧密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 		return
 	}
 
 	newHash, _ := bcrypt.GenerateFromPassword([]byte(req.NewPassword), 12)
 	h.db().Exec("UPDATE admin_users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE username = ?", string(newHash), currentUser)
-	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "密码修改成功"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": i18n.TE(c.Request, "errors.settings.password_changed")}))
 }
 
 func (h *SettingsHandler) UpdateOSList(c *gin.Context) {
@@ -701,7 +702,7 @@ func (h *SettingsHandler) updateListSetting(c *gin.Context, key string) {
 		SValue string `json:"svalue"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES (?, ?)", key, req.SValue)
@@ -712,7 +713,7 @@ func (h *SettingsHandler) updateListSetting(c *gin.Context, key string) {
 func (h *SettingsHandler) GetTLSConfig(c *gin.Context) {
 	cfg := config.AppConfig
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("配置未加载"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_not_loaded")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]interface{}{
@@ -733,46 +734,44 @@ func (h *SettingsHandler) UpdateTLSConfig(c *gin.Context) {
 		ACMEEmail string `json:"acme_email"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	cfg := config.AppConfig
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("配置未加载"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_not_loaded")))
 		return
 	}
 	if req.TLSMode != "" && !allowedTLSMode(req.TLSMode) {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("TLS 模式仅支持 self_signed、uploaded 或 acme"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.tls_mode_invalid")))
 		return
 	}
 	domain := strings.TrimSpace(req.Domain)
 	if domain != "" && !validPanelDomain(domain) {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("面板域名格式不正确"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.domain_format_invalid")))
 		return
 	}
 	acmeEmail := strings.TrimSpace(req.ACMEEmail)
 	if req.TLSMode == "acme" {
 		if domain == "" {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("自动申请证书需要先填写面板域名"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.acme_domain_required")))
 			return
 		}
 		if _, err := mail.ParseAddress(acmeEmail); err != nil {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("自动申请证书需要填写有效的邮箱地址"))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.acme_email_required")))
 			return
 		}
 	}
 	// 首次切换到 acme 模式时探测端口；已经在 acme 模式下运行时，端口本就被本进程占用，跳过探测避免误判
 	if req.TLSMode == "acme" && cfg.Panel.TLSMode != "acme" {
 		if err := checkPortAvailable(cfg.Panel.ACMEChallengePort); err != nil {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse(fmt.Sprintf(
-				"检测到 %d 端口已被占用（常见于已安装 Caddy/Nginx），无法自动申请证书，请改用自签证书或手动上传证书配合反向代理", cfg.Panel.ACMEChallengePort)))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.acme_port_in_use", i18n.P{"port": strconv.Itoa(cfg.Panel.ACMEChallengePort)})))
 			return
 		}
 		// The current process already owns TLSPort and will reuse it after the
 		// restart, so only the separate HTTP-01 challenge port must be free.
 		if _, err := executor.AllowPanelPort(cfg.Panel.ACMEChallengePort); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse(fmt.Sprintf(
-				"系统防火墙放行 ACME 验证端口 %d 失败，设置未保存: %v", cfg.Panel.ACMEChallengePort, err)))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.acme_firewall_failed", i18n.P{"port": strconv.Itoa(cfg.Panel.ACMEChallengePort), "error": err.Error()})))
 			return
 		}
 	}
@@ -783,18 +782,18 @@ func (h *SettingsHandler) UpdateTLSConfig(c *gin.Context) {
 	cfg.Panel.Domain = domain
 	cfg.Panel.ACMEEmail = acmeEmail
 	if err := config.SaveConfig(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存配置失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.save_config_failed")))
 		return
 	}
 	if changed {
 		executor.RestartPanelService()
 	}
-	message := "TLS 配置已更新"
+	message := i18n.TE(c.Request, "errors.settings.tls_updated")
 	if changed {
-		message = "TLS 配置已更新，服务将在几秒内自动重启生效"
+		message = i18n.TE(c.Request, "errors.settings.tls_updated_restarting")
 	}
 	if changed && cfg.Panel.TLSMode == "acme" {
-		message = "ACME 配置已保存，服务将在几秒内自动重启并申请 Let's Encrypt 证书；请等待约 30 秒后关闭当前标签页（必要时关闭浏览器），再重新打开面板地址检查新证书"
+		message = i18n.TE(c.Request, "errors.settings.acme_saved")
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": message}))
 }
@@ -802,7 +801,7 @@ func (h *SettingsHandler) UpdateTLSConfig(c *gin.Context) {
 func (h *SettingsHandler) IssueTLS(c *gin.Context) {
 	cfg := config.AppConfig
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("配置未加载"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_not_loaded")))
 		return
 	}
 	domain := cfg.Panel.Domain
@@ -811,19 +810,19 @@ func (h *SettingsHandler) IssueTLS(c *gin.Context) {
 	}
 	certPath, keyPath, err := generateSelfSignedPanelCertificate(cfg.Panel.DataDir, domain)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("生成自签证书失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.gen_self_signed_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	cfg.Panel.TLSMode = "self_signed"
 	cfg.Panel.TLSCertPath = certPath
 	cfg.Panel.TLSKeyPath = keyPath
 	if err := config.SaveConfig(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存配置失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.save_config_failed")))
 		return
 	}
 	executor.RestartPanelService()
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message":       "自签证书已生成，服务将在几秒内自动重启生效",
+		"message":       i18n.TE(c.Request, "errors.settings.self_signed_generated"),
 		"tls_cert_path": certPath,
 		"tls_key_path":  keyPath,
 	}))
@@ -836,27 +835,27 @@ func (h *SettingsHandler) UploadTLSCertificate(c *gin.Context) {
 		Domain  string `json:"domain"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	cfg := config.AppConfig
 	if cfg == nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("配置未加载"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_not_loaded")))
 		return
 	}
 	certPEM := strings.TrimSpace(req.CertPEM)
 	keyPEM := strings.TrimSpace(req.KeyPEM)
 	if certPEM == "" || keyPEM == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("证书和私钥不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "settings.cert_key_required")))
 		return
 	}
-	if err := validateCertificatePair(certPEM, keyPEM, strings.TrimSpace(req.Domain)); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("证书验证失败: "+err.Error()))
+	if err := validateCertificatePair(c, certPEM, keyPEM, strings.TrimSpace(req.Domain)); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.cert_verify_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	certPath, keyPath, err := writeUploadedPanelCertificate(cfg.Panel.DataDir, certPEM, keyPEM)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("写入证书失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.write_cert_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	if req.Domain != "" {
@@ -866,12 +865,12 @@ func (h *SettingsHandler) UploadTLSCertificate(c *gin.Context) {
 	cfg.Panel.TLSCertPath = certPath
 	cfg.Panel.TLSKeyPath = keyPath
 	if err := config.SaveConfig(cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("保存配置失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.save_config_failed")))
 		return
 	}
 	executor.RestartPanelService()
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message":       "证书已上传并验证通过，服务将在几秒内自动重启生效",
+		"message":       i18n.TE(c.Request, "errors.settings.cert_uploaded_verified"),
 		"tls_cert_path": certPath,
 		"tls_key_path":  keyPath,
 	}))
@@ -959,13 +958,13 @@ func writeUploadedPanelCertificate(dataDir, certPEM, keyPEM string) (string, str
 	return certPath, keyPath, nil
 }
 
-func validateCertificatePair(certPEM, keyPEM, domain string) error {
+func validateCertificatePair(c *gin.Context, certPEM, keyPEM, domain string) error {
 	pair, err := tls.X509KeyPair([]byte(certPEM), []byte(keyPEM))
 	if err != nil {
 		return err
 	}
 	if len(pair.Certificate) == 0 {
-		return fmt.Errorf("证书内容为空")
+		return fmt.Errorf("%s", i18n.TE(c.Request, "errors.settings.cert_content_empty"))
 	}
 	cert, err := x509.ParseCertificate(pair.Certificate[0])
 	if err != nil {
@@ -973,15 +972,15 @@ func validateCertificatePair(certPEM, keyPEM, domain string) error {
 	}
 	now := time.Now()
 	if now.Before(cert.NotBefore) || now.After(cert.NotAfter) {
-		return fmt.Errorf("证书不在有效期内")
+		return fmt.Errorf("%s", i18n.TE(c.Request, "errors.settings.cert_expired"))
 	}
 	if domain != "" {
 		if ip := net.ParseIP(domain); ip != nil {
 			if err := cert.VerifyHostname(ip.String()); err != nil {
-				return fmt.Errorf("证书不匹配该 IP/域名")
+				return fmt.Errorf("%s", i18n.TE(c.Request, "errors.settings.cert_ip_mismatch"))
 			}
 		} else if err := cert.VerifyHostname(domain); err != nil {
-			return fmt.Errorf("证书不匹配该域名")
+			return fmt.Errorf("%s", i18n.TE(c.Request, "errors.settings.cert_domain_mismatch"))
 		}
 	}
 	return nil
@@ -1002,18 +1001,18 @@ func (h *SettingsHandler) GetMonitoring(c *gin.Context) {
 func (h *SettingsHandler) UpdateMonitoring(c *gin.Context) {
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	allowed := map[string]bool{"http_probe_interval_minutes": true, "http_probe_timeout_seconds": true, "metric_retention_days": true, "ban_duration_hours": true}
 	for k, v := range req {
 		if !allowed[k] {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("不允许的配置项: "+k))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_key_not_allowed", i18n.P{"key": k})))
 			return
 		}
 		h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES (?, ?)", k, v)
 	}
-	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": "监控参数已保存"}))
+	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{"message": i18n.TE(c.Request, "errors.settings.monitoring_saved")}))
 }
 
 func (h *SettingsHandler) GetCronStatus(c *gin.Context) {

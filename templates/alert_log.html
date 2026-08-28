@@ -4,7 +4,7 @@
     <div class="card overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">类型</th><th class="table-header">级别</th><th class="table-header">内容</th><th class="table-header">状态</th><th class="table-header">时间</th>
+                <th class="table-header">{{t .Lang "server.col_type"}}</th><th class="table-header">{{t .Lang "alert_log.col_level"}}</th><th class="table-header">{{t .Lang "alert_log.col_message"}}</th><th class="table-header">{{t .Lang "server.col_status"}}</th><th class="table-header">{{t .Lang "alert_log.col_time"}}</th>
             </tr></thead>
             <tbody>
             <template x-for="l in logs" :key="l.id">
@@ -12,21 +12,21 @@
                     <td class="table-cell"><span class="badge-info text-xs" x-text="l.alert_type"></span></td>
                     <td class="table-cell"><span :class="l.level=='critical'?'badge-danger':'badge-warning'" x-text="l.level"></span></td>
                     <td class="table-cell text-sm text-gray-200" x-text="l.message"></td>
-                    <td class="table-cell"><span x-text="l.resolved?'已解决':'未解决'" class="text-xs" :class="l.resolved?'text-green-400':'text-yellow-400'"></span></td>
+                    <td class="table-cell"><span x-text="l.resolved?t('alert_log.resolved'):t('alert_log.unresolved')" class="text-xs" :class="l.resolved?'text-green-400':'text-yellow-400'"></span></td>
                     <td class="table-cell text-gray-500 text-xs" x-text="fmtTime(l.created_at)"></td>
                 </tr>
             </template>
             </tbody>
         </table>
-        <div class="text-center text-gray-500 py-8" x-show="logs.length==0">暂无告警记录</div>
+        <div class="text-center text-gray-500 py-8" x-show="logs.length==0">{{t .Lang "alert_log.empty"}}</div>
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-700/50 px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
-            <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
+            <div x-text="t('common.pagination_summary', {start: pageStart, end: pageEnd, total: total})"></div>
             <div class="flex items-center gap-2">
-                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
-                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.first_page')"></button>
+                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.prev_page')"></button>
                 <span class="px-2" x-text="page + ' / ' + totalPages"></span>
-                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
-                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.next_page')"></button>
+                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.last_page')"></button>
             </div>
         </div>
     </div>

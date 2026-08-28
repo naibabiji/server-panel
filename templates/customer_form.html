@@ -1,7 +1,7 @@
 {{template "base" .}}
 {{define "customer_form_content"}}
 <div x-data="customerForm()" class="p-6 max-w-2xl">
-    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑客户' : '添加客户'"></h2>
+    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? t('customer.title_edit') : t('customer.title_add')"></h2>
     <div class="card space-y-4" x-show="loading" x-cloak>
         <div class="skeleton-block h-9"></div>
         <div class="grid grid-cols-2 gap-4">
@@ -19,25 +19,25 @@
         <div class="skeleton-block h-9"></div>
     </div>
     <div class="card space-y-4" x-show="!loading">
-        <div><label class="label">客户名称 <span class="text-red-400">*</span></label>
-            <input type="text" x-model="form.name" class="input-field" placeholder="例如：客户A"></div>
+        <div><label class="label">{{t .Lang "customer.name_label"}} <span class="text-red-400">*</span></label>
+            <input type="text" x-model="form.name" class="input-field" placeholder="{{t .Lang "customer.name_placeholder"}}"></div>
         <div class="grid grid-cols-2 gap-4">
-            <div><label class="label">联系人</label><input type="text" x-model="form.contact_person" class="input-field"></div>
-            <div><label class="label">联系电话</label><input type="text" x-model="form.phone" class="input-field"></div>
+            <div><label class="label">{{t .Lang "customer.col_contact"}}</label><input type="text" x-model="form.contact_person" class="input-field"></div>
+            <div><label class="label">{{t .Lang "customer.phone_label"}}</label><input type="text" x-model="form.phone" class="input-field"></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-            <div><label class="label">联系邮箱</label><input type="email" x-model="form.email" class="input-field"></div>
-            <div><label class="label">公司名称</label><input type="text" x-model="form.company" class="input-field"></div>
+            <div><label class="label">{{t .Lang "customer.email_label"}}</label><input type="email" x-model="form.email" class="input-field"></div>
+            <div><label class="label">{{t .Lang "customer.company_label"}}</label><input type="text" x-model="form.company" class="input-field"></div>
         </div>
         <div class="grid grid-cols-2 gap-4">
-            <div><label class="label">合作开始日期</label><input type="date" x-model="form.start_date" class="input-field"></div>
-            <div><label class="label">公司地址</label><input type="text" x-model="form.address" class="input-field"></div>
+            <div><label class="label">{{t .Lang "customer.start_date_label"}}</label><input type="date" x-model="form.start_date" class="input-field"></div>
+            <div><label class="label">{{t .Lang "customer.address_label"}}</label><input type="text" x-model="form.address" class="input-field"></div>
         </div>
-        <div><label class="label">备注</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
+        <div><label class="label">{{t .Lang "server_form.notes_label"}}</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
         <div class="flex gap-3 pt-2">
             <button @click="save()" class="btn-primary" :disabled="saving">
-                <span x-show="!saving">保存</span><span x-show="saving">保存中...</span></button>
-            <a href="/{{.RandomSuffix}}/customers" class="btn-secondary">取消</a>
+                <span x-show="!saving">{{t .Lang "common.save"}}</span><span x-show="saving">{{t .Lang "common.saving"}}</span></button>
+            <a href="/{{.RandomSuffix}}/customers" class="btn-secondary">{{t .Lang "common.cancel"}}</a>
         </div>
     </div>
 </div>
@@ -64,11 +64,11 @@ function customerForm() {
         async save() {
             this.saving = true;
             try {
-                if (!this.form.name) { showToast('客户名称不能为空','error'); this.saving=false; return; }
+                if (!this.form.name) { showToast(t('customer.name_required'),'error'); this.saving=false; return; }
                 const method = this.isEdit ? 'PUT' : 'POST';
                 const url = this.isEdit ? '/api/customers/'+this.id : '/api/customers';
                 await api(url, {method, body: this.form});
-                showToast('保存成功','success');
+                showToast(t('common.save_success'),'success');
                 const target = this.isEdit ? '/customers/' + this.id : '/customers';
                 setTimeout(() => location.href = document.body.dataset.panelPrefix + target, 500);
             } catch(e) { showToast(e.message,'error'); }

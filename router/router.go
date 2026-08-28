@@ -15,8 +15,140 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/handlers"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/middleware"
 )
+
+// i18nKeys are the message keys exposed to client-side JS as
+// window.SERVER_PANEL_I18N.messages, for strings that Alpine components
+// generate at runtime (as opposed to static template text, which uses the
+// {{t .Lang "key"}} template func directly).
+var i18nKeys = []string{
+	"common.cancel", "common.confirm", "common.save", "common.close", "common.loading",
+	"common.none", "common.please_input", "common.show", "common.hide",
+	"common.operation_failed", "common.service_busy", "common.non_json_response",
+	"common.session_expired_redirect", "common.view_password_required",
+	"common.password_verify_title",
+	"search.placeholder", "search.searching", "search.no_results",
+	"search.servers_group", "search.websites_group",
+	"auth.login", "auth.username", "auth.username_placeholder",
+	"auth.password", "auth.password_placeholder", "auth.login_button",
+	"auth.logging_in", "auth.login_failed", "auth.missing_credentials",
+	"auth.invalid_credentials",
+	"dashboard.panel_update_available", "dashboard.sys_updates_available",
+	"dashboard.expire_date", "dashboard.auto_renewal_on", "dashboard.expired_days",
+	"dashboard.expires_today", "dashboard.days_left", "dashboard.probe_fail_generic",
+	"dashboard.probe_timeout", "dashboard.probe_conn_refused", "dashboard.probe_dns_fail",
+	"dashboard.probe_tls_error", "dashboard.cores", "dashboard.uptime", "dashboard.no_data",
+	"common.detail", "common.edit", "common.delete", "common.renew", "common.add",
+	"common.delete_success", "common.renew_success", "common.pagination_summary",
+	"common.first_page", "common.prev_page", "common.next_page", "common.last_page",
+	"common.status_active", "common.status_expired", "common.status_all",
+	"common.new_expiry_date",
+	"server.search_placeholder", "server.provider_all", "server.customer_all",
+	"server.add", "server.empty", "server.renew_title", "server.delete_confirm",
+	"common.yes", "common.no", "common.save_success",
+	"server_form.title_edit", "server_form.title_add",
+	"server_form.prompt_customer_name", "server_form.customer_created",
+	"server_form.prompt_provider_name", "server_form.provider_created",
+	"server_form.name_required", "server_form.fallback_customer_name",
+	"server_form.fallback_provider_name",
+	"common.copy", "common.copied_default",
+	"common.status_online", "common.status_probe_error", "common.status_offline", "common.status_unknown",
+	"server_detail.account_label", "server_detail.agent_installed", "server_detail.agent_not_installed",
+	"server_detail.agent_uninstalled_cleared", "server_detail.command_copied",
+	"server_detail.copy_failed_command", "server_detail.copy_failed_content", "server_detail.copy_failed_password",
+	"server_detail.cpu_value", "server_detail.disk_value", "server_detail.expires_in_days",
+	"server_detail.http_probe_bad", "server_detail.http_probe_ok", "server_detail.http_probe_pending",
+	"server_detail.install_agent", "server_detail.install_cmd_generated", "server_detail.install_cmd_note",
+	"server_detail.install_cmd_title", "server_detail.ip_copied", "server_detail.monitor_not_installed",
+	"server_detail.not_configured", "server_detail.panel_account_copied", "server_detail.panel_link_copied",
+	"server_detail.password_copied", "server_detail.proxy_url_invalid", "server_detail.ram_gb_value",
+	"server_detail.ram_mb_value", "server_detail.secret_default_label", "server_detail.secret_not_saved",
+	"server_detail.ssh_copied", "server_detail.uninstall_agent", "server_detail.uninstall_cmd_generated",
+	"server_detail.uninstall_cmd_note", "server_detail.uninstall_cmd_title", "server_detail.view_failed",
+	"server_detail.view_password", "server_detail.website_status_expired", "server_detail.website_status_running",
+	"server_detail.websites_load_failed",
+	"server_form.cycle_2year", "server_form.cycle_3year", "server_form.cycle_monthly",
+	"server_form.cycle_quarterly", "server_form.cycle_yearly", "server_form.probe_off",
+	"server_form.type_dedicated", "server_form.type_other", "server_form.type_shared",
+	"website.delete_confirm",
+	"website_form.domain_required", "website_form.fallback_server_name",
+	"website_form.panel_password_not_saved", "website_form.server_required",
+	"website_form.title_add", "website_form.title_edit",
+	"customer.delete_confirm", "customer.load_servers_failed", "customer.load_websites_failed",
+	"customer.name_required", "customer.title_add", "customer.title_edit",
+	"provider.clear_confirm", "provider.delete_confirm", "provider.name_required",
+	"provider.not_saved_private_notes", "provider.private_notes_cleared",
+	"provider.private_notes_placeholder_empty", "provider.private_notes_placeholder_saved",
+	"provider.title_add", "provider.title_edit",
+	"alert_log.resolved", "alert_log.unresolved",
+	"alert_rules.count_min_error", "alert_rules.disabled", "alert_rules.enabled",
+	"alert_rules.modal_title_add", "alert_rules.modal_title_edit", "alert_rules.name_required",
+	"alert_rules.threshold_advance_days", "alert_rules.threshold_advance_days_label",
+	"alert_rules.threshold_days_help", "alert_rules.threshold_days_placeholder",
+	"alert_rules.threshold_disk_help", "alert_rules.threshold_generic_label",
+	"alert_rules.threshold_offline_help", "alert_rules.threshold_offline_label",
+	"alert_rules.threshold_offline_minutes", "alert_rules.threshold_offline_placeholder",
+	"alert_rules.threshold_percent", "alert_rules.threshold_percent_help",
+	"alert_rules.threshold_percent_streak", "alert_rules.threshold_probe_fail",
+	"alert_rules.threshold_required", "alert_rules.threshold_usage_label",
+	"alert_rules.threshold_usage_placeholder", "alert_rules.type_cpu_high",
+	"alert_rules.type_disk_high", "alert_rules.type_http_probe_down", "alert_rules.type_memory_high",
+	"alert_rules.type_server_expiry", "alert_rules.type_server_offline", "alert_rules.type_website_expiry",
+	"alert_rules.update_success",
+	"common.saving",
+	"files.add_dir_button", "files.adding",
+	"files.busy_create_dir", "files.done_create_dir", "files.busy_rename", "files.done_rename",
+	"files.busy_delete", "files.done_delete", "files.busy_move", "files.done_move",
+	"files.busy_copy", "files.done_copy", "files.busy_compress", "files.done_compress",
+	"files.busy_extract", "files.done_extract",
+	"files.clipboard_copy_msg", "files.clipboard_copy_prefix", "files.clipboard_cut_msg",
+	"files.clipboard_move_prefix", "files.delete_confirm", "files.entry_type_dir",
+	"files.new_dir_prompt", "files.remove_root_confirm", "files.rename_prompt", "files.root_added",
+	"files.source_custom", "files.source_mounted", "files.source_panel", "files.upload_done",
+	"files.uploading",
+	"firewall.add_success", "firewall.delete_confirm", "firewall.unban_confirm", "firewall.unbanned",
+	"local_storage.can_login", "local_storage.cannot_login", "local_storage.desc_belongs_to",
+	"local_storage.desc_partitions_below", "local_storage.desc_rom", "local_storage.desc_unpartitioned",
+	"local_storage.dir_exists", "local_storage.dir_not_exists", "local_storage.enter_label",
+	"local_storage.filesystem_source", "local_storage.format_partition", "local_storage.fs_partitioned",
+	"local_storage.fs_raw_disk", "local_storage.fs_rom", "local_storage.fs_unformatted",
+	"local_storage.groups_label", "local_storage.initialize_disk", "local_storage.kind_device",
+	"local_storage.kind_disk", "local_storage.kind_part", "local_storage.kind_rom",
+	"local_storage.mount_and_auto", "local_storage.mounting_label", "local_storage.mp_no_need",
+	"local_storage.mp_not_mounted", "local_storage.mp_use_partition_below", "local_storage.permission_mode",
+	"local_storage.read_label", "local_storage.status_can_mount", "local_storage.status_has_partitions",
+	"local_storage.status_mounted", "local_storage.status_not_mounted", "local_storage.status_raw_disk",
+	"local_storage.status_rom", "local_storage.status_system_protected", "local_storage.sudo_suffix",
+	"local_storage.uid_status", "local_storage.unmount_confirm", "local_storage.used_available",
+	"local_storage.write_label",
+	"monitor.not_set", "monitor.updated_at",
+	"common.enter_view_password", "common.view_password_required_notice",
+	"settings.account_updated_relogin", "settings.acme_confirm", "settings.already_latest",
+	"settings.auto_update_saved", "settings.backup_confirm", "settings.backup_count",
+	"settings.backup_generated", "settings.backup_settings_saved", "settings.basic_auth_off_confirm",
+	"settings.cert_key_required", "settings.cert_uploaded", "settings.change_vp_title",
+	"settings.confirm_new_vp_label", "settings.confirm_new_vp_title", "settings.confirm_phrase_mismatch",
+	"settings.confirm_vp_label", "settings.confirm_vp_title", "settings.continue_button",
+	"settings.current_vp_label", "settings.email_not_sent", "settings.email_sent",
+	"settings.fill_domain_first", "settings.generating_backup", "settings.loading_suffix",
+	"settings.new_vp_label", "settings.new_vp_mismatch", "settings.not_set", "settings.nothing_to_change",
+	"settings.oplog_count", "settings.os_list_saved", "settings.packages_updatable",
+	"settings.password_mismatch", "settings.reset_new_vp_title", "settings.reset_vp_confirm",
+	"settings.reset_vp_confirm_label", "settings.reset_vp_confirm_message", "settings.reset_vp_title",
+	"settings.restart_timeout", "settings.restarting_wait_refresh", "settings.restore_confirm",
+	"settings.restore_scheduled", "settings.restoring_wait", "settings.select_backup_file",
+	"settings.self_signed_confirm", "settings.self_signed_issued", "settings.set_new_vp_title",
+	"settings.setup_vp_title", "settings.site_type_list_saved", "settings.sys_update_confirm",
+	"settings.sys_update_done", "settings.system_up_to_date", "settings.tab_backup", "settings.tab_basic",
+	"settings.tab_dictionary", "settings.tab_notification", "settings.tab_security", "settings.tab_update",
+	"settings.test_email_prompt", "settings.test_email_sent", "settings.tls_saved", "settings.unknown",
+	"settings.update_confirm", "settings.update_started", "settings.upload_restore_confirm",
+	"settings.vp_changed", "settings.vp_label", "settings.vp_mismatch", "settings.vp_not_set",
+	"settings.vp_reset_success", "settings.vp_set", "settings.vp_set_success", "settings.vp_strength_hint",
+	"settings.vp_verify_success", "settings.web_password_min_length",
+}
 
 var viewPasswordSetupCache = struct {
 	sync.Mutex
@@ -116,11 +248,15 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 		vpH := &handlers.ViewPasswordHandler{}
 
 		pg.GET("/login", func(c *gin.Context) {
+			i18n.MaybeSetLanguageCookie(c.Writer, c.Request)
+			lang := i18n.LangFromRequest(c.Request)
 			c.HTML(http.StatusOK, "login.html", gin.H{
 				"PanelTitle":   cfg.Panel.PanelTitle,
 				"PanelVersion": cfg.Panel.Version,
 				"RandomSuffix": suffix,
 				"AssetPrefix":  prefix + "/assets",
+				"Lang":         lang,
+				"MessagesJSON": i18n.MessagesJSON(lang, i18nKeys),
 			})
 		})
 		pg.POST("/api/auth/login", authH.Login)
@@ -362,7 +498,7 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 	})
 	r.StaticFS(prefix+"/assets", http.FS(staticSubFS))
 
-	tmpl := template.Must(template.New("").ParseFS(templatesFS, "templates/*.html"))
+	tmpl := template.Must(template.New("").Funcs(i18n.FuncMap()).ParseFS(templatesFS, "templates/*.html"))
 	r.SetHTMLTemplate(tmpl)
 
 	return r
@@ -386,7 +522,7 @@ func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 			}
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 				"success": false,
-				"message": "读取查看密码状态失败，请稍后刷新",
+				"message": i18n.TE(c.Request, "common.view_password_status_failed_refresh"),
 			})
 			return
 		}
@@ -416,7 +552,7 @@ func requireViewPasswordSetup(db *sql.DB, prefix string) gin.HandlerFunc {
 		if strings.HasPrefix(relativePath, "/api/") {
 			c.AbortWithStatusJSON(http.StatusPreconditionRequired, gin.H{
 				"success": false,
-				"message": "请先设置查看密码",
+				"message": i18n.TE(c.Request, "common.view_password_required"),
 			})
 			return
 		}
@@ -466,28 +602,10 @@ func cachedViewPasswordSetup() bool {
 }
 
 func pageData(cfg *config.Config, active string, contentTpl string, c *gin.Context) gin.H {
+	i18n.MaybeSetLanguageCookie(c.Writer, c.Request)
+	lang := i18n.LangFromRequest(c.Request)
 	title := cfg.Panel.PanelTitle
-	titles := map[string]string{
-		"dashboard":       "仪表盘",
-		"server_list":     "服务器管理",
-		"server_detail":   "服务器详情",
-		"server_form":     "编辑服务器",
-		"customer_list":   "客户管理",
-		"customer_detail": "客户详情",
-		"customer_form":   "编辑客户",
-		"website_list":    "网站管理",
-		"website_detail":  "网站详情",
-		"website_form":    "编辑网站",
-		"provider_list":   "服务商管理",
-		"provider_detail": "服务商详情",
-		"provider_form":   "编辑服务商",
-		"monitor":         "性能监控",
-		"firewall":        "安全防御",
-		"alert_rules":     "告警规则",
-		"alert_log":       "告警日志",
-		"settings":        "系统设置",
-	}
-	if t, ok := titles[active]; ok {
+	if t := i18n.T(lang, "title."+active); t != "title."+active {
 		title = t + " — " + title
 	}
 	csrfToken := middleware.GetCSRFToken(c)
@@ -501,5 +619,7 @@ func pageData(cfg *config.Config, active string, contentTpl string, c *gin.Conte
 		"Active":          active,
 		"AssetPrefix":     "/" + cfg.Panel.RandomSuffix + "/assets",
 		"CSRFToken":       csrfToken,
+		"Lang":            lang,
+		"MessagesJSON":    i18n.MessagesJSON(lang, i18nKeys),
 	}
 }

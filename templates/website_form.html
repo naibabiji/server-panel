@@ -1,7 +1,7 @@
 {{template "base" .}}
 {{define "website_form_content"}}
 <div x-data="websiteForm()" class="p-6 max-w-2xl">
-    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? '编辑网站' : '添加网站'"></h2>
+    <h2 class="text-lg font-semibold text-purple-300 mb-6" x-text="isEdit ? t('website_form.title_edit') : t('website_form.title_add')"></h2>
     <div class="card space-y-4" x-show="loading" x-cloak>
         <div class="skeleton-block h-9"></div>
         <div class="skeleton-block h-9"></div>
@@ -17,64 +17,64 @@
         <div class="skeleton-block h-9"></div>
     </div>
     <div class="card space-y-4" x-show="!loading">
-        <div><label class="label">网站名称</label><input type="text" x-model="form.name" class="input-field" placeholder="例如：公司官网"></div>
-        <div><label class="label">域名 <span class="text-red-400">*</span></label><input type="text" x-model="form.domain" class="input-field" placeholder="example.com"></div>
+        <div><label class="label">{{t .Lang "website_form.name_label"}}</label><input type="text" x-model="form.name" class="input-field" placeholder="{{t .Lang "website_form.name_placeholder"}}"></div>
+        <div><label class="label">{{t .Lang "website_form.domain_label"}} <span class="text-red-400">*</span></label><input type="text" x-model="form.domain" class="input-field" placeholder="{{t .Lang "website_form.domain_placeholder"}}"></div>
         <div>
-            <label class="label">网站类型</label>
+            <label class="label">{{t .Lang "website_form.type_label"}}</label>
             <select x-model="form.site_type" class="input-field">
-                <option value="">-- 请选择 --</option>
+                <option value="">{{t .Lang "common.select_placeholder"}}</option>
                 <template x-for="t in siteTypes" :key="t"><option :value="t" x-text="t"></option></template>
             </select>
         </div>
-        <div><label class="label">所属服务器 <span class="text-red-400">*</span></label>
+        <div><label class="label">{{t .Lang "website_form.server_label"}} <span class="text-red-400">*</span></label>
             <select x-model.number="form.server_id" class="input-field">
-                <option :value="0">-- 请选择 --</option>
+                <option :value="0">{{t .Lang "common.select_placeholder"}}</option>
                 <template x-for="s in servers" :key="s.id"><option :value="s.id" x-text="s.name"></option></template>
             </select>
         </div>
         <div>
             <div class="flex items-center justify-between">
-                <label class="label">所属客户</label>
-                <button type="button" @click="quickAddCustomer()" class="text-xs text-blue-400 hover:text-blue-300">+ 新增客户</button>
+                <label class="label">{{t .Lang "server_form.customer_label"}}</label>
+                <button type="button" @click="quickAddCustomer()" class="text-xs text-blue-400 hover:text-blue-300">{{t .Lang "server_form.add_customer"}}</button>
             </div>
             <select x-model="form.customer_id" class="input-field">
-                <option value="">-- 请选择 --</option>
+                <option value="">{{t .Lang "common.select_placeholder"}}</option>
                 <template x-for="c in customers" :key="c.id"><option :value="c.id" x-text="c.name"></option></template>
             </select>
         </div>
         <hr class="border-gray-700">
         <div class="grid grid-cols-2 gap-4">
             <div>
-                <label class="label">面板类型</label>
+                <label class="label">{{t .Lang "server_form.panel_type_label"}}</label>
                 <select x-model="form.panel_type" class="input-field">
-                    <option value="none">无</option><option value="baota">宝塔</option>
+                    <option value="none">{{t .Lang "server_form.panel_none"}}</option><option value="baota">{{t .Lang "server_form.panel_baota"}}</option>
                     <option value="wp-panel">WP Panel</option><option value="1panel">1Panel</option>
                     <option value="cyberpanel">CyberPanel</option><option value="directadmin">DirectAdmin</option>
-                    <option value="cpanel">cPanel</option><option value="other">其他</option>
+                    <option value="cpanel">cPanel</option><option value="other">{{t .Lang "server_form.panel_other"}}</option>
                 </select>
             </div>
-            <div><label class="label">面板地址</label><input type="text" x-model="form.panel_url" class="input-field" placeholder="https://..."></div>
-            <div><label class="label">面板账号</label><input type="text" x-model="form.panel_username" class="input-field" autocomplete="off"></div>
+            <div><label class="label">{{t .Lang "server_form.panel_url_label"}}</label><input type="text" x-model="form.panel_url" class="input-field" placeholder="https://..."></div>
+            <div><label class="label">{{t .Lang "website_form.panel_username_label"}}</label><input type="text" x-model="form.panel_username" class="input-field" autocomplete="off"></div>
             <div>
                 <div class="flex items-center justify-between">
-                    <label class="label">面板密码</label>
-                    <button type="button" @click="revealPanelPassword()" class="text-xs text-blue-400 hover:text-blue-300" x-show="isEdit">查看已保存密码</button>
+                    <label class="label">{{t .Lang "server_form.panel_password_label"}}</label>
+                    <button type="button" @click="revealPanelPassword()" class="text-xs text-blue-400 hover:text-blue-300" x-show="isEdit">{{t .Lang "website_form.reveal_saved_password"}}</button>
                 </div>
-                <input type="text" x-model="form.panel_password" class="input-field" placeholder="（留空则不修改）" autocomplete="off">
+                <input type="text" x-model="form.panel_password" class="input-field" placeholder="{{t .Lang "website_form.panel_password_placeholder"}}" autocomplete="off">
                 <code class="block text-xs text-green-200 break-all mt-2" x-show="panelPassword" x-text="panelPassword"></code>
             </div>
         </div>
-        <div><label class="label">到期日期</label><input type="date" x-model="form.expiry_date" class="input-field"></div>
+        <div><label class="label">{{t .Lang "server_form.expiry_date_label"}}</label><input type="date" x-model="form.expiry_date" class="input-field"></div>
         <div>
-            <label class="label">状态</label>
+            <label class="label">{{t .Lang "website_form.status_label"}}</label>
             <select x-model="form.status" class="input-field w-48">
-                <option value="active">运行中</option><option value="expired">已到期</option>
+                <option value="active">{{t .Lang "server_detail.website_status_running"}}</option><option value="expired">{{t .Lang "server_detail.website_status_expired"}}</option>
             </select>
         </div>
-        <div><label class="label">备注</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
+        <div><label class="label">{{t .Lang "server_form.notes_label"}}</label><textarea x-model="form.notes" class="input-field" rows="3"></textarea></div>
         <div class="flex gap-3 pt-2">
-            <button @click="save()" class="btn-primary" :disabled="saving"><span x-show="!saving">保存</span><span x-show="saving">保存中...</span></button>
-            <a href="/{{.RandomSuffix}}/websites" class="btn-secondary">取消</a>
+            <button @click="save()" class="btn-primary" :disabled="saving"><span x-show="!saving">{{t .Lang "common.save"}}</span><span x-show="saving">{{t .Lang "common.saving"}}</span></button>
+            <a href="/{{.RandomSuffix}}/websites" class="btn-secondary">{{t .Lang "common.cancel"}}</a>
         </div>
     </div>
 </div>
@@ -106,7 +106,7 @@ function websiteForm() {
                 if (serverID) {
                     this.form.server_id = serverID;
                     if (!this.servers.some(s => s.id === serverID)) {
-                        this.servers = [{id: serverID, name: '服务器 #'+serverID}, ...this.servers];
+                        this.servers = [{id: serverID, name: t('website_form.fallback_server_name', {id: serverID})}, ...this.servers];
                     }
                 }
             }
@@ -117,10 +117,10 @@ function websiteForm() {
                 Object.keys(this.form).forEach(k => { if (w[k] !== undefined && w[k] !== null) this.form[k] = w[k]; });
                 // 若保存的引用不在当前下拉列表中（如已被删除），注入以便正确回显
                 if (w.customer_id && !this.customers.some(c => c.id === w.customer_id)) {
-                    this.customers = [{id: w.customer_id, name: '客户 #'+w.customer_id}, ...this.customers];
+                    this.customers = [{id: w.customer_id, name: t('server_form.fallback_customer_name', {id: w.customer_id})}, ...this.customers];
                 }
                 if (w.server_id && !this.servers.some(s => s.id === w.server_id)) {
-                    this.servers = [{id: w.server_id, name: '服务器 #'+w.server_id}, ...this.servers];
+                    this.servers = [{id: w.server_id, name: t('website_form.fallback_server_name', {id: w.server_id})}, ...this.servers];
                 }
                 if (w.site_type && !this.siteTypes.includes(w.site_type)) {
                     this.siteTypes = [w.site_type, ...this.siteTypes];
@@ -135,12 +135,12 @@ function websiteForm() {
             } catch(e) {}
         },
         async quickAddCustomer() {
-            const name = prompt('请输入客户名称:');
+            const name = prompt(t('server_form.prompt_customer_name'));
             if (!name) return;
             try {
                 const d = await api('/api/customers', {method:'POST', body:{name}});
                 await this.refreshCustomers(d.data.id);
-                showToast('客户已创建','success');
+                showToast(t('server_form.customer_created'),'success');
             } catch(e) { showToast(e.message,'error'); }
         },
         async revealPanelPassword() {
@@ -149,14 +149,14 @@ function websiteForm() {
                 if (!viewToken) return;
                 const d = await api('/api/websites/'+this.id+'/secrets/panel-password', {headers:{'X-View-Token': viewToken}});
                 this.panelPassword = d.data.value || '';
-                if (!this.panelPassword) showToast('未保存网站面板密码','warning');
+                if (!this.panelPassword) showToast(t('website_form.panel_password_not_saved'),'warning');
             } catch(e) {}
         },
         async save() {
             this.saving = true;
             try {
-                if (!this.form.domain) { showToast('域名不能为空','error'); this.saving=false; return; }
-                if (!this.form.server_id) { showToast('请选择服务器','error'); this.saving=false; return; }
+                if (!this.form.domain) { showToast(t('website_form.domain_required'),'error'); this.saving=false; return; }
+                if (!this.form.server_id) { showToast(t('website_form.server_required'),'error'); this.saving=false; return; }
                 const payload = { ...this.form };
                 payload.server_id = parseInt(payload.server_id, 10) || 0;
                 payload.customer_id = payload.customer_id ? parseInt(payload.customer_id, 10) : null;
@@ -164,7 +164,7 @@ function websiteForm() {
                 const method = this.isEdit ? 'PUT' : 'POST';
                 const url = this.isEdit ? '/api/websites/'+this.id : '/api/websites';
                 await api(url, {method, body: payload});
-                showToast('保存成功','success');
+                showToast(t('common.save_success'),'success');
                 const target = this.isEdit ? '/websites/' + this.id : '/websites';
                 setTimeout(() => location.href = document.body.dataset.panelPrefix + target, 500);
             } catch(e) { showToast(e.message,'error'); }

@@ -12,6 +12,7 @@ import (
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/database"
 	"github.com/naibabiji/server-panel/executor"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -56,7 +57,7 @@ func (h *UpdateHandler) CheckUpdate(c *gin.Context) {
 	forceRefresh := c.Query("force") == "1"
 	release, err := cachedLatestPanelRelease(forceRefresh)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("检查更新失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.update.check_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	hasUpdate := executor.CompareVersions(release.TagName, current) > 0
@@ -127,7 +128,7 @@ func (h *UpdateHandler) DoUpdate(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message": "更新已开始，请勿关闭本页面，面板即将重启",
+		"message": i18n.TE(c.Request, "errors.update.started"),
 	}))
 }
 
@@ -180,20 +181,20 @@ func (h *UpdateHandler) GetAutoUpdateSettings(c *gin.Context) {
 func (h *UpdateHandler) UpdateAutoUpdateSettings(c *gin.Context) {
 	var req map[string]string
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if mode, ok := req["panel_auto_update_mode"]; ok && mode != "patch_only" && mode != "all_stable" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("自动更新模式仅支持 patch_only 或 all_stable"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.update.mode_invalid")))
 		return
 	}
 	if window, ok := req["panel_auto_update_window"]; ok && !isValidAutoUpdateWindow(window) {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("自动更新时间窗口格式必须为 HH:MM-HH:MM"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.update.window_format")))
 		return
 	}
 	for k, v := range req {
 		if !autoUpdateEditableKeys[k] {
-			c.JSON(http.StatusBadRequest, models.ErrorResponse("不允许的配置项: "+k))
+			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.config_key_not_allowed", i18n.P{"key": k})))
 			return
 		}
 		h.db().Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES (?, ?)", k, v)
@@ -240,7 +241,7 @@ func (h *UpdateHandler) GetOperationLogs(c *gin.Context) {
 		 FROM operation_logs ORDER BY id DESC LIMIT ? OFFSET ?`,
 		pageSize, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()

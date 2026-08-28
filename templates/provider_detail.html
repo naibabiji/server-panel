@@ -3,12 +3,12 @@
 <div x-data="providerDetail()" class="p-6 max-w-6xl">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <h2 class="text-lg font-semibold text-gray-100" x-text="provider.name || '加载中...'"></h2>
+            <h2 class="text-lg font-semibold text-gray-100" x-text="provider.name || t('common.loading')"></h2>
             <a :href="externalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-400 hover:text-blue-300" x-text="provider.website || '--'"></a>
         </div>
         <div class="flex gap-2">
-            <a :href="provider.id ? provider.id + '/edit' : '#'" class="btn-secondary text-sm">编辑</a>
-            <a href=".." class="text-sm text-gray-400 hover:text-white">返回列表</a>
+            <a :href="provider.id ? provider.id + '/edit' : '#'" class="btn-secondary text-sm">{{t .Lang "common.edit"}}</a>
+            <a href=".." class="text-sm text-gray-400 hover:text-white">{{t .Lang "server_detail.back_to_list"}}</a>
         </div>
     </div>
 
@@ -21,26 +21,26 @@
     </section>
 
     <section class="border border-[#2a3038] bg-[#171b21] mb-5" x-show="!providerLoading">
-        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">服务商信息</div>
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">{{t .Lang "provider.info_title"}}</div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
             <dl class="p-5 text-sm space-y-3 border-b md:border-b-0 md:border-r border-[#202833]">
-                <div class="flex"><dt class="w-24 text-gray-400">名称</dt><dd class="text-gray-200" x-text="provider.name || '--'"></dd></div>
-                <div class="flex"><dt class="w-24 text-gray-400">官网</dt><dd><a :href="externalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="provider.website || '--'"></a></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "server.col_name"}}</dt><dd class="text-gray-200" x-text="provider.name || '--'"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "provider.col_website"}}</dt><dd><a :href="externalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="provider.website || '--'"></a></dd></div>
             </dl>
             <dl class="p-5 text-sm space-y-3">
-                <div class="flex"><dt class="w-24 text-gray-400">联系方式</dt><dd class="text-gray-200" x-text="provider.contact || '--'"></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "provider.col_contact"}}</dt><dd class="text-gray-200" x-text="provider.contact || '--'"></dd></div>
             </dl>
         </div>
         <div class="p-5 border-t border-[#202833]" x-show="provider.notes">
-            <div class="text-sm text-gray-400 mb-2">备注</div>
+            <div class="text-sm text-gray-400 mb-2">{{t .Lang "server_form.notes_label"}}</div>
             <p class="text-sm text-gray-300 whitespace-pre-wrap" x-text="provider.notes"></p>
         </div>
         <div class="p-5 border-t border-[#202833]" x-show="provider.has_private_notes">
             <div class="flex items-center justify-between gap-3 mb-2">
-                <div class="text-sm text-gray-400">加密备注</div>
+                <div class="text-sm text-gray-400">{{t .Lang "provider.private_notes_label"}}</div>
                 <div class="flex gap-2">
-                    <button @click="showPrivateNotes()" class="btn-secondary text-xs" x-show="!privateNotes">查看</button>
-                    <button @click="clearPrivateNotes()" class="btn-secondary text-xs text-red-300 hover:text-red-200">清空</button>
+                    <button @click="showPrivateNotes()" class="btn-secondary text-xs" x-show="!privateNotes">{{t .Lang "provider.view"}}</button>
+                    <button @click="clearPrivateNotes()" class="btn-secondary text-xs text-red-300 hover:text-red-200">{{t .Lang "provider.clear"}}</button>
                 </div>
             </div>
             <p class="text-sm text-green-200 whitespace-pre-wrap" x-show="privateNotes" x-text="privateNotes"></p>
@@ -48,11 +48,11 @@
     </section>
 
     <section class="border border-[#2a3038] bg-[#171b21]">
-        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">服务器资源</div>
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-base font-semibold text-gray-100">{{t .Lang "customer.servers_section"}}</div>
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead><tr>
-                    <th class="table-header">名称</th><th class="table-header">IP</th><th class="table-header">客户</th><th class="table-header">状态</th><th class="table-header">到期日</th>
+                    <th class="table-header">{{t .Lang "server.col_name"}}</th><th class="table-header">{{t .Lang "server_detail.ip_label"}}</th><th class="table-header">{{t .Lang "server_detail.customer_label"}}</th><th class="table-header">{{t .Lang "server_detail.status_label"}}</th><th class="table-header">{{t .Lang "server.col_expiry"}}</th>
                 </tr></thead>
                 <tbody>
                 <template x-for="s in servers" :key="s.id">
@@ -60,13 +60,13 @@
                         <td class="table-cell text-white"><a :href="serverURL(s.id)" class="hover:text-purple-200" x-text="s.name"></a></td>
                         <td class="table-cell text-gray-400" x-text="s.ip_address || '--'"></td>
                         <td class="table-cell"><a :href="customerURL(s)" class="text-blue-400 hover:text-blue-300" x-text="s.customer_name || '--'"></a></td>
-                        <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?'活跃':'过期'"></span></td>
+                        <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?t('common.status_active'):t('common.status_expired')"></span></td>
                         <td class="table-cell text-gray-400" x-text="s.expiry_date || '--'"></td>
                     </tr>
                 </template>
                 </tbody>
             </table>
-            <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && servers.length==0">暂无服务器资源</div>
+            <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && servers.length==0">{{t .Lang "customer.no_servers"}}</div>
         </div>
     </section>
 </div>
@@ -84,7 +84,7 @@ function providerDetail() {
         async fetchServers() {
             this.loading = true;
             try { const d = await api('/api/servers?provider_id=' + this.provider.id + '&page_size=100'); this.servers = d.data.items || []; }
-            catch(e) { showToast(e.message || '加载服务器资源失败', 'error'); }
+            catch(e) { showToast(e.message || t('customer.load_servers_failed'), 'error'); }
             finally { this.loading = false; }
         },
         serverURL(id) {
@@ -105,18 +105,18 @@ function providerDetail() {
                 if (!viewToken) return;
                 const d = await api('/api/providers/' + this.provider.id + '/secrets/private-notes', {headers:{'X-View-Token': viewToken}});
                 this.privateNotes = d.data.value || '';
-                if (!this.privateNotes) showToast('未保存加密备注','warning');
+                if (!this.privateNotes) showToast(t('provider.not_saved_private_notes'),'warning');
             } catch(e) {}
         },
         async clearPrivateNotes() {
-            if (!await confirmModal('确认清空此服务商的加密备注？')) return;
+            if (!await confirmModal(t('provider.clear_confirm'))) return;
             try {
                 const viewToken = await unlockViewPasswordPrompt();
                 if (!viewToken) return;
                 await api('/api/providers/' + this.provider.id + '/secrets/private-notes', {method:'DELETE', headers:{'X-View-Token': viewToken}});
                 this.privateNotes = '';
                 this.provider.has_private_notes = false;
-                showToast('加密备注已清空', 'success');
+                showToast(t('provider.private_notes_cleared'), 'success');
             } catch(e) {}
         }
     }

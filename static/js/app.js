@@ -1,3 +1,16 @@
+function currentLocale() {
+    return (window.SERVER_PANEL_I18N && window.SERVER_PANEL_I18N.lang) || document.body?.dataset.lang || 'zh-CN';
+}
+
+function t(key, params = {}) {
+    const messages = (window.SERVER_PANEL_I18N && window.SERVER_PANEL_I18N.messages) || {};
+    let message = messages[key] || key;
+    Object.entries(params).forEach(([name, value]) => {
+        message = message.split('{{' + name + '}}').join(String(value));
+    });
+    return message;
+}
+
 // 防止 401/428 并发请求时重复触发跳转：第一个命中时置位，跳转后页面卸载，
 // 后续并发的同状态码分支只抛 silent 错误，不再重复改 location.href。
 let _authRedirecting = false;
@@ -195,7 +208,7 @@ function api(path, options = {}) {
                     // 定时器复位 flag，避免后续真正的 428/401 被误判为已在跳转。
                     setTimeout(() => { _authRedirecting = false; }, 0);
                 }
-                const e = new Error('会话已过期，正在跳转登录');
+                const e = new Error(t('common.session_expired_redirect'));
                 e.silent = true;
                 throw e;
             }
@@ -212,7 +225,7 @@ function api(path, options = {}) {
                     // 避免后续 401 因 flag 卡住而跳不到 /login。
                     setTimeout(() => { _authRedirecting = false; }, 0);
                 }
-                const e = new Error('请先设置查看密码');
+                const e = new Error(t('common.view_password_required'));
                 e.silent = true;
                 throw e;
             }
@@ -220,7 +233,7 @@ function api(path, options = {}) {
             if (!contentType.includes('application/json')) {
                 const text = await resp.text();
                 console.error('Non-JSON response:', resp.status, text.substring(0, 200));
-                throw new Error('服务器返回异常 (' + resp.status + ')');
+                throw new Error(t('common.non_json_response', { status: resp.status }));
             }
             const data = await resp.json();
             if (!resp.ok) {
@@ -228,7 +241,7 @@ function api(path, options = {}) {
                 throw new Error(data.message || 'Request failed (' + resp.status + ')');
             }
             if (!data.success) {
-                const err = new Error(data.message || '操作失败');
+                const err = new Error(data.message || t('common.operation_failed'));
                 if (data.conflicts) err.conflicts = data.conflicts;
                 throw err;
             }
@@ -256,7 +269,7 @@ async function unlockViewPasswordPrompt() {
         return '';
     }
 
-    const pw = await passwordPromptModal('请输入查看密码');
+    const pw = await passwordPromptModal(t('common.enter_view_password'));
     if (!pw) return '';
     const d = await api('/api/view-password/unlock', {method:'POST', body:{password:pw}});
     return d.data.view_token || '';
@@ -265,7 +278,7 @@ async function unlockViewPasswordPrompt() {
 function showViewPasswordRequiredNotice() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('view_password_required') === '1') {
-        showToast('请先设置查看密码。密码不支持找回，连续输错 5 次会自动清空已保存的服务器/网站敏感凭据。', 'warning');
+        showToast(t('common.view_password_required_notice'), 'warning');
     }
 }
 
@@ -456,10 +469,10 @@ function monitorMetricClass(sample, metric, cpuCores) {
 // panel's reachability checker has run at least once for a server that's
 // currently offline, hence the '未知' fallback for that case.
 function serverStatus(s) {
-    if (s.is_online) return { label: '在线', cls: 'badge-success' };
-    if (s.tcp_reachable === 1) return { label: '探针异常', cls: 'badge-warning' };
-    if (s.tcp_reachable === 0) return { label: '离线', cls: 'badge-danger' };
-    return { label: '未知', cls: 'badge-warning' };
+    if (s.is_online) return { label: t('common.status_online'), cls: 'badge-success' };
+    if (s.tcp_reachable === 1) return { label: t('common.status_probe_error'), cls: 'badge-warning' };
+    if (s.tcp_reachable === 0) return { label: t('common.status_offline'), cls: 'badge-danger' };
+    return { label: t('common.status_unknown'), cls: 'badge-warning' };
 }
 
 function showToast(message, type = 'info') {
@@ -489,7 +502,7 @@ function inputModal(options = {}) {
 
         const title = document.createElement('div');
         title.style.cssText = 'color:#f9fafb;font-size:16px;font-weight:600;margin-bottom:6px;';
-        title.textContent = options.title || '请输入';
+        title.textContent = options.title || t('common.please_input');
         dialog.appendChild(title);
 
         if (options.message) {
@@ -539,13 +552,13 @@ function inputModal(options = {}) {
             const toggle = document.createElement('button');
             toggle.type = 'button';
             toggle.tabIndex = -1;
-            toggle.textContent = '显示';
+            toggle.textContent = t('common.show');
             toggle.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#9ca3af;cursor:pointer;font-size:12px;padding:2px 4px;';
             toggle.onclick = () => {
                 const showing = input.style.webkitTextSecurity === '';
                 input.style.webkitTextSecurity = showing ? 'disc' : '';
                 input.dataset.revealed = showing ? 'false' : 'true';
-                toggle.textContent = showing ? '显示' : '隐藏';
+                toggle.textContent = showing ? t('common.show') : t('common.hide');
                 input.focus();
             };
             wrap.appendChild(input);
@@ -561,12 +574,12 @@ function inputModal(options = {}) {
         const cancel = document.createElement('button');
         cancel.type = 'button';
         cancel.style.cssText = 'background:#374151;color:#f3f4f6;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px;';
-        cancel.textContent = options.cancelText || '取消';
+        cancel.textContent = options.cancelText || t('common.cancel');
 
         const confirm = document.createElement('button');
         confirm.type = 'button';
         confirm.style.cssText = 'background:#7c3aed;color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:14px;';
-        confirm.textContent = options.confirmText || '确认';
+        confirm.textContent = options.confirmText || t('common.confirm');
 
         actions.appendChild(cancel);
         actions.appendChild(confirm);
@@ -595,14 +608,14 @@ function inputModal(options = {}) {
 
 function passwordPromptModal(label, options = {}) {
     return inputModal({
-        title: options.title || '密码验证',
+        title: options.title || t('common.password_verify_title'),
         label,
         message: options.message || '',
         // type=password 由 inputModal 内部转为 text + 一次性验证码语义 + 聚焦后掩码。
         type: 'password',
         autocomplete: options.autocomplete || 'one-time-code',
         placeholder: options.placeholder || '',
-        confirmText: options.confirmText || '确认',
+        confirmText: options.confirmText || t('common.confirm'),
     });
 }
 
@@ -614,12 +627,14 @@ function confirmModal(message) {
             <div style="background:#1f2937;border-radius:12px;border:1px solid #374151;padding:24px;max-width:32rem;width:100%;margin:0 16px;">
                 <p id="modal-message" style="color:#e5e7eb;margin-bottom:16px;"></p>
                 <div style="display:flex;justify-content:flex-end;gap:12px;">
-                    <button id="modal-cancel" style="background:#4b5563;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;">取消</button>
-                    <button id="modal-confirm" style="background:#dc2626;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;">确认</button>
+                    <button id="modal-cancel" style="background:#4b5563;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;"></button>
+                    <button id="modal-confirm" style="background:#dc2626;color:#fff;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:14px;"></button>
                 </div>
             </div>
         `;
         overlay.querySelector('#modal-message').textContent = message;
+        overlay.querySelector('#modal-cancel').textContent = t('common.cancel');
+        overlay.querySelector('#modal-confirm').textContent = t('common.confirm');
         document.body.appendChild(overlay);
         overlay.querySelector('#modal-cancel').onclick = () => { overlay.remove(); resolve(false); };
         overlay.querySelector('#modal-confirm').onclick = () => { overlay.remove(); resolve(true); };

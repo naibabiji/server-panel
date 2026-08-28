@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/models"
 	"github.com/naibabiji/server-panel/timeutil"
 )
@@ -117,22 +118,22 @@ func (h *DashboardHandler) GetExpiring(c *gin.Context) {
 
 	expiringServers, err := queryExpiringServers(db, "expiry_date >= date('now') AND expiry_date <= date('now','+30 days')")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取即将到期服务器失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.expiring_servers_failed")))
 		return
 	}
 	overdueServers, err := queryExpiringServers(db, "expiry_date < date('now')")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取已到期服务器失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.overdue_servers_failed")))
 		return
 	}
 	expiringWebsites, err := queryExpiringWebsites(db, "w.expiry_date >= date('now') AND w.expiry_date <= date('now','+30 days')")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取即将到期网站失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.expiring_websites_failed")))
 		return
 	}
 	overdueWebsites, err := queryExpiringWebsites(db, "w.expiry_date < date('now')")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取已到期网站失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.overdue_websites_failed")))
 		return
 	}
 
@@ -153,7 +154,7 @@ func (h *DashboardHandler) GetHTTPProbeIssues(c *gin.Context) {
 		 WHERE http_probe_enabled = 1 AND http_probe_healthy = 0
 		 ORDER BY http_probe_last_at DESC LIMIT 20`)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("获取 HTTP 探测异常失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.http_probe_issues_failed")))
 		return
 	}
 	defer rows.Close()
@@ -170,7 +171,7 @@ func (h *DashboardHandler) GetHTTPProbeIssues(c *gin.Context) {
 		var item probeIssue
 		var lastAt sql.NullString
 		if err := rows.Scan(&item.ID, &item.Name, &lastAt, &item.LastError); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("解析 HTTP 探测异常失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.parse_http_probe_failed")))
 			return
 		}
 		if lastAt.Valid {
@@ -180,7 +181,7 @@ func (h *DashboardHandler) GetHTTPProbeIssues(c *gin.Context) {
 		issues = append(issues, item)
 	}
 	if err := rows.Err(); err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取 HTTP 探测异常失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.read_http_probe_failed")))
 		return
 	}
 
@@ -245,7 +246,7 @@ func (h *DashboardHandler) GetHostMetricsLatest(c *gin.Context) {
 		&resp.DiskPercent, &resp.DiskUsed, &resp.DiskTotal, &resp.NetRXBytes, &resp.NetTXBytes,
 		&resp.LoadAvg1, &resp.LoadAvg5, &resp.LoadAvg15, &resp.UptimeSeconds, &resp.RecordedAt)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("暂无性能数据"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.no_perf_data")))
 		return
 	}
 
@@ -283,7 +284,7 @@ func (h *DashboardHandler) GetHostMetrics(c *gin.Context) {
 		 FROM host_metrics WHERE recorded_at >= ? ORDER BY recorded_at`,
 		timeutil.Display(since))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -294,7 +295,7 @@ func (h *DashboardHandler) GetHostMetrics(c *gin.Context) {
 		var netRX, netTX sql.NullInt64
 		var timeStr string
 		if err := rows.Scan(&timeStr, &p.CPU, &p.Memory, &p.Disk, &p.Load1, &p.Load5, &p.Load15, &netRX, &netTX); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取性能数据失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.dashboard.read_perf_data_failed")))
 			return
 		}
 		p.Time = timeStr

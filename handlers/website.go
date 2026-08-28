@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 )
@@ -74,7 +75,7 @@ func (h *WebsiteHandler) List(c *gin.Context) {
 			where+" ORDER BY "+orderBy+" LIMIT ? OFFSET ?",
 		append(args, pageSize, offset)...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -86,7 +87,7 @@ func (h *WebsiteHandler) List(c *gin.Context) {
 			&w.CustomerID, &w.CustomerName, &w.PanelType, &w.PanelURL, &w.PanelUsername,
 			&w.ExpiryDate, &w.Status, &w.Notes, &w.CreatedAt, &w.UpdatedAt)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取网站列表失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.website.list_failed")))
 			return
 		}
 		websites = append(websites, w)
@@ -130,7 +131,7 @@ func (h *WebsiteHandler) Get(c *gin.Context) {
 		&w.CustomerID, &w.CustomerName, &w.PanelType, &w.PanelURL, &w.PanelUsername, &w.PanelPasswordEnc,
 		&w.ExpiryDate, &w.Status, &w.Notes, &w.CreatedAt, &w.UpdatedAt)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.website.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(w))
@@ -139,14 +140,14 @@ func (h *WebsiteHandler) Get(c *gin.Context) {
 func (h *WebsiteHandler) Create(c *gin.Context) {
 	var w models.Website
 	if err := c.ShouldBindJSON(&w); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if !validateWebsiteInput(c, &w) {
 		return
 	}
 	if h.websiteDomainTaken(w.Domain, 0) {
-		c.JSON(http.StatusConflict, models.ErrorResponse("该域名已添加过网站"))
+		c.JSON(http.StatusConflict, models.ErrorResponse(i18n.TE(c.Request, "errors.website.domain_exists")))
 		return
 	}
 	panelPasswordEnc, ok := encryptOptionalPassword(c, h.db(), w.PanelPassword)
@@ -160,7 +161,7 @@ func (h *WebsiteHandler) Create(c *gin.Context) {
 		w.Name, w.Domain, w.SiteType, w.ServerID, w.CustomerID, w.PanelType, w.PanelURL, w.PanelUsername, panelPasswordEnc, w.ExpiryDate, w.Status, w.Notes,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.create_failed")))
 		return
 	}
 	id, _ := result.LastInsertId()
@@ -171,14 +172,14 @@ func (h *WebsiteHandler) Update(c *gin.Context) {
 	id := c.Param("id")
 	var w models.Website
 	if err := c.ShouldBindJSON(&w); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if !validateWebsiteInput(c, &w) {
 		return
 	}
 	if idNum, err := strconv.ParseInt(id, 10, 64); err == nil && h.websiteDomainTaken(w.Domain, idNum) {
-		c.JSON(http.StatusConflict, models.ErrorResponse("该域名已添加过网站"))
+		c.JSON(http.StatusConflict, models.ErrorResponse(i18n.TE(c.Request, "errors.website.domain_exists")))
 		return
 	}
 	panelPasswordEnc, ok := encryptOptionalPassword(c, h.db(), w.PanelPassword)
@@ -199,11 +200,11 @@ func (h *WebsiteHandler) Update(c *gin.Context) {
 
 	result, err := h.db().Exec(query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.update_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.website.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
@@ -214,50 +215,50 @@ func (h *WebsiteHandler) GetPanelPassword(c *gin.Context) {
 	setup, err := isViewPasswordSetup(h.db())
 	if err != nil {
 		log.Printf("read view password setup status failed: %v", err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.view_password_status_failed")))
 		return
 	}
 	if !setup {
-		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先设置查看密码"))
+		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse(i18n.TE(c.Request, "common.view_password_required")))
 		return
 	}
 	sessionToken, ok := getSessionToken(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("会话已过期，请重新登录"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "session.session_expired")))
 		return
 	}
 	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
-		c.JSON(http.StatusForbidden, models.ErrorResponse("请重新输入查看密码"))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.reenter_view_password")))
 		return
 	}
 	key, err := GetSecretEncryptionKey(h.db())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取加密密钥失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.read_encryption_key_failed")))
 		return
 	}
 
 	var encrypted string
 	err = h.db().QueryRow("SELECT panel_password_enc FROM websites WHERE id = ?", id).Scan(&encrypted)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.website.not_found")))
 		return
 	}
 	if encrypted == "" {
 		c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 			"field": "panel-password",
-			"label": "网站面板密码",
+			"label": i18n.TE(c.Request, "errors.website.label_panel_password"),
 			"value": "",
 		}))
 		return
 	}
 	value, err := DecryptPassword(encrypted, key)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("网站面板密码解密失败，请确认查看密码是否正确"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.website.panel_password_decrypt_failed")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 		"field": "panel-password",
-		"label": "网站面板密码",
+		"label": i18n.TE(c.Request, "errors.website.label_panel_password"),
 		"value": value,
 	}))
 }
@@ -266,11 +267,11 @@ func (h *WebsiteHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	result, err := h.db().Exec("DELETE FROM websites WHERE id = ?", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("删除失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.delete_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("网站不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.website.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
@@ -293,11 +294,11 @@ func (h *WebsiteHandler) websiteDomainTaken(domain string, excludeID int64) bool
 func validateWebsiteInput(c *gin.Context, w *models.Website) bool {
 	w.Domain = strings.TrimSpace(w.Domain)
 	if w.Domain == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("域名不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.website.domain_required")))
 		return false
 	}
 	if w.ServerID == 0 {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请选择所属服务器"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.website.select_server")))
 		return false
 	}
 	if w.Status == "" {

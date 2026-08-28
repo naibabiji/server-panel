@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/naibabiji/server-panel/i18n"
 )
 
 func CustomRecovery() gin.HandlerFunc {
@@ -14,7 +15,7 @@ func CustomRecovery() gin.HandlerFunc {
 				log.Printf("[PANIC] %v", err)
 				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 					"success": false,
-					"message": "Internal Server Error",
+					"message": i18n.TE(c.Request, "server_error.internal"),
 				})
 			}
 		}()

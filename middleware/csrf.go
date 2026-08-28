@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/naibabiji/server-panel/i18n"
 )
 
 func generateCSRFToken() string {
@@ -34,7 +35,7 @@ func CSRF() gin.HandlerFunc {
 		if err != nil || cookieToken == "" {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"message": "CSRF token 缺失",
+				"message": i18n.TE(c.Request, "csrf.missing"),
 			})
 			return
 		}
@@ -42,7 +43,7 @@ func CSRF() gin.HandlerFunc {
 		if headerToken != cookieToken {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"message": "CSRF token 不匹配",
+				"message": i18n.TE(c.Request, "csrf.mismatch"),
 			})
 			return
 		}

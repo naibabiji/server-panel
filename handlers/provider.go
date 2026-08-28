@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 )
@@ -53,7 +54,7 @@ func (h *ProviderHandler) List(c *gin.Context) {
 		FROM providers p `+where+" ORDER BY p.name LIMIT ? OFFSET ?",
 		append(args, pageSize, offset)...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -63,7 +64,7 @@ func (h *ProviderHandler) List(c *gin.Context) {
 		var p models.Provider
 		var hasPrivateNotes int
 		if err := rows.Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &hasPrivateNotes, &p.Notes, &p.CreatedAt, &p.UpdatedAt, &p.ServerCount); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取服务商列表失败"))
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.list_failed")))
 			return
 		}
 		p.HasPrivateNotes = hasPrivateNotes == 1
@@ -83,7 +84,7 @@ func (h *ProviderHandler) Get(c *gin.Context) {
 		"SELECT id, name, website, contact, private_notes_enc <> '', notes, created_at, updated_at FROM providers WHERE id = ?", id,
 	).Scan(&p.ID, &p.Name, &p.Website, &p.Contact, &hasPrivateNotes, &p.Notes, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务商不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.not_found")))
 		return
 	}
 	p.HasPrivateNotes = hasPrivateNotes == 1
@@ -93,17 +94,17 @@ func (h *ProviderHandler) Get(c *gin.Context) {
 func (h *ProviderHandler) Create(c *gin.Context) {
 	var p models.Provider
 	if err := c.ShouldBindJSON(&p); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if !validateProviderInput(c, &p) {
 		return
 	}
 	if h.providerNameTaken(p.Name, 0) {
-		c.JSON(http.StatusConflict, models.ErrorResponse("服务商已存在（名称不区分大小写）"))
+		c.JSON(http.StatusConflict, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.exists")))
 		return
 	}
-	privateNotesEnc, ok := encryptOptionalSecret(c, h.db(), p.PrivateNotes, "请先设置查看密码，再保存加密备注")
+	privateNotesEnc, ok := encryptOptionalSecret(c, h.db(), p.PrivateNotes, i18n.TE(c.Request, "errors.provider.setup_view_password_for_notes"))
 	if !ok {
 		return
 	}
@@ -113,7 +114,7 @@ func (h *ProviderHandler) Create(c *gin.Context) {
 		p.Name, p.Website, p.Contact, privateNotesEnc, p.Notes,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建失败，名称可能已存在"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.create_failed_exists")))
 		return
 	}
 	id, _ := result.LastInsertId()
@@ -124,21 +125,21 @@ func (h *ProviderHandler) Update(c *gin.Context) {
 	id := c.Param("id")
 	var p models.Provider
 	if err := c.ShouldBindJSON(&p); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if !validateProviderInput(c, &p) {
 		return
 	}
 	if idNum, err := strconv.ParseInt(id, 10, 64); err == nil && h.providerNameTaken(p.Name, idNum) {
-		c.JSON(http.StatusConflict, models.ErrorResponse("服务商已存在（名称不区分大小写）"))
+		c.JSON(http.StatusConflict, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.exists")))
 		return
 	}
 
 	query := "UPDATE providers SET name=?, website=?, contact=?, notes=?, updated_at=CURRENT_TIMESTAMP"
 	args := []interface{}{p.Name, p.Website, p.Contact, p.Notes}
 	if p.PrivateNotes != "" {
-		privateNotesEnc, ok := encryptOptionalSecret(c, h.db(), p.PrivateNotes, "请先设置查看密码，再保存加密备注")
+		privateNotesEnc, ok := encryptOptionalSecret(c, h.db(), p.PrivateNotes, i18n.TE(c.Request, "errors.provider.setup_view_password_for_notes"))
 		if !ok {
 			return
 		}
@@ -150,11 +151,11 @@ func (h *ProviderHandler) Update(c *gin.Context) {
 
 	result, err := h.db().Exec(query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败，名称可能已存在"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.update_failed_exists")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务商不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
@@ -165,32 +166,32 @@ func (h *ProviderHandler) GetPrivateNotes(c *gin.Context) {
 	setup, err := isViewPasswordSetup(h.db())
 	if err != nil {
 		log.Printf("read view password setup status failed: %v", err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.view_password_status_failed")))
 		return
 	}
 	if !setup {
-		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先设置查看密码"))
+		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse(i18n.TE(c.Request, "common.view_password_required")))
 		return
 	}
 	sessionToken, ok := getSessionToken(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("会话已过期，请重新登录"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "session.session_expired")))
 		return
 	}
 	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
-		c.JSON(http.StatusForbidden, models.ErrorResponse("请重新输入查看密码"))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.reenter_view_password")))
 		return
 	}
 
 	var encrypted string
 	if err := h.db().QueryRow("SELECT private_notes_enc FROM providers WHERE id = ?", id).Scan(&encrypted); err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务商不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.not_found")))
 		return
 	}
 	if encrypted == "" {
 		c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 			"field": "private-notes",
-			"label": "加密备注",
+			"label": i18n.TE(c.Request, "errors.provider.notes_label"),
 			"value": "",
 		}))
 		return
@@ -198,17 +199,17 @@ func (h *ProviderHandler) GetPrivateNotes(c *gin.Context) {
 
 	key, err := GetSecretEncryptionKey(h.db())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取加密密钥失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.read_encryption_key_failed")))
 		return
 	}
 	value, err := DecryptPassword(encrypted, key)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("加密备注解密失败，请确认查看密码是否正确"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.notes_decrypt_failed")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 		"field": "private-notes",
-		"label": "加密备注",
+		"label": i18n.TE(c.Request, "errors.provider.notes_label"),
 		"value": value,
 	}))
 }
@@ -218,30 +219,30 @@ func (h *ProviderHandler) ClearPrivateNotes(c *gin.Context) {
 	setup, err := isViewPasswordSetup(h.db())
 	if err != nil {
 		log.Printf("read view password setup status failed: %v", err)
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("读取查看密码状态失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.view_password_status_failed")))
 		return
 	}
 	if !setup {
-		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse("请先设置查看密码"))
+		c.JSON(http.StatusPreconditionRequired, models.ErrorResponse(i18n.TE(c.Request, "common.view_password_required")))
 		return
 	}
 	sessionToken, ok := getSessionToken(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("会话已过期，请重新登录"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "session.session_expired")))
 		return
 	}
 	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
-		c.JSON(http.StatusForbidden, models.ErrorResponse("请重新输入查看密码"))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.reenter_view_password")))
 		return
 	}
 
 	result, err := h.db().Exec("UPDATE providers SET private_notes_enc='', updated_at=CURRENT_TIMESTAMP WHERE id = ?", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("清空加密备注失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.clear_notes_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务商不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
@@ -251,11 +252,11 @@ func (h *ProviderHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	result, err := h.db().Exec("DELETE FROM providers WHERE id = ?", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("删除失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.delete_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("服务商不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
@@ -278,7 +279,7 @@ func (h *ProviderHandler) providerNameTaken(name string, excludeID int64) bool {
 func validateProviderInput(c *gin.Context, p *models.Provider) bool {
 	p.Name = strings.TrimSpace(p.Name)
 	if p.Name == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("服务商名称不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.provider.name_required")))
 		return false
 	}
 	return true

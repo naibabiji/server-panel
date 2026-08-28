@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -52,7 +53,7 @@ func (h *CustomerHandler) List(c *gin.Context) {
 		FROM customers c `+where+" ORDER BY c.created_at DESC LIMIT ? OFFSET ?",
 		append(args, pageSize, offset)...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("查询失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.query_failed")))
 		return
 	}
 	defer rows.Close()
@@ -78,7 +79,7 @@ func (h *CustomerHandler) Get(c *gin.Context) {
 	).Scan(&u.ID, &u.Name, &u.ContactPerson, &u.Phone, &u.Email, &u.Company,
 		&u.StartDate, &u.Address, &u.Notes, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("客户不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.customer.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(u))
@@ -87,11 +88,11 @@ func (h *CustomerHandler) Get(c *gin.Context) {
 func (h *CustomerHandler) Create(c *gin.Context) {
 	var u models.Customer
 	if err := c.ShouldBindJSON(&u); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if u.Name == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("客户名称不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.customer.name_required")))
 		return
 	}
 
@@ -101,7 +102,7 @@ func (h *CustomerHandler) Create(c *gin.Context) {
 		u.Name, u.ContactPerson, u.Phone, u.Email, u.Company, u.StartDate, u.Address, u.Notes,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("创建失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.create_failed")))
 		return
 	}
 	id, _ := result.LastInsertId()
@@ -112,11 +113,11 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 	id := c.Param("id")
 	var u models.Customer
 	if err := c.ShouldBindJSON(&u); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的请求数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.invalid_request")))
 		return
 	}
 	if u.Name == "" {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("客户名称不能为空"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.customer.name_required")))
 		return
 	}
 
@@ -125,11 +126,11 @@ func (h *CustomerHandler) Update(c *gin.Context) {
 		u.Name, u.ContactPerson, u.Phone, u.Email, u.Company, u.StartDate, u.Address, u.Notes, id,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("更新失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.update_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("客户不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.customer.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))
@@ -139,11 +140,11 @@ func (h *CustomerHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	result, err := h.db().Exec("DELETE FROM customers WHERE id = ?", id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("删除失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.delete_failed")))
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows == 0 {
-		c.JSON(http.StatusNotFound, models.ErrorResponse("客户不存在"))
+		c.JSON(http.StatusNotFound, models.ErrorResponse(i18n.TE(c.Request, "errors.customer.not_found")))
 		return
 	}
 	c.JSON(http.StatusOK, models.SuccessResponse(nil))

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -33,7 +34,7 @@ func (h *AgentDataHandler) Uninstall(c *gin.Context) {
 		serverID,
 	)
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message": "Agent 已标记为卸载",
+		"message": i18n.TE(c.Request, "errors.agent.marked_uninstalled"),
 	}))
 }
 
@@ -43,7 +44,7 @@ func (h *AgentDataHandler) ReceiveMetrics(c *gin.Context) {
 
 	var payload models.AgentMetricPayload
 	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("无效的指标数据"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.agent.invalid_metrics")))
 		return
 	}
 
@@ -71,7 +72,7 @@ func (h *AgentDataHandler) ReceiveMetrics(c *gin.Context) {
 		ingestLatency,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("写入指标失败"))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.agent.write_metrics_failed")))
 		return
 	}
 

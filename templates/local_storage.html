@@ -3,16 +3,16 @@
 <div x-data="localStoragePage()" class="p-6 space-y-6">
     <div class="border border-[#2a3038] bg-[#171b21] p-5">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
-            <div><h2 class="text-lg font-semibold text-gray-100">磁盘与挂载</h2><p class="text-sm text-gray-500 mt-1">整块磁盘和它下面的分区是包含关系，容量不要重复相加。</p></div>
-            <button @click="loadDevices()" class="btn-secondary text-sm">刷新</button>
+            <div><h2 class="text-lg font-semibold text-gray-100">{{t .Lang "local_storage.disks_section_title"}}</h2><p class="text-sm text-gray-500 mt-1">{{t .Lang "local_storage.disks_section_desc"}}</p></div>
+            <button @click="loadDevices()" class="btn-secondary text-sm">{{t .Lang "local_storage.refresh"}}</button>
         </div>
         <div class="mb-4 border border-blue-800/60 bg-blue-950/20 px-4 py-3 text-sm text-blue-200">
-            <div class="font-medium">怎样找到需要挂载的数据盘？</div>
-            <div class="mt-1 text-blue-300/80">先找到容量和服务商购买容量相符的“整块磁盘”，再操作缩进在它下面、已有文件系统的“分区”。系统盘已自动保护，虚拟光驱可以忽略。挂载目录限定为 /mnt/&lt;名称&gt;。</div>
+            <div class="font-medium">{{t .Lang "local_storage.mount_help_title"}}</div>
+            <div class="mt-1 text-blue-300/80">{{t .Lang "local_storage.mount_help_body"}}</div>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full">
-                <thead><tr><th class="table-header">磁盘 / 分区</th><th class="table-header">容量</th><th class="table-header">文件系统</th><th class="table-header">挂载位置</th><th class="table-header">状态</th><th class="table-header">操作</th></tr></thead>
+                <thead><tr><th class="table-header">{{t .Lang "local_storage.col_device"}}</th><th class="table-header">{{t .Lang "local_storage.col_size"}}</th><th class="table-header">{{t .Lang "local_storage.col_filesystem"}}</th><th class="table-header">{{t .Lang "local_storage.col_mountpoint"}}</th><th class="table-header">{{t .Lang "server.col_status"}}</th><th class="table-header">{{t .Lang "server.col_actions"}}</th></tr></thead>
                 <tbody>
                 <template x-for="d in devices" :key="d.path">
                     <tr class="border-t border-gray-700/50" :class="{'bg-[#13171c]': d.parent, 'opacity-60': d.type === 'rom'}">
@@ -20,16 +20,16 @@
                             <div class="flex items-center gap-2" :class="d.parent ? 'pl-7' : ''"><span x-show="d.parent" class="text-gray-600">↳</span><span class="font-mono text-gray-200" x-text="d.path"></span><span class="text-[11px] px-1.5 py-0.5 border border-gray-700 text-gray-400" x-text="deviceKind(d)"></span></div>
                             <div class="text-xs text-gray-500 mt-1" :class="d.parent ? 'pl-14' : ''" x-text="deviceDescription(d)"></div>
                         </td>
-                        <td class="table-cell text-sm"><div x-text="formatBytes(d.size)"></div><div x-show="d.has_children" class="text-xs text-gray-500 mt-1">整盘容量，已包含下方分区</div></td>
+                        <td class="table-cell text-sm"><div x-text="formatBytes(d.size)"></div><div x-show="d.has_children" class="text-xs text-gray-500 mt-1">{{t .Lang "local_storage.whole_disk_capacity_note"}}</div></td>
                         <td class="table-cell text-sm"><span x-text="filesystemLabel(d)"></span><div class="font-mono text-xs text-gray-500" x-show="d.uuid" x-text="d.uuid"></div></td>
-                        <td class="table-cell text-sm"><div x-text="mountpointLabel(d)"></div><div class="text-xs text-gray-500" x-show="d.used_bytes" x-text="formatBytes(d.used_bytes) + ' 已用 / ' + formatBytes(d.available_bytes) + ' 可用'"></div></td>
-                        <td class="table-cell"><span :class="statusClass(d)" x-text="statusLabel(d)"></span><span class="badge-success ml-1" x-show="d.managed_fstab">开机自动挂载</span></td>
+                        <td class="table-cell text-sm"><div x-text="mountpointLabel(d)"></div><div class="text-xs text-gray-500" x-show="d.used_bytes" x-text="t('local_storage.used_available', {used: formatBytes(d.used_bytes), available: formatBytes(d.available_bytes)})"></div></td>
+                        <td class="table-cell"><span :class="statusClass(d)" x-text="statusLabel(d)"></span><span class="badge-success ml-1" x-show="d.managed_fstab">{{t .Lang "local_storage.auto_mount_badge"}}</span></td>
                         <td class="table-cell whitespace-nowrap space-x-2">
-                            <button x-show="d.can_mount" @click="openMount(d)" class="btn-primary text-xs px-3 py-1.5">挂载此分区</button>
-                            <button x-show="!d.system && (d.mountpoints||[]).length" @click="unmount(d)" class="text-sm text-yellow-400">卸载</button>
-                            <button x-show="d.can_format" @click="openDestructive(d, 'format')" class="text-sm text-red-400">格式化分区</button>
-                            <button x-show="d.can_initialize" @click="openDestructive(d, 'initialize')" class="text-sm text-red-400">初始化裸盘</button>
-                            <span x-show="!hasAction(d)" class="text-xs text-gray-600">无需操作</span>
+                            <button x-show="d.can_mount" @click="openMount(d)" class="btn-primary text-xs px-3 py-1.5">{{t .Lang "local_storage.mount_this_partition"}}</button>
+                            <button x-show="!d.system && (d.mountpoints||[]).length" @click="unmount(d)" class="text-sm text-yellow-400">{{t .Lang "local_storage.unmount"}}</button>
+                            <button x-show="d.can_format" @click="openDestructive(d, 'format')" class="text-sm text-red-400">{{t .Lang "local_storage.format_partition"}}</button>
+                            <button x-show="d.can_initialize" @click="openDestructive(d, 'initialize')" class="text-sm text-red-400">{{t .Lang "local_storage.initialize_disk"}}</button>
+                            <span x-show="!hasAction(d)" class="text-xs text-gray-600">{{t .Lang "local_storage.no_action_needed"}}</span>
                         </td>
                     </tr>
                 </template>
@@ -39,51 +39,51 @@
     </div>
 
     <div class="border border-[#2a3038] bg-[#171b21] p-5">
-        <div class="mb-4"><h2 class="text-lg font-semibold text-gray-100">SSH 用户与目录权限</h2><p class="text-sm text-gray-500 mt-1">只读展示可登录用户和 authorized_keys 指纹，不显示密码或私钥。</p></div>
+        <div class="mb-4"><h2 class="text-lg font-semibold text-gray-100">{{t .Lang "local_storage.ssh_users_title"}}</h2><p class="text-sm text-gray-500 mt-1">{{t .Lang "local_storage.ssh_users_desc"}}</p></div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div class="space-y-3 max-h-[34rem] overflow-y-auto">
                 <template x-for="u in users" :key="u.username">
                     <div class="border border-[#252c35] p-3">
-                        <div class="flex justify-between"><span class="font-medium text-purple-300" x-text="u.username"></span><span class="text-xs text-gray-500" x-text="'UID ' + u.uid + ' · ' + (u.ssh_login ? '可登录 Shell' : '不可登录')"></span></div>
+                        <div class="flex justify-between"><span class="font-medium text-purple-300" x-text="u.username"></span><span class="text-xs text-gray-500" x-text="t('local_storage.uid_status', {uid: u.uid, status: u.ssh_login ? t('local_storage.can_login') : t('local_storage.cannot_login')})"></span></div>
                         <div class="text-xs text-gray-500 mt-1" x-text="u.home + ' · ' + u.shell"></div>
-                        <div class="text-xs text-gray-400 mt-1" x-text="'用户组：' + (u.groups || []).join(', ') + (u.sudo ? '（sudo）' : '')"></div>
+                        <div class="text-xs text-gray-400 mt-1" x-text="t('local_storage.groups_label', {groups: (u.groups || []).join(', '), sudoSuffix: u.sudo ? t('local_storage.sudo_suffix') : ''})"></div>
                         <template x-for="key in u.authorized_keys" :key="key.fingerprint">
                             <div class="mt-2 text-xs font-mono break-all text-gray-400"><span x-text="key.type + ' ' + key.fingerprint"></span><span x-show="key.comment" x-text="' · ' + key.comment"></span></div>
                         </template>
-                        <div class="text-xs text-gray-600 mt-2" x-show="!(u.authorized_keys||[]).length">未发现 authorized_keys</div>
+                        <div class="text-xs text-gray-600 mt-2" x-show="!(u.authorized_keys||[]).length">{{t .Lang "local_storage.no_authorized_keys"}}</div>
                     </div>
                 </template>
             </div>
             <div class="border border-[#252c35] p-4 h-fit">
-                <div class="text-sm font-medium text-gray-200 mb-3">检查用户对备份目录的权限</div>
-                <div class="space-y-3"><div><label class="label">用户</label><select x-model="permissionForm.username" class="input-field"><option value="">请选择</option><template x-for="u in users" :key="u.username"><option :value="u.username" x-text="u.username"></option></template></select></div><div><label class="label">目录</label><input x-model="permissionForm.path" class="input-field" placeholder="/mnt/backup-storage/server-01"></div><button @click="checkPermission()" class="btn-primary text-sm">检查权限</button></div>
+                <div class="text-sm font-medium text-gray-200 mb-3">{{t .Lang "local_storage.check_permission_title"}}</div>
+                <div class="space-y-3"><div><label class="label">{{t .Lang "local_storage.user_label"}}</label><select x-model="permissionForm.username" class="input-field"><option value="">{{t .Lang "local_storage.select_placeholder_plain"}}</option><template x-for="u in users" :key="u.username"><option :value="u.username" x-text="u.username"></option></template></select></div><div><label class="label">{{t .Lang "local_storage.directory_label"}}</label><input x-model="permissionForm.path" class="input-field" placeholder="/mnt/backup-storage/server-01"></div><button @click="checkPermission()" class="btn-primary text-sm">{{t .Lang "local_storage.check_permission_button"}}</button></div>
                 <div x-show="permission" x-cloak class="mt-4 border-t border-[#252c35] pt-4 text-sm space-y-2">
-                    <div x-text="permission.exists ? '目录存在' : '目录不存在'"></div><div x-show="permission.exists" x-text="'所在文件系统：' + (permission.source || '--') + ' → ' + (permission.mountpoint || '--')"></div><div x-show="permission.exists" x-text="'权限：' + permission.mode + ' · UID/GID ' + permission.owner_uid + '/' + permission.owner_gid"></div><div x-show="permission.exists"><span :class="permission.readable ? 'text-green-400' : 'text-red-400'">读</span> / <span :class="permission.writable ? 'text-green-400' : 'text-red-400'">写</span> / <span :class="permission.searchable ? 'text-green-400' : 'text-red-400'">进入</span></div>
+                    <div x-text="permission.exists ? t('local_storage.dir_exists') : t('local_storage.dir_not_exists')"></div><div x-show="permission.exists" x-text="t('local_storage.filesystem_source', {source: permission.source || '--', mountpoint: permission.mountpoint || '--'})"></div><div x-show="permission.exists" x-text="t('local_storage.permission_mode', {mode: permission.mode, uid: permission.owner_uid, gid: permission.owner_gid})"></div><div x-show="permission.exists"><span :class="permission.readable ? 'text-green-400' : 'text-red-400'" x-text="t('local_storage.read_label')"></span> / <span :class="permission.writable ? 'text-green-400' : 'text-red-400'" x-text="t('local_storage.write_label')"></span> / <span :class="permission.searchable ? 'text-green-400' : 'text-red-400'" x-text="t('local_storage.enter_label')"></span></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="modal-overlay" x-show="mountModal" x-cloak @click.self="if(!mounting) mountModal=false"><div class="modal-content"><h3 class="text-lg font-semibold text-purple-300 mb-4">挂载数据盘</h3><p class="text-sm text-gray-400 mb-3" x-text="selected && selected.path"></p><label class="label">挂载目录</label><input x-model="mountPoint" :disabled="mounting" class="input-field disabled:opacity-60" placeholder="/mnt/backup-storage"><div x-show="mounting" class="mt-3 text-sm text-blue-300">正在挂载并设置开机自动挂载，请稍候…</div><div class="flex gap-3 mt-5"><button @click="mount()" :disabled="mounting" class="btn-primary disabled:opacity-60 disabled:cursor-wait"><span x-text="mounting ? '正在挂载…' : '挂载并自动挂载'"></span></button><button @click="mountModal=false" :disabled="mounting" class="btn-secondary disabled:opacity-60">取消</button></div></div></div>
-    <div class="modal-overlay" x-show="destructiveModal" x-cloak @click.self="destructiveModal=false"><div class="modal-content"><h3 class="text-lg font-semibold text-red-400 mb-3" x-text="destructiveAction === 'initialize' ? '初始化裸盘' : '格式化分区'"></h3><p class="text-sm text-red-300 mb-3">此操作会永久删除目标设备上的全部数据且无法恢复。请输入完整设备路径确认：</p><div class="font-mono text-gray-200 mb-2" x-text="selected && selected.path"></div><input x-model="confirmation" class="input-field font-mono"><label class="label mt-3">挂载目录</label><input x-model="mountPoint" class="input-field" placeholder="/mnt/backup-storage"><div class="flex gap-3 mt-5"><button @click="runDestructive()" class="btn-danger">确认格式化并挂载</button><button @click="destructiveModal=false" class="btn-secondary">取消</button></div></div></div>
+    <div class="modal-overlay" x-show="mountModal" x-cloak @click.self="if(!mounting) mountModal=false"><div class="modal-content"><h3 class="text-lg font-semibold text-purple-300 mb-4">{{t .Lang "local_storage.mount_modal_title"}}</h3><p class="text-sm text-gray-400 mb-3" x-text="selected && selected.path"></p><label class="label">{{t .Lang "local_storage.mount_dir_label"}}</label><input x-model="mountPoint" :disabled="mounting" class="input-field disabled:opacity-60" placeholder="/mnt/backup-storage"><div x-show="mounting" class="mt-3 text-sm text-blue-300">{{t .Lang "local_storage.mounting_hint"}}</div><div class="flex gap-3 mt-5"><button @click="mount()" :disabled="mounting" class="btn-primary disabled:opacity-60 disabled:cursor-wait"><span x-text="mounting ? t('local_storage.mounting_label') : t('local_storage.mount_and_auto')"></span></button><button @click="mountModal=false" :disabled="mounting" class="btn-secondary disabled:opacity-60">{{t .Lang "common.cancel"}}</button></div></div></div>
+    <div class="modal-overlay" x-show="destructiveModal" x-cloak @click.self="destructiveModal=false"><div class="modal-content"><h3 class="text-lg font-semibold text-red-400 mb-3" x-text="destructiveAction === 'initialize' ? t('local_storage.initialize_disk') : t('local_storage.format_partition')"></h3><p class="text-sm text-red-300 mb-3">{{t .Lang "local_storage.destructive_warning"}}</p><div class="font-mono text-gray-200 mb-2" x-text="selected && selected.path"></div><input x-model="confirmation" class="input-field font-mono"><label class="label mt-3">{{t .Lang "local_storage.mount_dir_label"}}</label><input x-model="mountPoint" class="input-field" placeholder="/mnt/backup-storage"><div class="flex gap-3 mt-5"><button @click="runDestructive()" class="btn-danger">{{t .Lang "local_storage.confirm_format_and_mount"}}</button><button @click="destructiveModal=false" class="btn-secondary">{{t .Lang "common.cancel"}}</button></div></div></div>
 </div>
 <script>
 function localStoragePage() { return {
     devices: [], users: [], selected: null, mountModal: false, mounting: false, destructiveModal: false, mountPoint: '/mnt/backup-storage', confirmation: '', destructiveAction: '', permissionForm: {username:'', path:'/mnt/backup-storage'}, permission: null,
     async init() { await Promise.all([this.loadDevices(), this.loadUsers()]); },
     formatBytes(n) { if (!n) return '0 B'; const u=['B','KB','MB','GB','TB']; let i=0,v=Number(n); while(v>=1024&&i<u.length-1){v/=1024;i++;} return v.toFixed(i?1:0)+' '+u[i]; },
-    deviceKind(d) { if (d.type === 'rom') return '虚拟光驱'; if (d.type === 'disk') return '整块磁盘'; if (d.type === 'part') return '分区'; return d.type || '设备'; },
-    deviceDescription(d) { if (d.type === 'rom') return '安装介质，可忽略'; if (d.parent) return '属于 ' + d.parent; return [d.model,d.serial].filter(Boolean).join(' · ') || (d.has_children ? '下方列出该磁盘的分区' : '未分区的数据盘'); },
-    filesystemLabel(d) { if (d.type === 'rom') return '安装介质'; if (d.has_children) return '已分区（请查看下方）'; if (d.fstype) return d.fstype; return d.type === 'disk' ? '全新裸盘（尚未分区）' : '未格式化'; },
-    mountpointLabel(d) { if ((d.mountpoints||[]).length) return d.mountpoints.join(', '); if (d.type === 'rom') return '无需挂载'; if (d.has_children) return '请操作下方分区'; return '尚未挂载'; },
-    statusLabel(d) { if (d.system) return '系统盘（已保护）'; if (d.type === 'rom') return '虚拟光驱（可忽略）'; if ((d.mountpoints||[]).length) return '已挂载'; if (d.has_children) return '包含分区'; if (d.can_mount) return '可以挂载'; if (d.can_initialize) return '全新裸盘'; return '未挂载'; },
+    deviceKind(d) { if (d.type === 'rom') return t('local_storage.kind_rom'); if (d.type === 'disk') return t('local_storage.kind_disk'); if (d.type === 'part') return t('local_storage.kind_part'); return d.type || t('local_storage.kind_device'); },
+    deviceDescription(d) { if (d.type === 'rom') return t('local_storage.desc_rom'); if (d.parent) return t('local_storage.desc_belongs_to', {parent: d.parent}); return [d.model,d.serial].filter(Boolean).join(' · ') || (d.has_children ? t('local_storage.desc_partitions_below') : t('local_storage.desc_unpartitioned')); },
+    filesystemLabel(d) { if (d.type === 'rom') return t('local_storage.fs_rom'); if (d.has_children) return t('local_storage.fs_partitioned'); if (d.fstype) return d.fstype; return d.type === 'disk' ? t('local_storage.fs_raw_disk') : t('local_storage.fs_unformatted'); },
+    mountpointLabel(d) { if ((d.mountpoints||[]).length) return d.mountpoints.join(', '); if (d.type === 'rom') return t('local_storage.mp_no_need'); if (d.has_children) return t('local_storage.mp_use_partition_below'); return t('local_storage.mp_not_mounted'); },
+    statusLabel(d) { if (d.system) return t('local_storage.status_system_protected'); if (d.type === 'rom') return t('local_storage.status_rom'); if ((d.mountpoints||[]).length) return t('local_storage.status_mounted'); if (d.has_children) return t('local_storage.status_has_partitions'); if (d.can_mount) return t('local_storage.status_can_mount'); if (d.can_initialize) return t('local_storage.status_raw_disk'); return t('local_storage.status_not_mounted'); },
     statusClass(d) { if (d.system) return 'badge-warning'; if ((d.mountpoints||[]).length) return 'badge-success'; if (d.can_mount) return 'badge-success'; return 'badge-info'; },
     hasAction(d) { return d.can_mount || (!d.system && (d.mountpoints||[]).length) || d.can_format || d.can_initialize; },
     async loadDevices() { try { const d=await api('/api/local-storage/devices'); this.devices=d.data||[]; } catch(e){ showToast(e.message,'error'); } },
     async loadUsers() { try { const d=await api('/api/local-storage/users'); this.users=d.data||[]; } catch(e){ showToast(e.message,'error'); } },
     openMount(d) { this.selected=d; this.mountPoint='/mnt/backup-storage'; this.mounting=false; this.mountModal=true; },
     async mount() { if(this.mounting)return; this.mounting=true; try { const d=await api('/api/local-storage/mount',{method:'POST',body:{device_path:this.selected.path,mount_point:this.mountPoint}}); this.mountModal=false; showToast(d.data.message,'success'); await this.loadDevices(); } catch(e){showToast(e.message,'error');await this.loadDevices();} finally {this.mounting=false;} },
-    async unmount(d) { if(!await confirmModal('确认安全卸载 '+d.path+'？面板管理的开机自动挂载条目也会移除。'))return; try{const r=await api('/api/local-storage/unmount',{method:'POST',body:{device_path:d.path,remove_auto_mount:true}});showToast(r.data.message,'success');await this.loadDevices();}catch(e){showToast(e.message,'error');} },
+    async unmount(d) { if(!await confirmModal(t('local_storage.unmount_confirm', {path: d.path})))return; try{const r=await api('/api/local-storage/unmount',{method:'POST',body:{device_path:d.path,remove_auto_mount:true}});showToast(r.data.message,'success');await this.loadDevices();}catch(e){showToast(e.message,'error');} },
     openDestructive(d,a){this.selected=d;this.destructiveAction=a;this.confirmation='';this.mountPoint='/mnt/backup-storage';this.destructiveModal=true;},
     async runDestructive(){try{const r=await api('/api/local-storage/'+this.destructiveAction,{method:'POST',body:{device_path:this.selected.path,confirmation:this.confirmation,mount_point:this.mountPoint}});this.destructiveModal=false;showToast(r.data.message,'success');await this.loadDevices();}catch(e){showToast(e.message,'error');await this.loadDevices();}},
     async checkPermission(){try{const d=await api('/api/local-storage/permissions/check',{method:'POST',body:this.permissionForm});this.permission=d.data;}catch(e){showToast(e.message,'error');}}

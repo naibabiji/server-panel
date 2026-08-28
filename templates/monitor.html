@@ -2,19 +2,19 @@
 {{define "monitor_content"}}
 <div x-data="monitorPage()" x-init="fetch()" class="p-6">
     <div class="flex items-center justify-start mb-4">
-        <div class="text-xs text-gray-500" x-text="lastUpdate ? '更新于 ' + lastUpdate : ''"></div>
+        <div class="text-xs text-gray-500" x-text="lastUpdate ? t('monitor.updated_at', {time: lastUpdate}) : ''"></div>
     </div>
 
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">服务器</th><th class="table-header">服务商</th><th class="table-header">状态</th><th class="table-header">CPU</th><th class="table-header">内存</th><th class="table-header">磁盘</th><th class="table-header">负载</th><th class="table-header">运行时间</th>
+                <th class="table-header">{{t .Lang "website.col_server"}}</th><th class="table-header">{{t .Lang "server.col_provider"}}</th><th class="table-header">{{t .Lang "server.col_status"}}</th><th class="table-header">{{t .Lang "dashboard.cpu"}}</th><th class="table-header">{{t .Lang "dashboard.memory"}}</th><th class="table-header">{{t .Lang "dashboard.disk"}}</th><th class="table-header">{{t .Lang "monitor.col_load"}}</th><th class="table-header">{{t .Lang "monitor.col_uptime"}}</th>
             </tr></thead>
             <tbody>
             <template x-for="s in servers" :key="s.id">
                 <tr class="border-t border-[#202833] hover:bg-[#1d232b]">
                     <td class="table-cell"><a :href="'monitor/'+s.id" class="text-purple-300 hover:text-purple-200 font-medium" x-text="s.name"></a><div class="text-xs text-gray-500" x-text="s.ip_address"></div></td>
-                    <td class="table-cell text-gray-400" x-text="s.provider_name || '未设置'"></td>
+                    <td class="table-cell text-gray-400" x-text="s.provider_name || t('monitor.not_set')"></td>
                     <td class="table-cell"><span :class="serverStatus(s).cls" x-text="serverStatus(s).label"></span></td>
                     <td class="table-cell" :class="monitorMetricClass(s, 'cpu_percent', s.cpu_cores)" x-text="monitorMetricText(s, 'cpu_percent')"></td>
                     <td class="table-cell" :class="monitorMetricClass(s, 'memory_percent', s.cpu_cores)" x-text="monitorMetricText(s, 'memory_percent')"></td>
@@ -28,11 +28,11 @@
     </div>
 
     <div class="text-center text-gray-500 py-12" x-show="loading && servers.length==0">
-        正在加载性能数据...
+        {{t .Lang "monitor.loading_data"}}
     </div>
 
     <div class="text-center text-gray-500 py-12" x-show="!loading && servers.length==0">
-        暂无服务器性能数据。<br>请为服务器安装 Agent 探针后刷新。
+        {{t .Lang "monitor.empty_line1"}}<br>{{t .Lang "monitor.empty_line2"}}
     </div>
 </div>
 <script>

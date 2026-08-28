@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/config"
+	"github.com/naibabiji/server-panel/i18n"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -36,7 +37,7 @@ func BasicAuth(checker *BasicAuthChecker) gin.HandlerFunc {
 		if checker.IsBanned != nil && checker.IsBanned(ip) {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
 				"success": false,
-				"message": "IP已被临时封禁，请稍后再试",
+				"message": i18n.TE(c.Request, "common.ip_banned"),
 			})
 			return
 		}

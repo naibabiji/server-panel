@@ -2,24 +2,24 @@
 {{define "dashboard_content"}}
 <div x-data="dashboardPage()" class="p-6">
     <div class="mb-5 pb-5 border-b border-[#202833]">
-        <div class="text-sm text-gray-500">服务器状态、到期提醒和最近告警。</div>
+        <div class="text-sm text-gray-500">{{t .Lang "dashboard.subtitle"}}</div>
         <div class="flex flex-wrap gap-2 mt-3">
-            <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="panelUpdate.hasUpdate" x-text="'面板有新版本 ' + panelUpdate.latestVersion + ' 可用'"></a>
-            <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="sysUpdateCount > 0" x-text="sysUpdateCount + ' 个系统包可更新'"></a>
+            <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="panelUpdate.hasUpdate" x-text="t('dashboard.panel_update_available', {version: panelUpdate.latestVersion})"></a>
+            <a :href="panelURL('/settings#update')" class="badge-warning text-xs" x-show="sysUpdateCount > 0" x-text="t('dashboard.sys_updates_available', {count: sysUpdateCount})"></a>
         </div>
     </div>
     <div class="overflow-x-auto mb-6">
         <div class="border border-[#2a3038] bg-[#171b21]" style="display:grid;grid-template-columns:repeat(6,minmax(140px,1fr));min-width:900px;">
-            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">服务器总数</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1" x-text="stats.total_servers" x-show="!loading">0</div></div>
-            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">网站总数</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-purple-300" x-text="stats.total_websites" x-show="!loading">0</div></div>
-            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">Agent 在线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-green-400" x-text="stats.online_count" x-show="!loading">0</div></div>
-            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">Agent 离线</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-red-400" x-text="stats.offline_count" x-show="!loading">0</div></div>
-            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">30 天内到期</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count" x-show="!loading">0</div></div>
-            <div class="p-5"><div class="text-sm text-gray-400">已到期未处理</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-red-500" x-text="stats.overdue_count" x-show="!loading">0</div></div>
+            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">{{t .Lang "dashboard.total_servers"}}</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1" x-text="stats.total_servers" x-show="!loading">0</div></div>
+            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">{{t .Lang "dashboard.total_websites"}}</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-purple-300" x-text="stats.total_websites" x-show="!loading">0</div></div>
+            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">{{t .Lang "dashboard.agents_online"}}</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-green-400" x-text="stats.online_count" x-show="!loading">0</div></div>
+            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">{{t .Lang "dashboard.agents_offline"}}</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-red-400" x-text="stats.offline_count" x-show="!loading">0</div></div>
+            <div class="p-5 border-r border-[#202833]"><div class="text-sm text-gray-400">{{t .Lang "dashboard.expiring_30d"}}</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-yellow-400" x-text="stats.expiring_count" x-show="!loading">0</div></div>
+            <div class="p-5"><div class="text-sm text-gray-400">{{t .Lang "dashboard.overdue"}}</div><div class="skeleton-block h-7 w-12 mt-1" x-show="loading" x-cloak></div><div class="text-2xl font-semibold mt-1 text-red-500" x-text="stats.overdue_count" x-show="!loading">0</div></div>
         </div>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] mb-6" x-show="httpProbeIssues.length">
-        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-red-300">HTTP 探测异常</div>
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-red-300">{{t .Lang "dashboard.http_probe_issues"}}</div>
         <div class="p-5">
             <template x-for="item in httpProbeIssues" :key="'probe-'+item.id">
                 <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
@@ -36,7 +36,7 @@
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6" x-show="!loading && (expiring.overdue_servers.length || expiring.overdue_websites.length)">
         <section class="border border-red-900 bg-[#171b21]">
-            <div class="px-5 py-4 border-b border-red-900 bg-[#181e26] text-sm font-semibold text-red-400">已到期未处理的服务器</div>
+            <div class="px-5 py-4 border-b border-red-900 bg-[#181e26] text-sm font-semibold text-red-400">{{t .Lang "dashboard.overdue_servers"}}</div>
             <div class="p-5">
                 <template x-for="item in expiring.overdue_servers" :key="'overdue-server-'+item.id">
                     <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
@@ -52,7 +52,7 @@
             </div>
         </section>
         <section class="border border-red-900 bg-[#171b21]">
-            <div class="px-5 py-4 border-b border-red-900 bg-[#181e26] text-sm font-semibold text-red-400">已到期未处理的网站</div>
+            <div class="px-5 py-4 border-b border-red-900 bg-[#181e26] text-sm font-semibold text-red-400">{{t .Lang "dashboard.overdue_websites"}}</div>
             <div class="p-5">
                 <template x-for="item in expiring.overdue_websites" :key="'overdue-website-'+item.id">
                     <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
@@ -70,14 +70,14 @@
     </div>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <section class="border border-[#2a3038] bg-[#171b21]">
-            <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">即将到期的服务器</div>
+            <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">{{t .Lang "dashboard.upcoming_servers"}}</div>
             <div class="p-5">
                 <div class="space-y-3" x-show="loading" x-cloak>
                     <div class="skeleton-block h-5"></div>
                     <div class="skeleton-block h-5"></div>
                     <div class="skeleton-block h-5"></div>
                 </div>
-                <div class="text-sm text-gray-500" x-show="!loading && !expiring.servers.length">暂无即将到期服务器</div>
+                <div class="text-sm text-gray-500" x-show="!loading && !expiring.servers.length">{{t .Lang "dashboard.no_upcoming_servers"}}</div>
                 <template x-for="item in expiring.servers" :key="'server-'+item.id">
                     <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
                         <div class="flex items-center justify-between gap-4">
@@ -92,14 +92,14 @@
             </div>
         </section>
         <section class="border border-[#2a3038] bg-[#171b21]">
-            <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">即将到期的网站</div>
+            <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">{{t .Lang "dashboard.upcoming_websites"}}</div>
             <div class="p-5">
                 <div class="space-y-3" x-show="loading" x-cloak>
                     <div class="skeleton-block h-5"></div>
                     <div class="skeleton-block h-5"></div>
                     <div class="skeleton-block h-5"></div>
                 </div>
-                <div class="text-sm text-gray-500" x-show="!loading && !expiring.websites.length">暂无即将到期网站</div>
+                <div class="text-sm text-gray-500" x-show="!loading && !expiring.websites.length">{{t .Lang "dashboard.no_upcoming_websites"}}</div>
                 <template x-for="item in expiring.websites" :key="'website-'+item.id">
                     <a :href="panelURL(item.detail_path)" class="block py-3 border-b border-[#202833] last:border-0 hover:text-purple-200">
                         <div class="flex items-center justify-between gap-4">
@@ -115,14 +115,14 @@
         </section>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] mb-6">
-        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">最近告警</div>
+        <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] text-sm font-semibold text-gray-100">{{t .Lang "dashboard.recent_alerts"}}</div>
         <div class="p-5">
             <div class="space-y-3" x-show="loading" x-cloak>
                 <div class="skeleton-block h-5"></div>
                 <div class="skeleton-block h-5"></div>
                 <div class="skeleton-block h-5"></div>
             </div>
-            <div class="text-sm text-gray-500" x-show="!loading && !alerts.length">暂无告警</div>
+            <div class="text-sm text-gray-500" x-show="!loading && !alerts.length">{{t .Lang "dashboard.no_alerts"}}</div>
             <template x-for="a in alerts" :key="a.id">
                 <div class="flex items-center justify-between py-3 border-b border-[#202833] last:border-0">
                     <div><span :class="'badge-' + (a.level === 'critical' ? 'danger' : a.level === 'warning' ? 'warning' : 'info')" x-text="a.message" class="text-xs"></span></div>
@@ -134,37 +134,37 @@
     <section class="border border-[#2a3038] bg-[#171b21]">
         <div class="px-5 py-4 border-b border-[#202833] bg-[#181e26] flex items-center justify-between gap-3 flex-wrap">
             <div>
-                <div class="text-sm font-semibold text-gray-100">面板服务器性能</div>
+                <div class="text-sm font-semibold text-gray-100">{{t .Lang "dashboard.panel_host_performance"}}</div>
                 <div class="text-xs text-gray-500 mt-1" x-text="hostSummary()"></div>
             </div>
             <select @change="changeHostRange($event.target.value)" class="input-field w-28 text-sm">
-                <option value="24h">24小时</option>
-                <option value="7d">7天</option>
-                <option value="15d">15天</option>
-                <option value="30d">30天</option>
+                <option value="24h">{{t .Lang "dashboard.range_24h"}}</option>
+                <option value="7d">{{t .Lang "dashboard.range_7d"}}</option>
+                <option value="15d">{{t .Lang "dashboard.range_15d"}}</option>
+                <option value="30d">{{t .Lang "dashboard.range_30d"}}</option>
             </select>
         </div>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 p-5">
             <div class="card">
-                <div class="text-xs text-gray-400">CPU</div>
+                <div class="text-xs text-gray-400">{{t .Lang "dashboard.cpu"}}</div>
                 <div class="skeleton-block h-6 w-14 mt-1" x-show="loading" x-cloak></div>
                 <div class="text-xl font-bold mt-1 text-purple-400" x-text="(hostLatest.cpu_percent||0).toFixed(1)+'%'" x-show="!loading"></div>
                 <div class="mt-2" style="height:40px;position:relative;"><canvas id="cpuChart"></canvas></div>
             </div>
             <div class="card">
-                <div class="text-xs text-gray-400">内存</div>
+                <div class="text-xs text-gray-400">{{t .Lang "dashboard.memory"}}</div>
                 <div class="skeleton-block h-6 w-14 mt-1" x-show="loading" x-cloak></div>
                 <div class="text-xl font-bold mt-1 text-green-400" x-text="(hostLatest.memory_percent||0).toFixed(1)+'%'" x-show="!loading"></div>
                 <div class="mt-2" style="height:40px;position:relative;"><canvas id="memChart"></canvas></div>
             </div>
             <div class="card">
-                <div class="text-xs text-gray-400">磁盘</div>
+                <div class="text-xs text-gray-400">{{t .Lang "dashboard.disk"}}</div>
                 <div class="skeleton-block h-6 w-14 mt-1" x-show="loading" x-cloak></div>
                 <div class="text-xl font-bold mt-1 text-yellow-400" x-text="(hostLatest.disk_percent||0).toFixed(1)+'%'" x-show="!loading"></div>
                 <div class="mt-2" style="height:40px;"></div>
             </div>
             <div class="card">
-                <div class="text-xs text-gray-400">负载 (1m)</div>
+                <div class="text-xs text-gray-400">{{t .Lang "dashboard.load_1m"}}</div>
                 <div class="skeleton-block h-6 w-14 mt-1" x-show="loading" x-cloak></div>
                 <div class="text-xl font-bold mt-1 text-gray-200" x-text="(hostLatest.load_avg_1||0).toFixed(2)" x-show="!loading"></div>
                 <div class="mt-2" style="height:40px;position:relative;"><canvas id="loadChart"></canvas></div>
@@ -225,35 +225,35 @@ function dashboardPage() {
             return (document.body.dataset.panelPrefix || '') + path;
         },
         daysText(days) {
-            if (days < 0) return '已过期 ' + (-days) + ' 天';
-            if (days === 0) return '今天到期';
-            return days + ' 天';
+            if (days < 0) return t('dashboard.expired_days', {days: -days});
+            if (days === 0) return t('dashboard.expires_today');
+            return t('dashboard.days_left', {days});
         },
         websiteMeta(item) {
-            let text = '到期日：' + item.expiry_date;
+            let text = t('dashboard.expire_date', {date: item.expiry_date});
             if (item.server_name) text += ' · ' + item.server_name;
             return text;
         },
         serverMeta(item) {
-            let text = '到期日：' + item.expiry_date;
-            if (item.auto_renewal) text += ' · 已开启自动续期';
+            let text = t('dashboard.expire_date', {date: item.expiry_date});
+            if (item.auto_renewal) text += ' · ' + t('dashboard.auto_renewal_on');
             return text;
         },
         probeErrorSummary(msg) {
-            if (!msg) return '探测失败';
-            if (/context deadline exceeded|timeout|timed out/i.test(msg)) return '连接超时';
-            if (/connection refused/i.test(msg)) return '连接被拒绝';
-            if (/no such host|dns/i.test(msg)) return '域名解析失败';
-            if (/certificate|tls|x509/i.test(msg)) return 'TLS/证书错误';
+            if (!msg) return t('dashboard.probe_fail_generic');
+            if (/context deadline exceeded|timeout|timed out/i.test(msg)) return t('dashboard.probe_timeout');
+            if (/connection refused/i.test(msg)) return t('dashboard.probe_conn_refused');
+            if (/no such host|dns/i.test(msg)) return t('dashboard.probe_dns_fail');
+            if (/certificate|tls|x509/i.test(msg)) return t('dashboard.probe_tls_error');
             if (/^HTTP \d+/.test(msg)) return msg;
             return msg.length > 40 ? msg.slice(0, 40) + '…' : msg;
         },
         hostSummary() {
             const parts = [];
             if (this.hostLatest.hostname) parts.push(this.hostLatest.hostname);
-            if (this.hostLatest.cpu_cores) parts.push(this.hostLatest.cpu_cores + ' 核');
-            if (this.hostLatest.uptime_seconds) parts.push('运行 ' + formatUptime(this.hostLatest.uptime_seconds));
-            return parts.join(' · ') || '暂无数据';
+            if (this.hostLatest.cpu_cores) parts.push(t('dashboard.cores', {count: this.hostLatest.cpu_cores}));
+            if (this.hostLatest.uptime_seconds) parts.push(t('dashboard.uptime', {value: formatUptime(this.hostLatest.uptime_seconds)}));
+            return parts.join(' · ') || t('dashboard.no_data');
         },
         async loadHostLatest() {
             try { const d = await api('/api/dashboard/host-metrics/latest'); this.hostLatest = d.data || {}; } catch(e) {}

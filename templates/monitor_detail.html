@@ -3,18 +3,18 @@
 <div x-data="monitorDetail()" class="p-6">
     <div class="flex items-center justify-between mb-4">
         <div>
-            <h2 class="text-lg font-semibold text-purple-300" x-text="server.name || '加载中...'"></h2>
+            <h2 class="text-lg font-semibold text-purple-300" x-text="server.name || t('common.loading')"></h2>
             <div class="text-xs text-gray-500 mt-1" x-text="server.ip_address"></div>
         </div>
         <div class="flex gap-2">
             <select @change="changeRange($event.target.value)" class="input-field w-28 text-sm">
-                <option value="24h">24小时</option>
-                <option value="7d">7天</option>
-                <option value="15d">15天</option>
-                <option value="30d">30天</option>
+                <option value="24h">{{t .Lang "dashboard.range_24h"}}</option>
+                <option value="7d">{{t .Lang "dashboard.range_7d"}}</option>
+                <option value="15d">{{t .Lang "dashboard.range_15d"}}</option>
+                <option value="30d">{{t .Lang "dashboard.range_30d"}}</option>
             </select>
-            <a :href="'../servers/'+server.id" class="btn-secondary text-sm" x-show="server.id">服务器详情</a>
-            <a href="../monitor" class="btn-secondary text-sm">返回</a>
+            <a :href="'../servers/'+server.id" class="btn-secondary text-sm" x-show="server.id">{{t .Lang "title.server_detail"}}</a>
+            <a href="../monitor" class="btn-secondary text-sm">{{t .Lang "monitor.back"}}</a>
         </div>
     </div>
 
@@ -26,19 +26,19 @@
     </div>
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" x-show="!loading">
         <div class="card">
-            <div class="text-xs text-gray-400">CPU</div>
+            <div class="text-xs text-gray-400">{{t .Lang "dashboard.cpu"}}</div>
             <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'cpu_percent', server.cpu_cores)" x-text="monitorMetricText(latest, 'cpu_percent')"></div>
         </div>
         <div class="card">
-            <div class="text-xs text-gray-400">内存</div>
+            <div class="text-xs text-gray-400">{{t .Lang "dashboard.memory"}}</div>
             <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'memory_percent', server.cpu_cores)" x-text="monitorMetricText(latest, 'memory_percent')"></div>
         </div>
         <div class="card">
-            <div class="text-xs text-gray-400">磁盘</div>
+            <div class="text-xs text-gray-400">{{t .Lang "dashboard.disk"}}</div>
             <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'disk_percent', server.cpu_cores)" x-text="monitorMetricText(latest, 'disk_percent')"></div>
         </div>
         <div class="card">
-            <div class="text-xs text-gray-400">负载 (1m)</div>
+            <div class="text-xs text-gray-400">{{t .Lang "dashboard.load_1m"}}</div>
             <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'load_avg_1', server.cpu_cores)" x-text="monitorMetricText(latest, 'load_avg_1')"></div>
         </div>
     </div>

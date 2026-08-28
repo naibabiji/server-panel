@@ -2,13 +2,13 @@
 {{define "provider_list_content"}}
 <div x-data="providerList()" x-init="fetch()" class="p-6">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <input type="text" x-model="search" @input="resetAndFetch()" placeholder="搜索服务商..." class="input-field w-48">
-        <a href="providers/new" class="btn-primary text-sm">添加服务商</a>
+        <input type="text" x-model="search" @input="resetAndFetch()" placeholder="{{t .Lang "provider.search_placeholder"}}" class="input-field w-48">
+        <a href="providers/new" class="btn-primary text-sm">{{t .Lang "provider.add"}}</a>
     </div>
     <div class="border border-[#2a3038] bg-[#171b21] overflow-x-auto">
         <table class="w-full">
             <thead><tr>
-                <th class="table-header">名称</th><th class="table-header">官网</th><th class="table-header">联系方式</th><th class="table-header">服务数量</th><th class="table-header">备注</th><th class="table-header">操作</th>
+                <th class="table-header">{{t .Lang "server.col_name"}}</th><th class="table-header">{{t .Lang "provider.col_website"}}</th><th class="table-header">{{t .Lang "provider.col_contact"}}</th><th class="table-header">{{t .Lang "provider.col_service_count"}}</th><th class="table-header">{{t .Lang "server_form.notes_label"}}</th><th class="table-header">{{t .Lang "server.col_actions"}}</th>
             </tr></thead>
             <tbody>
             <template x-for="p in items" :key="p.id">
@@ -19,23 +19,23 @@
                     <td class="table-cell text-gray-400" x-text="p.server_count || 0"></td>
                     <td class="table-cell text-gray-400 text-sm whitespace-pre-wrap" x-text="p.notes||'--'"></td>
                     <td class="table-cell">
-                        <a :href="'providers/'+p.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">详情</a>
-                        <a :href="'providers/'+p.id+'/edit'" class="text-sm text-purple-300 hover:text-purple-200 mr-2">编辑</a>
-                        <a href="#" @click.prevent="del(p.id)" class="text-sm text-red-400 hover:text-red-300">删除</a>
+                        <a :href="'providers/'+p.id" class="text-sm text-blue-400 hover:text-blue-300 mr-2">{{t .Lang "common.detail"}}</a>
+                        <a :href="'providers/'+p.id+'/edit'" class="text-sm text-purple-300 hover:text-purple-200 mr-2">{{t .Lang "common.edit"}}</a>
+                        <a href="#" @click.prevent="del(p.id)" class="text-sm text-red-400 hover:text-red-300">{{t .Lang "common.delete"}}</a>
                     </td>
                 </tr>
             </template>
             </tbody>
         </table>
-        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">暂无服务商</div>
+        <div class="text-center text-gray-500 py-8 text-sm" x-show="!loading && items.length==0">{{t .Lang "provider.empty"}}</div>
         <div class="flex flex-wrap items-center justify-between gap-3 border-t border-[#202833] px-4 py-3 text-sm text-gray-400" x-show="total > pageSize">
-            <div x-text="'第 ' + pageStart + '-' + pageEnd + ' 条，共 ' + total + ' 条'"></div>
+            <div x-text="t('common.pagination_summary', {start: pageStart, end: pageEnd, total: total})"></div>
             <div class="flex items-center gap-2">
-                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">首页</button>
-                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40">上一页</button>
+                <button @click="goPage(1)" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.first_page')"></button>
+                <button @click="prevPage()" :disabled="page <= 1" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.prev_page')"></button>
                 <span class="px-2" x-text="page + ' / ' + totalPages"></span>
-                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">下一页</button>
-                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40">末页</button>
+                <button @click="nextPage()" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.next_page')"></button>
+                <button @click="goPage(totalPages)" :disabled="page >= totalPages" class="btn-secondary text-xs disabled:opacity-40" x-text="t('common.last_page')"></button>
             </div>
         </div>
     </div>
@@ -69,7 +69,7 @@ function providerList() {
             return 'https://' + url;
         },
         async del(id) {
-            if (!await confirmModal('确认删除？')) return;
+            if (!await confirmModal(t('provider.delete_confirm'))) return;
             try { await api('/api/providers/'+id, {method:'DELETE'}); await this.fetch(); } catch(e) { showToast(e.message,'error'); }
         }
     }

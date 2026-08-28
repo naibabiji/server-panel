@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
 	"golang.org/x/crypto/bcrypt"
@@ -27,7 +28,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Password string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse("请提供用户名和密码"))
+		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "auth.missing_credentials")))
 		return
 	}
 
@@ -44,14 +45,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if h.AttemptTracker != nil {
 			h.AttemptTracker.RecordAttempt(middleware.ClientIP(c), "web_login")
 		}
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("用户名或密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "auth.invalid_credentials")))
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)) != nil {
 		if h.AttemptTracker != nil {
 			h.AttemptTracker.RecordAttempt(middleware.ClientIP(c), "web_login")
 		}
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse("用户名或密码错误"))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "auth.invalid_credentials")))
 		return
 	}
 
@@ -75,7 +76,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	}
 	c.SetCookie("sp_session", "", -1, "/", "", middleware.IsSecureRequest(c), true)
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message": "已登出",
+		"message": i18n.TE(c.Request, "auth.logged_out"),
 	}))
 }
 

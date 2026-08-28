@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/executor"
+	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/models"
 )
 
@@ -34,6 +35,7 @@ var sysPkgCache sysPkgCacheState
 var sysUpdateMu sync.Mutex
 
 const sysPkgCacheTTL = 5 * time.Minute
+
 // apt 检查失败（非 Debian 主机/无权限）时缓存错误一小段时间，
 // 避免每次缓存过期都重新执行 shell 命令。
 const sysPkgErrTTL = 60 * time.Second
@@ -59,7 +61,7 @@ func (h *SystemUpdateHandler) Check(c *gin.Context) {
 	if sysPkgCache.lastErr != nil && time.Now().Before(sysPkgCache.errExpireAt) {
 		err := sysPkgCache.lastErr
 		sysPkgCache.mu.Unlock()
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("检查系统更新失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.system_update.check_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 	sysPkgCache.mu.Unlock()
@@ -70,7 +72,7 @@ func (h *SystemUpdateHandler) Check(c *gin.Context) {
 		sysPkgCache.lastErr = err
 		sysPkgCache.errExpireAt = time.Now().Add(sysPkgErrTTL)
 		sysPkgCache.mu.Unlock()
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("检查系统更新失败: "+err.Error()))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.system_update.check_failed", i18n.P{"error": err.Error()})))
 		return
 	}
 
@@ -92,7 +94,7 @@ func (h *SystemUpdateHandler) Check(c *gin.Context) {
 // action — the frontend must confirm with the admin before calling it.
 func (h *SystemUpdateHandler) Update(c *gin.Context) {
 	if !sysUpdateMu.TryLock() {
-		c.JSON(http.StatusConflict, models.ErrorResponse("已有系统更新任务正在执行，请稍后再试"))
+		c.JSON(http.StatusConflict, models.ErrorResponse(i18n.TE(c.Request, "errors.system_update.task_running")))
 		return
 	}
 	defer sysUpdateMu.Unlock()
@@ -101,7 +103,7 @@ func (h *SystemUpdateHandler) Update(c *gin.Context) {
 	out1, err := runAptCommand("update")
 	if err != nil {
 		executor.RecordOperationLog("system_update", "apt", "failed", "apt update failed: "+err.Error())
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("apt update 失败: "+err.Error()+"\n"+out1))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.system_update.apt_update_failed", i18n.P{"error": err.Error(), "output": out1})))
 		return
 	}
 	out2, err := runAptCommand("upgrade", "-y",
@@ -109,7 +111,7 @@ func (h *SystemUpdateHandler) Update(c *gin.Context) {
 		"-o", "Dpkg::Options::=--force-confold")
 	if err != nil {
 		executor.RecordOperationLog("system_update", "apt", "failed", "apt upgrade failed: "+err.Error())
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse("apt upgrade 失败: "+err.Error()+"\n"+out2))
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.system_update.apt_upgrade_failed", i18n.P{"error": err.Error(), "output": out2})))
 		return
 	}
 
@@ -119,7 +121,7 @@ func (h *SystemUpdateHandler) Update(c *gin.Context) {
 
 	executor.RecordOperationLog("system_update", "apt", "success", "apt update && apt upgrade -y completed")
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
-		"message": "系统更新完成",
+		"message": i18n.TE(c.Request, "errors.system_update.done"),
 		"output":  out1 + "\n" + out2,
 	}))
 }
