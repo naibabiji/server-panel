@@ -23,6 +23,8 @@ type ServerHandler struct {
 	DB *sql.DB
 }
 
+const effectiveServerStatusSQL = "CASE WHEN s.expiry_date != '' AND s.expiry_date < date('now') THEN 'expired' ELSE 'active' END"
+
 func (h *ServerHandler) List(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "30"))
@@ -48,7 +50,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 		args = append(args, s, s, s)
 	}
 	if status != "" {
-		where += " AND s.status = ?"
+		where += " AND " + effectiveServerStatusSQL + " = ?"
 		args = append(args, status)
 	}
 	if customerID != "" {
@@ -70,9 +72,10 @@ func (h *ServerHandler) List(c *gin.Context) {
 	offset := (page - 1) * pageSize
 	query := `SELECT s.id, s.name, s.ip_address, s.server_type, s.os, s.customer_id, COALESCE(u.name,''),
 		s.cpu_cores, s.ram_gb, s.disk_gb, s.bandwidth, s.provider_id, COALESCE(p.name,''),
-		s.location, s.ssh_port, s.ssh_username, s.panel_type, s.panel_url, s.panel_username,
+		s.location, s.ssh_port, s.ssh_username, s.panel_type,
+		(SELECT COUNT(*) FROM websites w WHERE w.server_id = s.id), s.panel_url, s.panel_username,
 		s.purchase_date, s.expiry_date, s.renewal_cycle, s.auto_renewal, s.purchase_price, s.currency,
-		s.status, s.agent_version, s.last_seen_at, s.is_online,
+		` + effectiveServerStatusSQL + `, s.agent_version, s.last_seen_at, s.is_online,
 		s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at, s.http_probe_last_error,
 		s.tcp_reachable, s.tcp_reachable_checked_at,
 		s.status_page_enabled, s.notes, s.created_at, s.updated_at
@@ -96,7 +99,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 		var lastSeen, probeLast, tcpReachableAt sql.NullString
 		err := rows.Scan(&s.ID, &s.Name, &s.IPAddress, &s.ServerType, &s.OS, &s.CustomerID, &s.CustomerName,
 			&s.CPUCores, &s.RAMGB, &s.DiskGB, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
-			&s.Location, &s.SSHPort, &s.SSHUsername, &s.PanelType, &s.PanelURL, &s.PanelUsername,
+			&s.Location, &s.SSHPort, &s.SSHUsername, &s.PanelType, &s.WebsiteCount, &s.PanelURL, &s.PanelUsername,
 			&s.PurchaseDate, &s.ExpiryDate, &s.RenewalCycle, &s.AutoRenewal, &s.PurchasePrice, &s.Currency,
 			&s.Status, &s.AgentVersion, &lastSeen, &s.IsOnline,
 			&s.HTTPProbeEnabled, &probeHealthy, &probeLast, &s.HTTPProbeLastError,
@@ -162,7 +165,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 		s.cpu_cores, s.ram_gb, s.disk_gb, s.bandwidth, s.provider_id, COALESCE(p.name,''),
 		s.location, s.ssh_port, s.ssh_username, s.ssh_password_enc, s.panel_type, s.panel_url, s.panel_username,
 		s.panel_password_enc, s.purchase_date, s.expiry_date, s.renewal_cycle, s.auto_renewal, s.purchase_price, s.currency,
-		s.status, s.agent_api_key_enc, s.agent_version, s.last_seen_at, s.is_online,
+		`+effectiveServerStatusSQL+`, s.agent_api_key_enc, s.agent_version, s.last_seen_at, s.is_online,
 		s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at, s.http_probe_last_error,
 		s.tcp_reachable, s.tcp_reachable_checked_at,
 		s.status_page_enabled, s.status_page_token, s.notes, s.created_at, s.updated_at
@@ -224,9 +227,7 @@ func (h *ServerHandler) Create(c *gin.Context) {
 		return
 	}
 	s.ExpiryDate = models.RenewedExpiryDate(s.ExpiryDate, s.RenewalCycle, s.AutoRenewal, time.Now())
-	if s.AutoRenewal == 1 && s.ExpiryDate != "" {
-		s.Status = models.ServerStatusActive
-	}
+	s.Status = models.ServerStatusForExpiry(s.ExpiryDate, time.Now())
 
 	result, err := h.DB.Exec(
 		`INSERT INTO servers (name, ip_address, server_type, os, customer_id, cpu_cores, ram_gb, disk_gb, bandwidth,
@@ -396,9 +397,7 @@ func (h *ServerHandler) Update(c *gin.Context) {
 		return
 	}
 	s.ExpiryDate = models.RenewedExpiryDate(s.ExpiryDate, s.RenewalCycle, s.AutoRenewal, time.Now())
-	if s.AutoRenewal == 1 && s.ExpiryDate != "" {
-		s.Status = models.ServerStatusActive
-	}
+	s.Status = models.ServerStatusForExpiry(s.ExpiryDate, time.Now())
 
 	query := `UPDATE servers SET name=?, ip_address=?, server_type=?, os=?, customer_id=?,
 		cpu_cores=?, ram_gb=?, disk_gb=?, bandwidth=?, provider_id=?, location=?,
@@ -464,13 +463,12 @@ func (h *ServerHandler) GetStats(c *gin.Context) {
 	h.DB.QueryRow("SELECT COUNT(*) FROM servers").Scan(&total)
 	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE is_online = 1").Scan(&online)
 	h.DB.QueryRow(`SELECT COUNT(*) FROM servers
-		WHERE is_online = 0 AND status = 'active'
+		WHERE is_online = 0
 		AND (agent_version != '' OR last_seen_at IS NOT NULL)`).Scan(&offline)
 	// Same "expiring"/"overdue" split as /api/dashboard/stats - expiring is
-	// the next-30-days window, overdue is already past expiry_date and
-	// still active (not yet renewed/handled).
-	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date >= date('now') AND expiry_date <= date('now','+30 days') AND status = 'active'").Scan(&expiring)
-	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date < date('now') AND status = 'active'").Scan(&overdue)
+	// the next-30-days window and overdue is already past expiry_date.
+	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date >= date('now') AND expiry_date <= date('now','+30 days')").Scan(&expiring)
+	h.DB.QueryRow("SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date < date('now')").Scan(&overdue)
 
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]int{
 		"total":    total,

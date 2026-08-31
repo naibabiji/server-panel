@@ -14,16 +14,15 @@ import (
 )
 
 // Regression test for the "overdue records vanish from the dashboard"
-// bug: a server/website whose expiry_date is in the past but is still
-// status='active' (i.e. never renewed/handled) must keep showing up,
-// in its own overdue_* bucket, without crowding out items that are
-// genuinely expiring soon in the next 30 days.
+// bug: a server whose expiry_date is in the past must keep showing up in
+// its own overdue bucket after its derived status becomes expired, without
+// crowding out items that are genuinely expiring soon in the next 30 days.
 func TestDashboardGetExpiringSplitsOverdueFromUpcoming(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	db := newDashboardTestDB(t)
 
 	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, auto_renewal, status) VALUES (1, 'soon-server', date('now','+5 days'), 1, 'active')")
-	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, status) VALUES (2, 'overdue-server', date('now','-40 days'), 'active')")
+	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, status) VALUES (2, 'overdue-server', date('now','-40 days'), 'expired')")
 	mustExecDashboard(t, db, "INSERT INTO websites (id, name, domain, server_id, expiry_date, status) VALUES (1, 'soon-site', 'soon.example', 1, date('now','+5 days'), 'active')")
 	mustExecDashboard(t, db, "INSERT INTO websites (id, name, domain, server_id, expiry_date, status) VALUES (2, 'overdue-site', 'overdue.example', 1, date('now','-40 days'), 'active')")
 
@@ -103,7 +102,7 @@ func TestDashboardGetStatsReportsOverdueSeparatelyFromExpiring(t *testing.T) {
 	db := newDashboardTestDB(t)
 
 	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, status) VALUES (1, 'soon', date('now','+5 days'), 'active')")
-	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, status) VALUES (2, 'overdue', date('now','-5 days'), 'active')")
+	mustExecDashboard(t, db, "INSERT INTO servers (id, name, expiry_date, status) VALUES (2, 'overdue', date('now','-5 days'), 'expired')")
 
 	h := &DashboardHandler{}
 	w := performDashboardRequest(h.GetStats)

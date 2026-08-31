@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 // PanelType 常量
 const (
 	PanelTypeNone        = "none"
@@ -31,6 +33,15 @@ const (
 )
 
 var ServerStatuses = []string{ServerStatusActive, ServerStatusExpired}
+
+// ServerStatusForExpiry derives the lifecycle status from the expiry date.
+// A server remains active through its expiry date and expires the next day.
+func ServerStatusForExpiry(expiryDate string, now time.Time) string {
+	if expiryDate != "" && expiryDate < now.UTC().Format(time.DateOnly) {
+		return ServerStatusExpired
+	}
+	return ServerStatusActive
+}
 
 // RenewalCycle 常量
 const (
@@ -69,6 +80,7 @@ type Server struct {
 	SSHPasswordEnc     string  `json:"-"`
 	SSHPassword        string  `json:"ssh_password,omitempty"`
 	PanelType          string  `json:"panel_type"`
+	WebsiteCount       int     `json:"website_count"`
 	PanelURL           string  `json:"panel_url"`
 	PanelUsername      string  `json:"panel_username"`
 	PanelPasswordEnc   string  `json:"-"`

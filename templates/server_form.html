@@ -166,12 +166,6 @@
                 <div class="server-form-title">{{t .Lang "server_form.section_status"}}</div>
                 <div class="server-form-fields compact">
                     <div>
-                        <label class="label">{{t .Lang "server_form.status_label"}}</label>
-                        <select x-model="form.status" class="input-field">
-                            <option value="active">{{t .Lang "common.status_active"}}</option><option value="expired">{{t .Lang "common.status_expired"}}</option>
-                        </select>
-                    </div>
-                    <div>
                         <label class="label">{{t .Lang "server_form.http_probe_label"}}</label>
                         <select x-model="form.http_probe_enabled" class="input-field">
                             <option :value="0">{{t .Lang "server_form.probe_off"}}</option><option :value="1">{{t .Lang "server_form.probe_on"}}</option>
@@ -196,7 +190,7 @@
 function serverForm() {
     return {
         isEdit: false, id: null, saving: false, done: false, loading: false,
-        form: { name:'', ip_address:'', server_type:'vps', os:'', customer_id:'', cpu_cores:'', ram_gb:'', disk_gb:'', bandwidth:'', provider_id:'', location:'', ssh_port:22, ssh_username:'root', ssh_password:'', panel_type:'none', panel_url:'', panel_username:'', panel_password:'', purchase_date:'', expiry_date:'', renewal_cycle:'', auto_renewal:0, purchase_price:0, currency:'USD', status:'active', http_probe_enabled:0, notes:'' },
+        form: { name:'', ip_address:'', server_type:'vps', os:'', customer_id:'', cpu_cores:'', ram_gb:'', disk_gb:'', bandwidth:'', provider_id:'', location:'', ssh_port:22, ssh_username:'root', ssh_password:'', panel_type:'none', panel_url:'', panel_username:'', panel_password:'', purchase_date:'', expiry_date:'', renewal_cycle:'', auto_renewal:0, purchase_price:0, currency:'USD', http_probe_enabled:0, notes:'' },
         customers: [], providers: [], osList: [],
         async init() {
             const path = window.location.pathname;

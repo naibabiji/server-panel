@@ -25,7 +25,7 @@
         <table class="w-full">
             <thead><tr>
                 <th class="table-header">{{t .Lang "server.col_name"}}</th><th class="table-header">{{t .Lang "server.col_ip"}}</th><th class="table-header">{{t .Lang "server.col_provider"}}</th><th class="table-header">{{t .Lang "server.col_type"}}</th>
-                <th class="table-header">{{t .Lang "server.col_panel"}}</th><th class="table-header">{{t .Lang "server.col_status"}}</th><th class="table-header">{{t .Lang "server.col_online"}}</th>
+                <th class="table-header">{{t .Lang "server.col_panel"}}</th><th class="table-header">{{t .Lang "server.col_website_count"}}</th><th class="table-header">{{t .Lang "server.col_status"}}</th><th class="table-header">{{t .Lang "server.col_online"}}</th>
                 <th class="table-header cursor-pointer select-none hover:text-gray-200" @click="toggleSort('expiry_date')">
                     {{t .Lang "server.col_expiry"}}<span x-text="sortIndicator('expiry_date')"></span>
                 </th>
@@ -38,7 +38,8 @@
                     <td class="table-cell text-gray-400" x-text="s.ip_address || '--'"></td>
                     <td class="table-cell text-gray-400" x-text="s.provider_name || '--'"></td>
                     <td class="table-cell"><span class="badge-info" x-text="s.server_type"></span></td>
-                    <td class="table-cell text-gray-400" x-text="s.panel_type == 'none' ? '--' : s.panel_type"></td>
+                    <td class="table-cell text-gray-400" x-text="panelTypeLabel(s.panel_type)"></td>
+                    <td class="table-cell text-gray-400" x-text="s.website_count || 0"></td>
                     <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?t('common.status_active'):t('common.status_expired')"></span></td>
                     <td class="table-cell"><span :class="serverStatus(s).cls" x-text="serverStatus(s).label"></span></td>
                     <td class="table-cell" :class="expiryClass(s.expiry_date)" x-text="s.expiry_date || '--'"></td>
@@ -120,6 +121,18 @@ function serverList() {
             if (this.sortBy !== field) return '';
             return this.sortOrder === 'asc' ? ' ▲' : ' ▼';
         },
+        panelTypeLabel(value) {
+            const labels = {
+                'wp-panel': 'WP Panel',
+                'baota': t('server_form.panel_baota'),
+                '1panel': '1Panel',
+                'cyberpanel': 'CyberPanel',
+                'directadmin': 'DirectAdmin',
+                'cpanel': 'cPanel',
+                'other': t('server_form.panel_other'),
+            };
+            return !value || value === 'none' ? '--' : (labels[value] || value);
+        },
         expiryClass,
         async renew(s) {
             const newDate = await inputModal({
@@ -133,7 +146,6 @@ function serverList() {
                 const d = await api('/api/servers/' + s.id);
                 const full = d.data;
                 full.expiry_date = newDate;
-                full.status = 'active';
                 await api('/api/servers/' + s.id, { method: 'PUT', body: full });
                 showToast(t('common.renew_success'), 'success');
                 await this.fetch();

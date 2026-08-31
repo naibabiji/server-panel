@@ -52,7 +52,7 @@ var i18nKeys = []string{
 	"server_form.prompt_customer_name", "server_form.customer_created",
 	"server_form.prompt_provider_name", "server_form.provider_created",
 	"server_form.name_required", "server_form.fallback_customer_name",
-	"server_form.fallback_provider_name",
+	"server_form.fallback_provider_name", "server_form.panel_baota", "server_form.panel_other",
 	"common.copy", "common.copied_default",
 	"common.status_online", "common.status_probe_error", "common.status_offline", "common.status_unknown",
 	"server_detail.account_label", "server_detail.agent_installed", "server_detail.agent_not_installed",

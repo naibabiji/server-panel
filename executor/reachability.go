@@ -51,7 +51,7 @@ func checkReachability() {
 
 	rows, err := db.Query(
 		`SELECT id, ip_address, ssh_port FROM servers
-		 WHERE is_online = 0 AND status = 'active' AND ip_address != ''
+		 WHERE is_online = 0 AND ip_address != ''
 		 AND (agent_version != '' OR last_seen_at IS NOT NULL)`)
 	if err != nil {
 		log.Printf("reachability checker query failed: %v", err)

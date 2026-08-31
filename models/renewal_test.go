@@ -74,3 +74,23 @@ func TestRenewedExpiryDate(t *testing.T) {
 		})
 	}
 }
+
+func TestServerStatusForExpiry(t *testing.T) {
+	now := time.Date(2026, time.August, 31, 12, 0, 0, 0, time.Local)
+	tests := []struct {
+		name, expiryDate, want string
+	}{
+		{name: "no expiry date", want: ServerStatusActive},
+		{name: "future", expiryDate: "2026-09-01", want: ServerStatusActive},
+		{name: "expiry day", expiryDate: "2026-08-31", want: ServerStatusActive},
+		{name: "past", expiryDate: "2026-08-30", want: ServerStatusExpired},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ServerStatusForExpiry(tt.expiryDate, now); got != tt.want {
+				t.Fatalf("ServerStatusForExpiry(%q) = %q, want %q", tt.expiryDate, got, tt.want)
+			}
+		})
+	}
+}

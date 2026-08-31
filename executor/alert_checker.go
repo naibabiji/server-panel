@@ -127,7 +127,7 @@ func checkExpiryAlerts(db *sql.DB, alertType, table, dateCol string) {
 		itemRows, err := db.Query(
 			`SELECT id, name, CAST(julianday(expiry_date) - julianday(date('now')) AS INTEGER), auto_renewal
 			 FROM servers
-			 WHERE expiry_date != '' AND expiry_date <= date('now', ?) AND status = 'active'`,
+			 WHERE expiry_date != '' AND expiry_date <= date('now', ?)`,
 			dateModifier)
 		if err != nil {
 			return
@@ -425,7 +425,7 @@ func checkOfflineAlerts(db *sql.DB) {
 			        THEN tcp_reachable
 			        ELSE NULL
 			   END
-			 FROM servers WHERE is_online = 0 AND status = 'active'
+			 FROM servers WHERE is_online = 0
 			 AND last_seen_at IS NOT NULL AND last_seen_at < datetime('now', ? || ' minutes')`,
 			reachabilityFreshnessWindow, strconv.Itoa(-minutes))
 		if err != nil {

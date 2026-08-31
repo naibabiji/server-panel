@@ -24,11 +24,11 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 	db.QueryRow("SELECT COUNT(*) FROM servers").Scan(&total)
 	db.QueryRow("SELECT COUNT(*) FROM servers WHERE is_online = 1").Scan(&online)
 	db.QueryRow(`SELECT COUNT(*) FROM servers
-		WHERE is_online = 0 AND status = 'active'
+		WHERE is_online = 0
 		AND (agent_version != '' OR last_seen_at IS NOT NULL)`).Scan(&offline)
-	db.QueryRow(`SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date <= date('now','+30 days') AND expiry_date >= date('now') AND status = 'active'`).Scan(&expiringServers)
+	db.QueryRow(`SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date <= date('now','+30 days') AND expiry_date >= date('now')`).Scan(&expiringServers)
 	db.QueryRow(`SELECT COUNT(*) FROM websites WHERE expiry_date != '' AND expiry_date <= date('now','+30 days') AND expiry_date >= date('now') AND status = 'active'`).Scan(&expiringWebsites)
-	db.QueryRow(`SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date < date('now') AND status = 'active'`).Scan(&overdueServers)
+	db.QueryRow(`SELECT COUNT(*) FROM servers WHERE expiry_date != '' AND expiry_date < date('now')`).Scan(&overdueServers)
 	db.QueryRow(`SELECT COUNT(*) FROM websites WHERE expiry_date != '' AND expiry_date < date('now') AND status = 'active'`).Scan(&overdueWebsites)
 	db.QueryRow("SELECT COUNT(*) FROM websites").Scan(&totalWebsites)
 	db.QueryRow("SELECT COUNT(*) FROM alert_log WHERE resolved = 0 AND created_at > datetime('now','-7 days')").Scan(&recentAlerts)
@@ -60,7 +60,7 @@ func queryExpiringServers(db *sql.DB, extraWhere string) ([]ExpiringItem, error)
 		 auto_renewal,
 		 CAST(julianday(expiry_date) - julianday(date('now')) AS INTEGER) AS days_left
 		 FROM servers
-		 WHERE expiry_date != '' AND status = 'active' AND ` + extraWhere + `
+		 WHERE expiry_date != '' AND ` + extraWhere + `
 		 ORDER BY expiry_date ASC LIMIT 10`)
 	if err != nil {
 		return nil, err
