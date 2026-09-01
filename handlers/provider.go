@@ -175,7 +175,7 @@ func (h *ProviderHandler) GetPrivateNotes(c *gin.Context) {
 	}
 	sessionToken, ok := getSessionToken(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "session.session_expired")))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(i18n.TE(c.Request, "session.session_expired"), models.ErrorCodeSessionExpired))
 		return
 	}
 	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
@@ -228,7 +228,7 @@ func (h *ProviderHandler) ClearPrivateNotes(c *gin.Context) {
 	}
 	sessionToken, ok := getSessionToken(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "session.session_expired")))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(i18n.TE(c.Request, "session.session_expired"), models.ErrorCodeSessionExpired))
 		return
 	}
 	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {

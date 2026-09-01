@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/naibabiji/server-panel/i18n"
+	"github.com/naibabiji/server-panel/models"
 )
 
 type Session struct {
@@ -79,13 +80,13 @@ func SessionRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := c.Cookie("sp_session")
 		if err != nil || token == "" {
-			abortSession(c, i18n.TE(c.Request, "session.please_login"))
+			abortSession(c, i18n.TE(c.Request, "session.please_login"), models.ErrorCodeSessionRequired)
 			return
 		}
 
 		session := GlobalSessionStore.Get(token)
 		if session == nil {
-			abortSession(c, i18n.TE(c.Request, "session.session_expired"))
+			abortSession(c, i18n.TE(c.Request, "session.session_expired"), models.ErrorCodeSessionExpired)
 			return
 		}
 
@@ -104,7 +105,7 @@ func SessionRequired() gin.HandlerFunc {
 	}
 }
 
-func abortSession(c *gin.Context, msg string) {
+func abortSession(c *gin.Context, msg, code string) {
 	c.SetCookie("sp_session", "", -1, "/", "", IsSecureRequest(c), true)
 
 	if isPageRequest(c) {
@@ -113,10 +114,7 @@ func abortSession(c *gin.Context, msg string) {
 		return
 	}
 
-	c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-		"success": false,
-		"message": msg,
-	})
+	c.AbortWithStatusJSON(http.StatusUnauthorized, models.ErrorResponseWithCode(msg, code))
 }
 
 func isPageRequest(c *gin.Context) bool {

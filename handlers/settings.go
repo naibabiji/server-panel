@@ -513,7 +513,7 @@ func (h *SettingsHandler) UpdateAccount(c *gin.Context) {
 		var currentHash string
 		err := h.db().QueryRow("SELECT password_hash FROM admin_users WHERE username = ?", currentUser).Scan(&currentHash)
 		if err != nil || bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.OldPassword)) != nil {
-			c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
+			c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 			return
 		}
 		newUser := req.WebUsername
@@ -637,11 +637,11 @@ func (h *SettingsHandler) UpdateWebAccount(c *gin.Context) {
 	currentUser := h.sessionUser(c)
 	var currentHash string
 	if err := h.db().QueryRow("SELECT password_hash FROM admin_users WHERE username = ?", currentUser).Scan(&currentHash); err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.OldPassword)) != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 		return
 	}
 
@@ -676,11 +676,11 @@ func (h *SettingsHandler) ChangePassword(c *gin.Context) {
 	currentUser := h.sessionUser(c)
 	var currentHash string
 	if err := h.db().QueryRow("SELECT password_hash FROM admin_users WHERE username = ?", currentUser).Scan(&currentHash); err != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.OldPassword)) != nil {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.old_password_wrong")))
 		return
 	}
 

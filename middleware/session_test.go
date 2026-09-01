@@ -1,12 +1,14 @@
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/naibabiji/server-panel/models"
 )
 
 func TestSessionRequiredRefreshesCookieMaxAge(t *testing.T) {
@@ -67,5 +69,38 @@ func TestSessionRequiredRejectsMissingCookie(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "请先登录") {
 		t.Errorf("body = %q, want it to mention 请先登录", w.Body.String())
+	}
+	var response models.ApiResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.ErrorCode != models.ErrorCodeSessionRequired {
+		t.Errorf("error_code = %q, want %q", response.ErrorCode, models.ErrorCodeSessionRequired)
+	}
+}
+
+func TestSessionRequiredMarksExpiredSession(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	router := gin.New()
+	router.GET("/protected", SessionRequired(), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+	req.AddCookie(&http.Cookie{Name: "sp_session", Value: "expired-or-unknown"})
+	req.Header.Set("Accept", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	var response models.ApiResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusUnauthorized)
+	}
+	if response.ErrorCode != models.ErrorCodeSessionExpired {
+		t.Errorf("error_code = %q, want %q", response.ErrorCode, models.ErrorCodeSessionExpired)
 	}
 }

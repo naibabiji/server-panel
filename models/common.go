@@ -1,10 +1,16 @@
 package models
 
 type ApiResponse struct {
-	Success bool        `json:"success"`
-	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
+	Success   bool        `json:"success"`
+	Message   string      `json:"message,omitempty"`
+	ErrorCode string      `json:"error_code,omitempty"`
+	Data      interface{} `json:"data,omitempty"`
 }
+
+const (
+	ErrorCodeSessionRequired = "SESSION_REQUIRED"
+	ErrorCodeSessionExpired  = "SESSION_EXPIRED"
+)
 
 type PaginatedResult struct {
 	Items    interface{} `json:"items"`
@@ -19,4 +25,8 @@ func SuccessResponse(data interface{}) ApiResponse {
 
 func ErrorResponse(msg string) ApiResponse {
 	return ApiResponse{Success: false, Message: msg}
+}
+
+func ErrorResponseWithCode(msg, code string) ApiResponse {
+	return ApiResponse{Success: false, Message: msg, ErrorCode: code}
 }

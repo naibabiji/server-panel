@@ -121,7 +121,7 @@ func (h *ViewPasswordHandler) Change(c *gin.Context) {
 		return
 	}
 	if !VerifyPassword(req.OldPassword, hash) {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.old_wrong")))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.old_wrong")))
 		return
 	}
 
@@ -189,7 +189,7 @@ func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 		}
 		remaining := maxUnlockAttempts - unlockAttempts[ip]
 		unlockAttemptsMu.Unlock()
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.wrong_remaining", i18n.P{"remaining": strconv.Itoa(remaining)})))
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.wrong_remaining", i18n.P{"remaining": strconv.Itoa(remaining)})))
 		return
 	}
 
@@ -199,7 +199,7 @@ func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 
 	sessionToken, ok := getSessionToken(c)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse(i18n.TE(c.Request, "session.session_expired")))
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(i18n.TE(c.Request, "session.session_expired"), models.ErrorCodeSessionExpired))
 		return
 	}
 	token, err := CreateViewToken(sessionToken, ip)

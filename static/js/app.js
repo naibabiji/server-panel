@@ -197,21 +197,6 @@ function api(path, options = {}) {
 
     return fetch(url, { ...options, headers })
         .then(async (resp) => {
-            if (resp.status === 401 && !path.startsWith('/api/auth/login')) {
-                // 会话过期：跳转 /login。这里必须 throw（而非返回永不 settle 的
-                // Promise），否则 Promise.all 会被一个挂起的 Promise 永久拖死。
-                // silent 标记让 .catch 不再弹 toast（跳转本身已是反馈）。
-                if (!_authRedirecting) {
-                    _authRedirecting = true;
-                    window.location.href = prefix + '/login';
-                    // 真跳转时页面会卸载，定时器不会执行；若因某种原因未卸载，
-                    // 定时器复位 flag，避免后续真正的 428/401 被误判为已在跳转。
-                    setTimeout(() => { _authRedirecting = false; }, 0);
-                }
-                const e = new Error(t('common.session_expired_redirect'));
-                e.silent = true;
-                throw e;
-            }
             if (resp.status === 503) {
                 throw new Error('Service busy, please retry later');
             }
@@ -236,6 +221,20 @@ function api(path, options = {}) {
                 throw new Error(t('common.non_json_response', { status: resp.status }));
             }
             const data = await resp.json();
+            const sessionInvalid = resp.status === 401 &&
+                (data.error_code === 'SESSION_REQUIRED' || data.error_code === 'SESSION_EXPIRED');
+            if (sessionInvalid && !path.startsWith('/api/auth/login')) {
+                // 仅会话中间件的稳定错误码可以触发重登。业务凭据错误即使返回
+                // 401，也必须保留原始错误，避免把查看密码错误误判为会话过期。
+                if (!_authRedirecting) {
+                    _authRedirecting = true;
+                    window.location.href = prefix + '/login';
+                    setTimeout(() => { _authRedirecting = false; }, 0);
+                }
+                const e = new Error(t('common.session_expired_redirect'));
+                e.silent = true;
+                throw e;
+            }
             if (!resp.ok) {
                 console.error('API error:', resp.status, data);
                 throw new Error(data.message || 'Request failed (' + resp.status + ')');
