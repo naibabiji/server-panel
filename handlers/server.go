@@ -217,6 +217,9 @@ func (h *ServerHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.server.name_required")))
 		return
 	}
+	if !validateOptionalHTTPURL(c, &s.PanelURL) {
+		return
+	}
 
 	sshPasswordEnc, ok := encryptOptionalPassword(c, h.DB, s.SSHPassword)
 	if !ok {
@@ -385,6 +388,9 @@ func (h *ServerHandler) Update(c *gin.Context) {
 	}
 	if s.Name == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.server.name_required")))
+		return
+	}
+	if !validateOptionalHTTPURL(c, &s.PanelURL) {
 		return
 	}
 

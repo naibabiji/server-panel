@@ -14,7 +14,7 @@
             <template x-for="p in items" :key="p.id">
                 <tr class="border-t border-[#202833] hover:bg-[#1d232b]">
                     <td class="table-cell text-white"><a :href="'providers/'+p.id" class="hover:text-purple-200" x-text="p.name"></a></td>
-                    <td class="table-cell"><a :href="externalURL(p.website)" target="_blank" rel="noopener noreferrer" class="text-purple-400 hover:text-purple-300 text-sm" x-text="p.website||'--'"></a></td>
+                    <td class="table-cell"><a :href="safeExternalURL(p.website)" target="_blank" rel="noopener noreferrer" class="text-purple-400 hover:text-purple-300 text-sm" x-text="p.website||'--'"></a></td>
                     <td class="table-cell text-gray-400" x-text="p.contact||'--'"></td>
                     <td class="table-cell text-gray-400" x-text="p.server_count || 0"></td>
                     <td class="table-cell text-gray-400 text-sm whitespace-pre-wrap" x-text="p.notes||'--'"></td>
@@ -62,11 +62,6 @@ function providerList() {
                 await this.ensurePageHasItems(this.items);
             } catch(e) {}
             this.loading = false;
-        },
-        externalURL(url) {
-            if (!url) return '#';
-            if (/^https?:\/\//i.test(url)) return url;
-            return 'https://' + url;
         },
         async del(id) {
             if (!await confirmModal(t('provider.delete_confirm'))) return;

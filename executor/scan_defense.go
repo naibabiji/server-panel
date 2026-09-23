@@ -8,14 +8,17 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/naibabiji/server-panel/database"
 )
 
 const (
-	nftTable = "sp_filter"
-	nftSet4  = "banned_ipv4"
-	nftSet6  = "banned_ipv6"
+	nftTable          = "sp_filter"
+	nftSet4           = "banned_ipv4"
+	nftSet6           = "banned_ipv6"
+	nftSetSize        = 65536
+	maxBanReasonBytes = 256
 )
 
 var (
@@ -61,8 +64,8 @@ func initNFTablesRules(ports string) error {
 	_, _ = runNftCommand("delete", "table", "inet", nftTable)
 	commands := [][]string{
 		{"add", "table", "inet", nftTable},
-		{"add", "set", "inet", nftTable, nftSet4, "{ type ipv4_addr; }"},
-		{"add", "set", "inet", nftTable, nftSet6, "{ type ipv6_addr; }"},
+		{"add", "set", "inet", nftTable, nftSet4, fmt.Sprintf("{ type ipv4_addr; flags timeout; size %d; }", nftSetSize)},
+		{"add", "set", "inet", nftTable, nftSet6, fmt.Sprintf("{ type ipv6_addr; flags timeout; size %d; }", nftSetSize)},
 		{"add", "chain", "inet", nftTable, "input", "{ type filter hook input priority 0; policy accept; }"},
 		{"add", "rule", "inet", nftTable, "input", "ip", "saddr", "@" + nftSet4, "tcp", "dport", ports, "drop"},
 		{"add", "rule", "inet", nftTable, "input", "ip6", "saddr", "@" + nftSet6, "tcp", "dport", ports, "drop"},
@@ -76,7 +79,7 @@ func initNFTablesRules(ports string) error {
 	if err != nil {
 		return fmt.Errorf("verify nftables table: %w", err)
 	}
-	for _, required := range []string{nftSet4, nftSet6, "hook input", "drop"} {
+	for _, required := range []string{nftSet4, nftSet6, "flags timeout", fmt.Sprintf("size %d", nftSetSize), "hook input", "drop"} {
 		if !strings.Contains(string(ruleset), required) {
 			return fmt.Errorf("verify nftables table: missing %s", required)
 		}
@@ -103,7 +106,10 @@ func BanIP(ip, reason, source string, durationHours int) {
 	if parsed := net.ParseIP(ip); parsed != nil && parsed.IsLoopback() {
 		return
 	}
-	ensureBanRecord(ip, reason, source, durationHours)
+	expiresAt, active := ensureBanRecord(ip, reason, source, durationHours)
+	if !active {
+		return
+	}
 	if !nftInitialized {
 		return
 	}
@@ -111,26 +117,89 @@ func BanIP(ip, reason, source string, durationHours int) {
 	if !ok {
 		return
 	}
-	if _, err := runNftCommand("add", "element", "inet", nftTable, setName,
-		"{ "+ip+" }"); err != nil {
+	if _, err := runNftCommand(nftAddElementArgs(setName, ip, expiresAt)...); err != nil {
 		log.Printf("failed to add %s to nftables banned set: %v", ip, err)
 		return
 	}
 }
 
-func ensureBanRecord(ip, reason, source string, durationHours int) {
+// ensureBanRecord returns the active ban's expiry. A nil expiry is permanent.
+func ensureBanRecord(ip, reason, source string, durationHours int) (*time.Time, bool) {
 	db := database.GetDB()
-	if db != nil {
-		var count int
-		_ = db.QueryRow(`SELECT COUNT(*) FROM firewall_bans
-			WHERE ip_address = ? AND unbanned_at IS NULL
-			AND (expires_at IS NULL OR expires_at > datetime('now'))`, ip).Scan(&count)
-		if count > 0 {
-			return
-		}
-		db.Exec(`INSERT INTO firewall_bans (ip_address, reason, source, expires_at) VALUES (?, ?, ?, datetime('now', '+'||?||' hours'))`,
-			ip, reason, source, durationHours)
+	if db == nil {
+		return expiryForDuration(durationHours), true
 	}
+
+	var expiresAt sql.NullString
+	err := db.QueryRow(`SELECT expires_at FROM firewall_bans
+		WHERE ip_address = ? AND unbanned_at IS NULL
+		AND (expires_at IS NULL OR expires_at > datetime('now'))
+		ORDER BY created_at DESC LIMIT 1`, ip).Scan(&expiresAt)
+	if err == nil {
+		return parseBanExpiry(expiresAt)
+	}
+	if err != sql.ErrNoRows {
+		return nil, false
+	}
+
+	reason = truncateUTF8Bytes(reason, maxBanReasonBytes)
+	expiry := expiryForDuration(durationHours)
+	var insertExpiry interface{}
+	if expiry != nil {
+		insertExpiry = expiry.UTC().Format("2006-01-02 15:04:05")
+	}
+	if _, err := db.Exec(`INSERT INTO firewall_bans (ip_address, reason, source, expires_at) VALUES (?, ?, ?, ?)`,
+		ip, reason, source, insertExpiry); err != nil {
+		return nil, false
+	}
+	return expiry, true
+}
+
+func truncateUTF8Bytes(value string, maxBytes int) string {
+	value = strings.ToValidUTF8(value, "\uFFFD")
+	if len(value) <= maxBytes {
+		return value
+	}
+	cut := maxBytes
+	for cut > 0 && !utf8.RuneStart(value[cut]) {
+		cut--
+	}
+	return value[:cut]
+}
+
+func expiryForDuration(durationHours int) *time.Time {
+	if durationHours <= 0 {
+		return nil
+	}
+	expiresAt := time.Now().UTC().Add(time.Duration(durationHours) * time.Hour)
+	return &expiresAt
+}
+
+func parseBanExpiry(value sql.NullString) (*time.Time, bool) {
+	if !value.Valid || value.String == "" {
+		return nil, true
+	}
+	for _, layout := range []string{"2006-01-02 15:04:05", time.RFC3339Nano, time.RFC3339} {
+		if parsed, err := time.Parse(layout, value.String); err == nil {
+			if !parsed.After(time.Now().UTC()) {
+				return nil, false
+			}
+			return &parsed, true
+		}
+	}
+	return nil, false
+}
+
+func nftAddElementArgs(setName, ip string, expiresAt *time.Time) []string {
+	element := ip
+	if expiresAt != nil {
+		seconds := int64(time.Until(*expiresAt).Seconds())
+		if seconds < 1 {
+			seconds = 1
+		}
+		element += fmt.Sprintf(" timeout %ds", seconds)
+	}
+	return []string{"add", "element", "inet", nftTable, setName, "{ " + element + " }"}
 }
 
 // UnbanIP removes an IP from nftables and marks it unbanned in DB.
@@ -201,7 +270,6 @@ func cleanExpiredBans() {
 	for _, ip := range ips {
 		if nftInitialized && !deleteNftElement(ip) {
 			log.Printf("failed to remove expired ban from nftables: ip=%s", ip)
-			continue
 		}
 		db.Exec("UPDATE firewall_bans SET unbanned_at = CURRENT_TIMESTAMP WHERE ip_address = ? AND unbanned_at IS NULL", ip)
 	}
@@ -232,7 +300,7 @@ func restoreActiveBans() {
 	if db == nil || !nftInitialized {
 		return
 	}
-	rows, err := db.Query(`SELECT ip_address FROM firewall_bans
+	rows, err := db.Query(`SELECT ip_address, expires_at FROM firewall_bans
 		WHERE unbanned_at IS NULL AND (expires_at IS NULL OR expires_at > datetime('now'))`)
 	if err != nil {
 		log.Printf("failed to load active firewall bans: %v", err)
@@ -243,7 +311,8 @@ func restoreActiveBans() {
 	restored := 0
 	for rows.Next() {
 		var ip string
-		if err := rows.Scan(&ip); err != nil {
+		var rawExpiry sql.NullString
+		if err := rows.Scan(&ip, &rawExpiry); err != nil {
 			continue
 		}
 		if IsWhitelisted(ip) {
@@ -253,8 +322,14 @@ func restoreActiveBans() {
 		if !ok {
 			continue
 		}
-		if _, err := runNftCommand("add", "element", "inet", nftTable, setName, "{ "+ip+" }"); err == nil {
+		expiresAt, active := parseBanExpiry(rawExpiry)
+		if !active {
+			continue
+		}
+		if _, err := runNftCommand(nftAddElementArgs(setName, ip, expiresAt)...); err == nil {
 			restored++
+		} else {
+			log.Printf("failed to restore %s to nftables banned set: %v", ip, err)
 		}
 	}
 	if restored > 0 {

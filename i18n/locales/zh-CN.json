@@ -793,6 +793,9 @@
     "view_password_status_failed": "读取查看密码状态失败",
     "read_encryption_key_failed": "读取加密密钥失败",
     "password_processing_failed": "密码处理失败",
+    "url": {
+      "http_required": "链接必须为空，或使用有效的 http:// 或 https:// 地址"
+    },
     "agent": {
       "invalid_metrics": "无效的指标数据",
       "write_metrics_failed": "写入指标失败",

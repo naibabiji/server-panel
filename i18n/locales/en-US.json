@@ -793,6 +793,9 @@
     "view_password_status_failed": "Failed to read view password status",
     "read_encryption_key_failed": "Failed to read the encryption key",
     "password_processing_failed": "Password processing failed",
+    "url": {
+      "http_required": "The URL must be empty or a valid http:// or https:// address"
+    },
     "agent": {
       "invalid_metrics": "Invalid metrics data",
       "write_metrics_failed": "Failed to write metrics",

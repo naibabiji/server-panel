@@ -301,6 +301,9 @@ func validateWebsiteInput(c *gin.Context, w *models.Website) bool {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.website.select_server")))
 		return false
 	}
+	if !validateOptionalHTTPURL(c, &w.PanelURL) {
+		return false
+	}
 	if w.Status == "" {
 		w.Status = models.WebsiteStatusActive
 	}

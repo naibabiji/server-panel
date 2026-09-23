@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between mb-6">
         <div>
             <h2 class="text-lg font-semibold text-gray-100" x-text="provider.name || t('common.loading')"></h2>
-            <a :href="externalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-400 hover:text-blue-300" x-text="provider.website || '--'"></a>
+            <a :href="safeExternalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-sm text-blue-400 hover:text-blue-300" x-text="provider.website || '--'"></a>
         </div>
         <div class="flex gap-2">
             <a :href="provider.id ? provider.id + '/edit' : '#'" class="btn-secondary text-sm">{{t .Lang "common.edit"}}</a>
@@ -25,7 +25,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
             <dl class="p-5 text-sm space-y-3 border-b md:border-b-0 md:border-r border-[#202833]">
                 <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "server.col_name"}}</dt><dd class="text-gray-200" x-text="provider.name || '--'"></dd></div>
-                <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "provider.col_website"}}</dt><dd><a :href="externalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="provider.website || '--'"></a></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "provider.col_website"}}</dt><dd><a :href="safeExternalURL(provider.website)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="provider.website || '--'"></a></dd></div>
             </dl>
             <dl class="p-5 text-sm space-y-3">
                 <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "provider.col_contact"}}</dt><dd class="text-gray-200" x-text="provider.contact || '--'"></dd></div>
@@ -93,11 +93,6 @@ function providerDetail() {
         customerURL(server) {
             if (!server || !server.customer_id) return '#';
             return (document.body.dataset.panelPrefix || '') + '/customers/' + server.customer_id;
-        },
-        externalURL(url) {
-            if (!url) return '#';
-            if (/^https?:\/\//i.test(url)) return url;
-            return 'https://' + url;
         },
         async showPrivateNotes() {
             try {

@@ -11,6 +11,25 @@ function t(key, params = {}) {
     return message;
 }
 
+function safeHTTPURL(value) {
+    const candidate = String(value || '').trim();
+    if (!candidate) return '';
+    try {
+        const parsed = new URL(candidate);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : '';
+    } catch (e) {
+        return '';
+    }
+}
+
+function safeExternalURL(value) {
+    const candidate = String(value || '').trim();
+    if (!candidate) return '';
+    if (/^https?:\/\//i.test(candidate)) return safeHTTPURL(candidate);
+    if (/^(?:javascript|data|vbscript|file|blob):/i.test(candidate)) return '';
+    return safeHTTPURL('https://' + candidate);
+}
+
 // 防止 401/428 并发请求时重复触发跳转：第一个命中时置位，跳转后页面卸载，
 // 后续并发的同状态码分支只抛 silent 错误，不再重复改 location.href。
 let _authRedirecting = false;

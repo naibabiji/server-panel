@@ -29,7 +29,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
             <dl class="p-5 text-sm space-y-3 border-b md:border-b-0 md:border-r border-[#202833]">
                 <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "server.col_name"}}</dt><dd class="text-gray-200" x-text="w.name || '--'"></dd></div>
-                <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "server_detail.col_domain"}}</dt><dd><a :href="externalURL(w.domain)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="w.domain || '--'"></a></dd></div>
+                <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "server_detail.col_domain"}}</dt><dd><a :href="safeExternalURL(w.domain)" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 break-all" x-text="w.domain || '--'"></a></dd></div>
                 <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "server.col_type"}}</dt><dd class="text-gray-200" x-text="w.site_type || '--'"></dd></div>
                 <div class="flex"><dt class="w-24 text-gray-400">{{t .Lang "server_detail.status_label"}}</dt><dd><span :class="w.status=='active'?'badge-success':'badge-danger'" x-text="w.status=='active'?t('server_detail.website_status_running'):t('server_detail.website_status_expired')"></span></dd></div>
             </dl>
@@ -52,7 +52,8 @@
                 <dt class="text-gray-400">{{t .Lang "website_form.panel_info_label"}}</dt>
                 <dd class="text-gray-200">
                     <div x-text="w.panel_type && w.panel_type !== 'none' ? w.panel_type : t('server_detail.not_configured')"></div>
-                    <a class="text-blue-400 hover:text-blue-300 break-all" :href="w.panel_url" target="_blank" rel="noopener noreferrer" x-show="w.panel_url" x-text="w.panel_url"></a>
+                    <a class="text-blue-400 hover:text-blue-300 break-all" :href="safeHTTPURL(w.panel_url)" target="_blank" rel="noopener noreferrer" x-show="safeHTTPURL(w.panel_url)" x-text="w.panel_url"></a>
+                    <span class="break-all text-gray-300" x-show="w.panel_url && !safeHTTPURL(w.panel_url)" x-text="w.panel_url"></span>
                     <div x-show="w.panel_username" class="text-gray-400"><span x-text="t('server_detail.account_label')"></span><span x-text="w.panel_username"></span></div>
                     <div class="mt-2 flex items-center gap-2" x-show="panelPassword">
                         <code class="text-xs text-green-200 break-all" x-text="panelPassword"></code>
@@ -84,11 +85,6 @@ function websiteDetail() {
         customerURL() {
             if (!this.w.customer_id) return '#';
             return (document.body.dataset.panelPrefix || '') + '/customers/' + this.w.customer_id;
-        },
-        externalURL(domain) {
-            if (!domain) return '#';
-            if (/^https?:\/\//i.test(domain)) return domain;
-            return 'https://' + domain;
         },
         async revealPanelPassword() {
             try {
