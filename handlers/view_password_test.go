@@ -66,3 +66,54 @@ func TestUnlockWrongViewPasswordIsBusinessError(t *testing.T) {
 		t.Errorf("body = %q, business error must not contain a session error code", w.Body.String())
 	}
 }
+
+func TestForcedResetHelpersClearProviderPrivateNotes(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, stmt := range []string{
+		`CREATE TABLE servers (ssh_password_enc TEXT NOT NULL, panel_password_enc TEXT NOT NULL)`,
+		`CREATE TABLE websites (panel_password_enc TEXT NOT NULL)`,
+		`CREATE TABLE providers (private_notes_enc TEXT NOT NULL)`,
+		`INSERT INTO servers VALUES ('ssh-secret', 'panel-secret')`,
+		`INSERT INTO websites VALUES ('website-secret')`,
+		`INSERT INTO providers VALUES ('provider-secret')`,
+	} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("setup %q: %v", stmt, err)
+		}
+	}
+
+	cleared, err := clearSavedSecrets(db)
+	if err != nil {
+		t.Fatalf("clearSavedSecrets: %v", err)
+	}
+	if cleared != 2 {
+		t.Fatalf("cleared = %d, want 2", cleared)
+	}
+	var providerBeforeForce string
+	if err := db.QueryRow(`SELECT private_notes_enc FROM providers`).Scan(&providerBeforeForce); err != nil {
+		t.Fatal(err)
+	}
+	if providerBeforeForce != "provider-secret" {
+		t.Fatalf("failed-attempt cleanup unexpectedly cleared provider note: %q", providerBeforeForce)
+	}
+	if err := clearProviderPrivateNotes(db); err != nil {
+		t.Fatalf("clearProviderPrivateNotes: %v", err)
+	}
+	for _, query := range []string{
+		`SELECT ssh_password_enc || panel_password_enc FROM servers`,
+		`SELECT panel_password_enc FROM websites`,
+		`SELECT private_notes_enc FROM providers`,
+	} {
+		var value string
+		if err := db.QueryRow(query).Scan(&value); err != nil {
+			t.Fatal(err)
+		}
+		if value != "" {
+			t.Fatalf("query %q retained secret %q", query, value)
+		}
+	}
+}

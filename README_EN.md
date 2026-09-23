@@ -10,7 +10,7 @@
 
 Server Panel is a security-focused, lightweight, open-source server management panel for independent developers, website owners, hosting operators, and small infrastructure teams. It brings **VPS and dedicated-server assets, websites, customers, providers, renewals, Agent-based performance monitoring, alerts, backups, and everyday file operations** into one private dashboard.
 
-Built with Go and SQLite, Server Panel deploys as a single binary and includes a bilingual Chinese/English UI, built-in HTTPS, layered login protection, and encrypted credential storage. It is a practical self-hosted choice for anyone looking for a VPS management panel, server asset inventory, website expiry reminder, or lightweight Linux server monitoring dashboard without sending credentials and customer data to a third-party SaaS.
+Built with Go and SQLite, Server Panel deploys as a single binary and includes a bilingual Chinese/English UI, built-in HTTPS, layered login protection, and encryption for designated credentials. It is a practical self-hosted choice for anyone looking for a VPS management panel, server asset inventory, website expiry reminder, or lightweight Linux server monitoring dashboard without sending credentials and customer data to a third-party SaaS.
 
 > Debian 13 is the primary development and test platform. Other Debian/Ubuntu systems using systemd may work, but are not guaranteed to be fully compatible.
 
@@ -20,7 +20,7 @@ Server Panel addresses two separate questions: **How difficult is it to break in
 
 | Attack stage | Defenses an attacker must cross | Limits that remain after a breach |
 |---|---|---|
-| Discover and enter the panel | Randomized URL path, HTTPS, optional BasicAuth, independent panel login, failed-attempt bans, malicious scan detection, and nftables IPv4/IPv6 integration | Entry-point access or a normal dashboard session still cannot directly read stored secrets |
+| Discover and enter the panel | Randomized URL path, HTTPS, optional BasicAuth, independent panel login, failed-attempt bans, malicious scan detection, and nftables IPv4/IPv6 integration | Entry-point access or a normal dashboard session still cannot directly read view-password-protected server/website passwords and provider notes |
 | Read sensitive data | Independent view password, bcrypt verification, AES-256-GCM encryption, single-use tokens bound to the session and source IP, and a two-minute lifetime | Five consecutive failures erase stored server and website password copies instead of allowing unlimited guessing |
 
 In other words, **dashboard access is not secret-access permission**. An attacker who obtains a login password, browser session, or ordinary dashboard access must still defeat a second independent authorization layer before sensitive-data endpoints will return credentials. See the full [Security Model](#security-model) below.
@@ -31,10 +31,10 @@ In other words, **dashboard access is not secret-access permission**. An attacke
 - **Agent-based monitoring:** collect CPU, memory, disk, network, load, uptime, and heartbeat data with fleet and per-server history views.
 - **Availability and renewal tracking:** HTTP probes, Agent offline detection, server reachability checks, server/website expiry reminders, and recurring renewal-date advancement.
 - **Flexible alerts:** rules for CPU, memory, disk, offline servers, failed HTTP probes, and expiring assets, with SMTP email notifications.
-- **Encrypted secrets:** protect SSH passwords, control-panel passwords, website credentials, private provider notes, and Agent keys.
+- **Protected secrets:** encrypt SSH passwords, control-panel passwords, website credentials, and private provider notes. Agent keys are displayed once and retained only as SHA-256 hashes.
 - **Files and local storage:** upload, download, copy, move, rename, compress, and extract inside restricted roots; inspect, mount, unmount, or initialize local data disks.
 - **Backup and restore:** create manual or scheduled self-contained encrypted backups containing SQLite data and the key, with retention, optional email delivery, and cross-panel upload restore.
-- **Safe maintenance:** signed panel updates with health checks and rollback, automatic update policies, and Debian/Ubuntu package update support.
+- **Safe maintenance:** signed panel updates with health checks, binary rollback, conditional database rollback, automatic update policies, and Debian/Ubuntu package update support.
 - **Bilingual interface:** switch between Simplified Chinese and English from the login page or dashboard.
 
 ## Quick Install
@@ -53,7 +53,7 @@ Open the generated URL after installation:
 https://your-server:8444/<random-path>/login
 ```
 
-Credentials are printed in the installation log. The installer opens the HTTPS port when UFW or firewalld is already active. If your provider uses a cloud firewall or security group, allow the matching TCP port there as well (default: `8444`).
+Credentials are printed in the installation log. The installer opens the HTTPS port when UFW or firewalld is already active. If your provider uses a cloud firewall or security group, allow the matching TCP port there as well (default: `8444`). The online installer currently does not verify the downloaded binary's checksum or signature; use a trusted network or verify Release assets yourself and install offline.
 
 ## Screenshots
 
@@ -106,9 +106,11 @@ Credentials are printed in the installation log. The installer opens the HTTPS p
 ### HTTPS, Updates, and Backups
 
 - Use a self-signed certificate, upload your own certificate, or issue a Let's Encrypt certificate through ACME.
-- Panel updates include download, signature/checksum verification, database and binary backup, replacement, restart, health check, and automatic rollback on failure.
+- Panel updates include download, signature/checksum verification, database and binary backup, replacement, restart, health checks, binary rollback, and conditional database rollback.
 - Schedule daily or weekly backups, configure retention, and optionally deliver backups over SMTP when they fit the configured size limit.
 - New backups use the encrypted `.spbackup` format. Upload them to any Server Panel version that supports the format and enter the view password used when the backup was created. Legacy `.tar.gz` restore remains available for compatibility.
+- Panel backups cover only the SQLite database and `secret.key`; they do not include `config.json`, TLS certificates, systemd configuration, or arbitrary data-directory files.
+- Backup snapshots empty the `metrics` and `host_metrics` history tables; collection starts fresh after restore.
 
 ## Security Model
 
@@ -135,10 +137,10 @@ Server SSH passwords, server/website control-panel passwords, and private provid
 2. **Encryption at rest:** sensitive values use AES-256-GCM. The database stores randomized-nonce ciphertext rather than directly readable plaintext.
 3. **Short-lived single-use authorization:** successful view-password verification creates a one-time token bound to the current server-side session and source IP. It expires after two minutes and is consumed on first use.
 4. **Endpoint-level enforcement:** sensitive-data endpoints require and consume a valid view token in addition to checking the login session.
-5. **Brute-force damage control:** five consecutive incorrect view-password attempts from a source erase stored server SSH, server control-panel, and website control-panel password copies and revoke view tokens. Server, website, customer, monitoring, and expiry records remain intact.
+5. **Brute-force damage control:** five consecutive incorrect view-password attempts from a source erase stored server SSH, server control-panel, and website control-panel password copies and revoke view tokens; provider notes and other business records remain. A confirmed forced reset additionally erases provider private notes and creates a new backup identity.
 6. **Agent isolation:** every Agent has an independent key, old keys become invalid after regeneration, and Agents only submit monitoring data—they do not read stored passwords.
 
-This means **stealing a normal panel account or authenticated browser session does not directly enable a credential export**. The attacker must also obtain the independent view password before triggering erasure and satisfy the token, session, source-IP, and expiration constraints.
+This means **stealing a normal panel account or authenticated browser session does not directly enable export of those protected credentials**. The attacker must also obtain the independent view password before triggering erasure and satisfy the token, session, source-IP, and expiration constraints. SMTP is an exception: its password is currently plaintext in the `settings` table and is returned by the authenticated SMTP settings endpoint without a view token.
 
 ### The security boundary that must be understood
 
@@ -146,7 +148,11 @@ If an attacker gains `root` on the panel host, can read arbitrary panel process 
 
 New `.spbackup` files encrypt both the database and `secret.key`; the private backup identity is embedded only after encryption with the view password. Possession of the file alone no longer directly exposes saved credentials. Restore requires the view password active when that backup was created. Use a strong view password because a stolen file can still be attacked offline. Historical `.tar.gz` backups remain plaintext-sensitive assets and should be protected or securely destroyed.
 
+An in-panel update failure attempts binary rollback. Database rollback is conditional on the service having stopped and a limited core-table readability check judging the live database broken. Schema changes must therefore remain compatible with the previous binary; “automatic rollback” does not mean unconditional database restoration.
+
 > Self-hosting does not make a service automatically secure. Use strong passwords and HTTPS, and place the panel behind a cloud firewall, VPN, Tailscale, WireGuard, Cloudflare, or a trusted reverse proxy when appropriate.
+
+> Agent commands generated for a self-signed panel may enable `tls_skip_verify`; the installer checks only a SHA-256 value obtained from the same download origin and does not verify an Ed25519 signature. Use a trusted certificate and download path when active network attacks are in scope.
 
 ## Installation and Maintenance
 
@@ -157,7 +163,7 @@ New `.spbackup` files encrypt both the database and `secret.key`; the private ba
 - `root` privileges for installation
 - Access to GitHub Releases; an optional temporary GitHub proxy can be supplied when generating an Agent installer
 
-Running the installer over an existing installation preserves configuration, database, certificates, and credentials while replacing the binary. To regenerate configuration and login details:
+Running the installer over an existing installation preserves existing configuration and data while replacing the binary and refreshing service/firewall setup. It does not provide the in-panel updater's automatic backup, health check, or rollback. To regenerate configuration and login details:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/naibabiji/server-panel/master/install.sh | INSTALL_MODE=reinstall bash

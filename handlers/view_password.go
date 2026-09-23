@@ -102,6 +102,11 @@ func (h *ViewPasswordHandler) Setup(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.clear_saved_failed")))
 			return
 		}
+		if err := clearProviderPrivateNotes(tx); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.clear_saved_failed")))
+			return
+		}
 	}
 	if _, err := tx.Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('view_password_hash', ?)", hash); err != nil {
 		tx.Rollback()
@@ -300,6 +305,15 @@ func clearSavedSecrets(db interface {
 	}
 	websiteRows, _ := websiteResult.RowsAffected()
 	return int(rows + websiteRows), nil
+}
+
+func clearProviderPrivateNotes(db interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}) error {
+	_, err := db.Exec(`UPDATE providers
+		SET private_notes_enc = ''
+		WHERE private_notes_enc != ''`)
+	return err
 }
 
 func clearViewTokens() {
