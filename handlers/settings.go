@@ -374,6 +374,15 @@ func (h *SettingsHandler) RunDatabaseBackup(c *gin.Context) {
 		EmailEnabled *bool `json:"email_enabled"`
 	}
 	_ = c.ShouldBindJSON(&req)
+	sessionToken, ok := getSessionToken(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, models.ErrorResponseWithCode(i18n.TE(c.Request, "session.session_expired"), models.ErrorCodeSessionExpired))
+		return
+	}
+	if !ConsumeViewToken(c.GetHeader("X-View-Token"), sessionToken, middleware.ClientIP(c)) {
+		c.JSON(http.StatusForbidden, models.ErrorResponse(i18n.TE(c.Request, "errors.reenter_view_password")))
+		return
+	}
 
 	emailEnabled := false
 	if req.EmailEnabled != nil {
@@ -414,12 +423,13 @@ func (h *SettingsHandler) DownloadBackup(c *gin.Context) {
 func (h *SettingsHandler) RestoreBackup(c *gin.Context) {
 	var req struct {
 		Filename string `json:"filename"`
+		Password string `json:"password"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Filename) == "" {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.provide_backup_filename")))
 		return
 	}
-	if err := executor.ScheduleRestore(strings.TrimSpace(req.Filename)); err != nil {
+	if err := executor.ScheduleRestore(strings.TrimSpace(req.Filename), req.Password); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.restore_failed", i18n.P{"error": err.Error()})))
 		return
 	}
@@ -437,7 +447,8 @@ func (h *SettingsHandler) RestoreBackupUpload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.select_backup_file")))
 		return
 	}
-	if !strings.HasSuffix(strings.ToLower(fileHeader.Filename), ".tar.gz") {
+	lowerName := strings.ToLower(fileHeader.Filename)
+	if !strings.HasSuffix(lowerName, ".tar.gz") && !strings.HasSuffix(lowerName, ".spbackup") {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.backup_ext_only")))
 		return
 	}
@@ -446,7 +457,7 @@ func (h *SettingsHandler) RestoreBackupUpload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.save_upload_failed", i18n.P{"error": err.Error()})))
 		return
 	}
-	if err := executor.ScheduleRestore(filename); err != nil {
+	if err := executor.ScheduleRestore(filename, c.PostForm("password")); err != nil {
 		_ = executor.RemoveBackupFile(filename)
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.settings.restore_failed", i18n.P{"error": err.Error()})))
 		return

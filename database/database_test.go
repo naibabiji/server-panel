@@ -2,6 +2,7 @@ package database
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -51,5 +52,20 @@ func TestOpenFailsFastWhenWALDoesNotActuallyEngage(t *testing.T) {
 	}
 	if DB != nil {
 		t.Fatal("DB package var should remain nil after a failed Open")
+	}
+}
+
+func TestRunMigrationsReportsShortInvalidSQLWithoutPanicking(t *testing.T) {
+	withTestDB(t)
+	original := migrations
+	migrations = []string{"invalid"}
+	t.Cleanup(func() { migrations = original })
+
+	err := RunMigrations()
+	if err == nil {
+		t.Fatal("RunMigrations succeeded with invalid SQL")
+	}
+	if !strings.Contains(err.Error(), "SQL: invalid") {
+		t.Fatalf("error does not contain the short SQL statement: %v", err)
 	}
 }

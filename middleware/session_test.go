@@ -104,3 +104,57 @@ func TestSessionRequiredMarksExpiredSession(t *testing.T) {
 		t.Errorf("error_code = %q, want %q", response.ErrorCode, models.ErrorCodeSessionExpired)
 	}
 }
+
+func TestSessionRequiredRedirectAbortsHTMLRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	downstreamCalled := false
+	router := gin.New()
+	router.GET("/panel/protected", SessionRequired(), func(c *gin.Context) {
+		downstreamCalled = true
+		c.String(http.StatusOK, "sensitive response")
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/panel/protected", nil)
+	req.Header.Set("Accept", "text/html")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusFound)
+	}
+	if downstreamCalled {
+		t.Fatal("protected handler ran after unauthenticated HTML redirect")
+	}
+	if location := w.Header().Get("Location"); location != "/panel/login" {
+		t.Errorf("Location = %q, want %q", location, "/panel/login")
+	}
+	if strings.Contains(w.Body.String(), "sensitive response") {
+		t.Fatalf("redirect response leaked downstream body: %q", w.Body.String())
+	}
+}
+
+func TestSessionRequiredStopsForgedCSRFWriteAfterHTMLRedirect(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	mutated := false
+	router := gin.New()
+	router.PUT("/panel/api/settings/basic-auth", SessionRequired(), SetCSRFToken, CSRF(), func(c *gin.Context) {
+		mutated = true
+		c.Status(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/panel/api/settings/basic-auth", strings.NewReader(`{}`))
+	req.Header.Set("Accept", "text/html")
+	req.Header.Set("X-CSRF-Token", "attacker-controlled")
+	req.AddCookie(&http.Cookie{Name: "csrf_token", Value: "attacker-controlled"})
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusFound)
+	}
+	if mutated {
+		t.Fatal("state-changing handler ran without an authenticated session")
+	}
+}

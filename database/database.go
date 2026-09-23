@@ -89,10 +89,18 @@ func RunMigrations() error {
 			if strings.Contains(err.Error(), "duplicate column name") {
 				continue
 			}
-			return fmt.Errorf("migration failed: %w\nSQL: %s", err, stmt[:100])
+			return fmt.Errorf("migration failed: %w\nSQL: %s", err, sqlPreview(stmt))
 		}
 	}
 	return nil
+}
+
+func sqlPreview(stmt string) string {
+	const limit = 100
+	if len(stmt) <= limit {
+		return stmt
+	}
+	return stmt[:limit]
 }
 
 func GetDB() *sql.DB {

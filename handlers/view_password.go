@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/executor"
 	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/middleware"
 	"github.com/naibabiji/server-panel/models"
@@ -77,11 +78,6 @@ func (h *ViewPasswordHandler) Setup(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.reset_confirm_phrase")))
 			return
 		}
-		if _, err := clearSavedSecrets(db); err != nil {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.clear_saved_failed")))
-			return
-		}
-		clearViewTokens()
 	}
 
 	hash, err := HashPassword(req.Password)
@@ -90,7 +86,40 @@ func (h *ViewPasswordHandler) Setup(c *gin.Context) {
 		return
 	}
 
-	db.Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('view_password_hash', ?)", hash)
+	recipient, wrappedIdentity, err := executor.PrepareBackupEncryption(db, "", req.Password, req.Force)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(err.Error()))
+		return
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
+		return
+	}
+	if existingHash != "" && req.Force {
+		if _, err := clearSavedSecrets(tx); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.clear_saved_failed")))
+			return
+		}
+	}
+	if _, err := tx.Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('view_password_hash', ?)", hash); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
+		return
+	}
+	if err := executor.SaveBackupEncryptionSettings(tx, recipient, wrappedIdentity); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
+		return
+	}
+	if existingHash != "" && req.Force {
+		clearViewTokens()
+	}
 
 	c.JSON(http.StatusOK, models.SuccessResponse(map[string]string{
 		"message": i18n.TE(c.Request, "errors.vp.setup_success"),
@@ -130,12 +159,22 @@ func (h *ViewPasswordHandler) Change(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.password_processing_failed")))
 		return
 	}
+	recipient, wrappedIdentity, err := executor.PrepareBackupEncryption(db, req.OldPassword, req.NewPassword, false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(err.Error()))
+		return
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.change_failed")))
 		return
 	}
 	if _, err := tx.Exec("INSERT OR REPLACE INTO settings (skey, svalue) VALUES ('view_password_hash', ?)", newHash); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
+		return
+	}
+	if err := executor.SaveBackupEncryptionSettings(tx, recipient, wrappedIdentity); err != nil {
 		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
 		return
@@ -196,6 +235,26 @@ func (h *ViewPasswordHandler) Unlock(c *gin.Context) {
 	unlockAttemptsMu.Lock()
 	delete(unlockAttempts, ip)
 	unlockAttemptsMu.Unlock()
+
+	recipient, wrappedIdentity, err := executor.PrepareBackupEncryption(db, "", req.Password, false)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(err.Error()))
+		return
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
+		return
+	}
+	if err := executor.SaveBackupEncryptionSettings(tx, recipient, wrappedIdentity); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.vp.save_failed")))
+		return
+	}
 
 	sessionToken, ok := getSessionToken(c)
 	if !ok {

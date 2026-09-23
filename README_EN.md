@@ -33,7 +33,7 @@ In other words, **dashboard access is not secret-access permission**. An attacke
 - **Flexible alerts:** rules for CPU, memory, disk, offline servers, failed HTTP probes, and expiring assets, with SMTP email notifications.
 - **Encrypted secrets:** protect SSH passwords, control-panel passwords, website credentials, private provider notes, and Agent keys.
 - **Files and local storage:** upload, download, copy, move, rename, compress, and extract inside restricted roots; inspect, mount, unmount, or initialize local data disks.
-- **Backup and restore:** create manual or scheduled backups containing both SQLite data and the encryption key, with retention, optional email delivery, and upload restore.
+- **Backup and restore:** create manual or scheduled self-contained encrypted backups containing SQLite data and the key, with retention, optional email delivery, and cross-panel upload restore.
 - **Safe maintenance:** signed panel updates with health checks and rollback, automatic update policies, and Debian/Ubuntu package update support.
 - **Bilingual interface:** switch between Simplified Chinese and English from the login page or dashboard.
 
@@ -108,7 +108,7 @@ Credentials are printed in the installation log. The installer opens the HTTPS p
 - Use a self-signed certificate, upload your own certificate, or issue a Let's Encrypt certificate through ACME.
 - Panel updates include download, signature/checksum verification, database and binary backup, replacement, restart, health check, and automatic rollback on failure.
 - Schedule daily or weekly backups, configure retention, and optionally deliver backups over SMTP when they fit the configured size limit.
-- Restore the database and encryption key from a local backup or an uploaded `.tar.gz` archive.
+- New backups use the encrypted `.spbackup` format. Upload them to any Server Panel version that supports the format and enter the view password used when the backup was created. Legacy `.tar.gz` restore remains available for compatibility.
 
 ## Security Model
 
@@ -144,7 +144,7 @@ This means **stealing a normal panel account or authenticated browser session do
 
 If an attacker gains `root` on the panel host, can read arbitrary panel process memory, or can replace the running binary, the host is fully compromised. Because the panel must decrypt credentials for legitimate users, no software can honestly promise secrecy at that privilege level. Isolate the host immediately, rotate every credential, and rebuild from a trusted backup.
 
-Backups are also sensitive assets. A full backup contains both the database and encryption key so credentials remain recoverable after disaster restoration. Restrict backup file permissions and keep off-site copies in a separate trusted location.
+New `.spbackup` files encrypt both the database and `secret.key`; the private backup identity is embedded only after encryption with the view password. Possession of the file alone no longer directly exposes saved credentials. Restore requires the view password active when that backup was created. Use a strong view password because a stolen file can still be attacked offline. Historical `.tar.gz` backups remain plaintext-sensitive assets and should be protected or securely destroyed.
 
 > Self-hosting does not make a service automatically secure. Use strong passwords and HTTPS, and place the panel behind a cloud firewall, VPN, Tailscale, WireGuard, Cloudflare, or a trusted reverse proxy when appropriate.
 
@@ -174,7 +174,7 @@ journalctl -u server-panel -f
 server-panel --reset-password
 ```
 
-Restore a full backup from the command line:
+Legacy unencrypted backups can be restored from the command line. Upload encrypted `.spbackup` files through the settings page of any compatible Server Panel and enter the original view password:
 
 ```bash
 systemctl stop server-panel

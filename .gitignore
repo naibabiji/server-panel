@@ -7,6 +7,7 @@ bin/
 *.db
 *.local-secrets.md
 docs/
+AGENTS.md
 CLAUDE.md
 sign-release.sh
 tools/sign-checksums/

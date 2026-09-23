@@ -77,6 +77,14 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 		RecordOperationLog("database_backup", trigger, "failed", err.Error())
 		return result, err
 	}
+	legacyPath := path
+	path, err = createPortableBackup(legacyPath, dir)
+	_ = os.Remove(legacyPath)
+	if err != nil {
+		setBackupStatus("failed", "", err.Error())
+		RecordOperationLog("database_backup", trigger, "failed", err.Error())
+		return result, err
+	}
 
 	info, err := os.Stat(path)
 	if err != nil {
@@ -90,7 +98,7 @@ func RunDatabaseBackup(trigger string, emailEnabled bool) (DatabaseBackupResult,
 	result.SizeBytes = info.Size()
 	result.SizeHuman = formatBackupSize(info.Size())
 	result.Status = "success"
-	result.Message = "备份已生成（含数据库与密钥）"
+	result.Message = "加密备份已生成（恢复时需要生成备份时的查看密码）"
 
 	var warnings []string
 
@@ -194,11 +202,11 @@ func sendDatabaseBackupEmail(result DatabaseBackupResult) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("读取备份文件失败: %w", err)
 	}
-	body := fmt.Sprintf("Server Panel 备份已生成，附件包含数据库和密钥（server-panel.db + secret.key）。\n\n文件名：%s\n大小：%s\n生成时间：%s\n\n此附件可解密面板中保存的所有敏感信息，请妥善保存，不要转发给无关人员。",
+	body := fmt.Sprintf("Server Panel 加密备份已生成。\n\n文件名：%s\n大小：%s\n生成时间：%s\n\n恢复时需要输入生成此备份时使用的查看密码。请妥善保存备份和密码。",
 		result.Filename, result.SizeHuman, timeutil.NowDisplay())
 	err = SendMailWithAttachments("", "Server Panel 备份", body, []MailAttachment{{
 		Filename:    result.Filename,
-		ContentType: "application/gzip",
+		ContentType: "application/octet-stream",
 		Data:        data,
 	}})
 	if err != nil {
@@ -208,7 +216,7 @@ func sendDatabaseBackupEmail(result DatabaseBackupResult) (string, error) {
 }
 
 func pruneDatabaseBackups(dir string, keepCount int) error {
-	entries, err := filepath.Glob(filepath.Join(dir, "server-panel-backup.*.tar.gz"))
+	entries, err := filepath.Glob(filepath.Join(dir, "server-panel-backup.*.spbackup"))
 	if err != nil {
 		return err
 	}

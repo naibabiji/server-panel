@@ -313,7 +313,7 @@
                         <div class="border-t border-[#202833] pt-3 mt-3">
                             <div class="mb-2">{{t .Lang "settings.or_upload_restore"}}</div>
                             <div class="flex flex-wrap items-center gap-2">
-                                <input type="file" accept=".gz,.tar.gz" @change="restoreUpload.file = $event.target.files[0]" class="input-field text-xs">
+                                <input type="file" accept=".spbackup,.gz,.tar.gz" @change="restoreUpload.file = $event.target.files[0]" class="input-field text-xs">
                                 <button @click="uploadRestore()" class="btn-danger text-sm" :disabled="restoreUpload.uploading">{{t .Lang "settings.upload_and_restore_button"}}</button>
                             </div>
                         </div>
@@ -352,7 +352,7 @@
                                 </div>
                                 <div class="flex gap-2 shrink-0">
                                     <a :href="backupDownloadUrl(item.filename)" class="btn-secondary text-xs">{{t .Lang "files.download"}}</a>
-                                    <button @click="restoreExisting(item.filename)" class="btn-danger text-xs">{{t .Lang "settings.restore_this_backup"}}</button>
+                                    <button @click="restoreExisting(item)" class="btn-danger text-xs">{{t .Lang "settings.restore_this_backup"}}</button>
                                 </div>
                             </div>
                         </template>
@@ -901,9 +901,11 @@ function settingsPage() {
         async runBackup() {
             const ok = await confirmModal(t('settings.backup_confirm'));
             if (!ok) return;
+			const viewToken = await unlockViewPasswordPrompt();
+			if (!viewToken) return;
             this.backupRun = { running:true, message:'', status:'', filename:'', size_human:'', email_sent:false, email_skipped_reason:'' };
             try {
-                const d = await api('/api/settings/backup/run', {method:'POST', body:{email_enabled: !!this.backup.email_enabled}});
+				const d = await api('/api/settings/backup/run', {method:'POST', headers:{'X-View-Token': viewToken}, body:{email_enabled: !!this.backup.email_enabled}});
                 this.backupRun = Object.assign({running:false}, d.data || {});
                 const toastType = this.backupRun.status === 'warning' ? 'warning' : 'success';
                 showToast(this.backupRun.message || t('settings.backup_generated'), toastType);
@@ -930,11 +932,20 @@ function settingsPage() {
             const d = await api('/api/settings/backup/list');
             this.backupList = d.data || [];
         },
-        async restoreExisting(filename) {
+		async restoreExisting(item) {
+			const filename = item.filename;
             const ok = await confirmModal(t('settings.restore_confirm', {filename}));
             if (!ok) return;
+			let password = '';
+			if (item.encrypted) {
+				password = window.prompt(t('settings.restore_password_prompt')) || '';
+				if (!password) return;
+			} else {
+				const legacyOK = await confirmModal(t('settings.restore_legacy_warning'));
+				if (!legacyOK) return;
+			}
             try {
-                const d = await api('/api/settings/backup/restore', {method:'POST', body:{filename}});
+				const d = await api('/api/settings/backup/restore', {method:'POST', body:{filename, password}});
                 showToast(d.data.message || t('settings.restore_scheduled'),'success');
                 this.backupListModalOpen = false;
                 this._waitForRestoreRestart();
@@ -945,8 +956,18 @@ function settingsPage() {
             if (!file) { showToast(t('settings.select_backup_file'),'error'); return; }
             const ok = await confirmModal(t('settings.upload_restore_confirm', {filename: file.name}));
             if (!ok) return;
+			const encrypted = file.name.toLowerCase().endsWith('.spbackup');
+			let password = '';
+			if (encrypted) {
+				password = window.prompt(t('settings.restore_password_prompt')) || '';
+				if (!password) return;
+			} else {
+				const legacyOK = await confirmModal(t('settings.restore_legacy_warning'));
+				if (!legacyOK) return;
+			}
             const formData = new FormData();
             formData.append('file', file);
+			formData.append('password', password);
             this.restoreUpload.uploading = true;
             try {
                 const d = await api('/api/settings/backup/restore-upload', {method:'POST', body: formData});

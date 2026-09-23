@@ -66,6 +66,102 @@ func TestManagedRootCannotBeDeleted(t *testing.T) {
 	}
 }
 
+func TestManagedSymlinkMutationNeverFollowsTarget(t *testing.T) {
+	db := fileManagerTestDB(t)
+	dataDir := t.TempDir()
+	root := filepath.Join(dataDir, "backups")
+	targetDir := filepath.Join(root, "releases", "v1")
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(targetDir, "keep.txt"), []byte("keep"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	current := filepath.Join(root, "current")
+	if err := os.Symlink(filepath.Join("releases", "v1"), current); err != nil {
+		t.Fatal(err)
+	}
+	if err := RenameManagedFile(db, dataDir, root, "/current", "previous"); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Lstat(filepath.Join(root, "previous")); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("renamed entry is not the symlink: info=%v err=%v", info, err)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir, "keep.txt")); err != nil {
+		t.Fatalf("renaming symlink changed its target: %v", err)
+	}
+
+	if err := DeleteManagedFile(db, dataDir, root, "/previous"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "previous")); !os.IsNotExist(err) {
+		t.Fatalf("symlink entry still exists: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(targetDir, "keep.txt")); err != nil {
+		t.Fatalf("deleting symlink removed its target: %v", err)
+	}
+}
+
+func TestManagedSelfSymlinkCannotDeleteRoot(t *testing.T) {
+	db := fileManagerTestDB(t)
+	dataDir := t.TempDir()
+	root := filepath.Join(dataDir, "backups")
+	if err := os.MkdirAll(root, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "keep.txt"), []byte("keep"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(".", filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := DeleteManagedFile(db, dataDir, root, "/link"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "keep.txt")); err != nil {
+		t.Fatalf("deleting self symlink removed managed root contents: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, "link")); !os.IsNotExist(err) {
+		t.Fatalf("self symlink was not removed: %v", err)
+	}
+}
+
+func TestManagedFileEntryPathPreservesSymlinkForMoveAndCopy(t *testing.T) {
+	db := fileManagerTestDB(t)
+	dataDir := t.TempDir()
+	root := filepath.Join(dataDir, "backups")
+	if err := os.MkdirAll(filepath.Join(root, "target"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link")
+	if err := os.Symlink("target", link); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ManagedFileEntryPath(db, dataDir, root, "/link")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != link {
+		t.Fatalf("entry path = %q, want symlink path %q", got, link)
+	}
+	moved := filepath.Join(root, "moved")
+	if err := os.Rename(got, moved); err != nil {
+		t.Fatalf("move symlink entry: %v", err)
+	}
+	if info, err := os.Lstat(moved); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("moved entry is not the symlink: info=%v err=%v", info, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "target")); err != nil {
+		t.Fatalf("moving symlink changed its target: %v", err)
+	}
+	if err := CopyManagedFile(moved, filepath.Join(root, "copy")); err == nil {
+		t.Fatal("copying a symlink was accepted")
+	}
+}
+
 func TestCustomRootRejectsServerRootWithGuidance(t *testing.T) {
 	_, err := validateCustomFileRoot("/", "/www/server/server-panel")
 	if err == nil || !strings.Contains(err.Error(), "SSH/SFTP") || !strings.Contains(err.Error(), "/var/www") {

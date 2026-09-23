@@ -170,7 +170,7 @@ func (h *FileManagerHandler) Transfer(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(i18n.TE(c.Request, "errors.files.cannot_copy_root")))
 		return
 	}
-	src, err := executor.ManagedFilePath(h.DB, h.dataDir(), req.Root, req.Source, false)
+	src, err := executor.ManagedFileEntryPath(h.DB, h.dataDir(), req.Root, req.Source)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse(err.Error()))
 		return

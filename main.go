@@ -294,6 +294,9 @@ func applyPendingRestoreIfAny(cfg *config.Config) error {
 		return nil
 	}
 	fmt.Printf("检测到待处理的恢复请求，正在从 %s 恢复...\n", archivePath)
+	if executor.IsStagedRestore(archivePath) {
+		defer os.Remove(archivePath)
+	}
 	return runRestoreBackup(cfg, archivePath)
 }
 

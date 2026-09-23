@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/naibabiji/server-panel/config"
@@ -19,13 +20,14 @@ import (
 // SaveUploadedBackup produce. It's the only shape ResolveBackupPath accepts,
 // so a client-supplied filename can never escape the backups directory via
 // "..", an absolute path, or an unrelated file elsewhere on disk.
-var backupFilenamePattern = regexp.MustCompile(`^server-panel-backup\.[0-9]{8}-[0-9]{6}(\.uploaded)?\.tar\.gz$`)
+var backupFilenamePattern = regexp.MustCompile(`^server-panel-backup\.[0-9]{8}-[0-9]{6}(\.uploaded)?(\.tar\.gz|\.spbackup)$`)
 
 type BackupFileInfo struct {
 	Filename  string `json:"filename"`
 	SizeBytes int64  `json:"size_bytes"`
 	SizeHuman string `json:"size_human"`
 	ModTime   string `json:"mod_time"`
+	Encrypted bool   `json:"encrypted"`
 }
 
 // ListDatabaseBackups lists full backup archives on disk, newest first.
@@ -35,14 +37,14 @@ func ListDatabaseBackups() ([]BackupFileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	matches, err := filepath.Glob(filepath.Join(dir, "server-panel-backup.*.tar.gz"))
+	matches, err := filepath.Glob(filepath.Join(dir, "server-panel-backup.*"))
 	if err != nil {
 		return nil, err
 	}
 	items := make([]BackupFileInfo, 0, len(matches))
 	for _, path := range matches {
 		info, statErr := os.Stat(path)
-		if statErr != nil {
+		if statErr != nil || !backupFilenamePattern.MatchString(filepath.Base(path)) {
 			continue
 		}
 		items = append(items, BackupFileInfo{
@@ -50,6 +52,7 @@ func ListDatabaseBackups() ([]BackupFileInfo, error) {
 			SizeBytes: info.Size(),
 			SizeHuman: formatBackupSize(info.Size()),
 			ModTime:   timeutil.Display(info.ModTime()),
+			Encrypted: strings.HasSuffix(path, ".spbackup"),
 		})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ModTime > items[j].ModTime })
@@ -124,7 +127,11 @@ func SaveUploadedBackup(fh *multipart.FileHeader) (string, error) {
 	}
 	defer src.Close()
 
-	filename := fmt.Sprintf("server-panel-backup.%s.uploaded.tar.gz", time.Now().UTC().Format("20060102-150405"))
+	ext := ".tar.gz"
+	if strings.HasSuffix(strings.ToLower(fh.Filename), ".spbackup") {
+		ext = ".spbackup"
+	}
+	filename := fmt.Sprintf("server-panel-backup.%s.uploaded%s", time.Now().UTC().Format("20060102-150405"), ext)
 	finalPath := filepath.Join(dir, filename)
 	tmpPath := fmt.Sprintf("%s.tmp.%d", finalPath, time.Now().UnixNano())
 
@@ -204,19 +211,42 @@ func ConsumePendingRestore() (string, bool) {
 // boot happens right away. See executor/restart.go's RestartPanelService and
 // main.go's runRestoreBackup/applyPendingRestoreIfAny for why this goes
 // through a restart instead of swapping the live database in place.
-func ScheduleRestore(filename string) error {
+func ScheduleRestore(filename, password string) error {
 	cfg := config.AppConfig
 	path, err := ResolveBackupPath(filename)
 	if err != nil {
 		return err
 	}
-	if err := validateBackupArchive(path); err != nil {
+	restorePath := path
+	if strings.HasSuffix(path, ".spbackup") {
+		if strings.TrimSpace(password) == "" {
+			return fmt.Errorf("请输入生成此备份时使用的查看密码")
+		}
+		stageDir := filepath.Join(cfg.Panel.DataDir, ".restore-staging")
+		if dirErr := os.MkdirAll(stageDir, 0700); dirErr != nil {
+			return fmt.Errorf("创建恢复暂存目录失败: %w", dirErr)
+		}
+		restorePath, err = decryptPortableBackup(path, password, stageDir)
+		if err != nil {
+			return fmt.Errorf("加密备份解密失败: %w", err)
+		}
+		defer func() {
+			if err != nil {
+				_ = os.Remove(restorePath)
+			}
+		}()
+	}
+	if err = validateBackupArchive(restorePath); err != nil {
 		return fmt.Errorf("备份文件校验失败: %w", err)
 	}
-	if err := writePendingRestoreMarker(cfg, path); err != nil {
+	if err = writePendingRestoreMarker(cfg, restorePath); err != nil {
 		return fmt.Errorf("写入恢复标记失败: %w", err)
 	}
 	RecordOperationLog("database_restore", filename, "scheduled", "已安排从备份恢复，等待服务重启")
 	RestartPanelService()
 	return nil
+}
+
+func IsStagedRestore(path string) bool {
+	return strings.HasPrefix(filepath.Base(path), "server-panel-restore-stage.") && strings.HasSuffix(path, ".tar.gz")
 }

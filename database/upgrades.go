@@ -141,7 +141,7 @@ func RunUpgrades() error {
 				if strings.Contains(err.Error(), "duplicate column name") {
 					continue
 				}
-				return fmt.Errorf("upgrade %s failed: %w\nSQL: %s", u.Version, err, stmt[:100])
+				return fmt.Errorf("upgrade %s failed: %w\nSQL: %s", u.Version, err, sqlPreview(stmt))
 			}
 		}
 		if u.Func != nil {

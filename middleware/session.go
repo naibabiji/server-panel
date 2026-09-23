@@ -110,6 +110,7 @@ func abortSession(c *gin.Context, msg, code string) {
 
 	if isPageRequest(c) {
 		prefix := extractPrefix(c)
+		c.Abort()
 		c.Redirect(http.StatusFound, prefix+"/login")
 		return
 	}

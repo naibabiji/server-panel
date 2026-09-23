@@ -138,6 +138,7 @@ var i18nKeys = []string{
 	"settings.password_mismatch", "settings.reset_new_vp_title", "settings.reset_vp_confirm",
 	"settings.reset_vp_confirm_label", "settings.reset_vp_confirm_message", "settings.reset_vp_title",
 	"settings.restart_timeout", "settings.restarting_wait_refresh", "settings.restore_confirm",
+	"settings.restore_legacy_warning", "settings.restore_password_prompt",
 	"settings.restore_scheduled", "settings.restoring_wait", "settings.select_backup_file",
 	"settings.self_signed_confirm", "settings.self_signed_issued", "settings.set_new_vp_title",
 	"settings.setup_vp_title", "settings.site_type_list_saved", "settings.sys_update_confirm",

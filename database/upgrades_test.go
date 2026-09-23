@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -99,5 +100,72 @@ func TestAddTCPReachabilityColumnsIsIdempotentOnFreshSchema(t *testing.T) {
 	// still be safely re-runnable.
 	if err := addTCPReachabilityColumns(); err != nil {
 		t.Fatalf("addTCPReachabilityColumns second run: %v", err)
+	}
+}
+
+func TestFreshDatabaseRunsMigrationsAndAllUpgrades(t *testing.T) {
+	withTestDB(t)
+
+	if err := RunMigrations(); err != nil {
+		t.Fatalf("RunMigrations: %v", err)
+	}
+	if err := RunUpgrades(); err != nil {
+		t.Fatalf("RunUpgrades: %v", err)
+	}
+
+	version, err := currentSchemaVersion()
+	if err != nil {
+		t.Fatalf("currentSchemaVersion: %v", err)
+	}
+	if version != LatestVersion() {
+		t.Fatalf("schema version = %q, want latest %q", version, LatestVersion())
+	}
+	for _, table := range []string{"admin_users", "servers", "websites", "operation_logs", "host_metrics"} {
+		exists, err := tableExists(table)
+		if err != nil {
+			t.Fatalf("tableExists(%q): %v", table, err)
+		}
+		if !exists {
+			t.Errorf("final fresh schema is missing table %q", table)
+		}
+	}
+	for _, tc := range []struct{ table, column string }{
+		{"servers", "agent_api_key_enc"},
+		{"servers", "cpu_cores"},
+		{"providers", "private_notes_enc"},
+		{"servers", "tcp_reachable"},
+	} {
+		exists, err := columnExists(tc.table, tc.column)
+		if err != nil {
+			t.Fatalf("columnExists(%q, %q): %v", tc.table, tc.column, err)
+		}
+		if !exists {
+			t.Errorf("final fresh schema is missing %s.%s", tc.table, tc.column)
+		}
+	}
+}
+
+func TestRunUpgradesReportsShortInvalidSQLWithoutPanicking(t *testing.T) {
+	withTestDB(t)
+	if _, err := DB.Exec(`CREATE TABLE schema_version (
+		version TEXT NOT NULL,
+		updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	)`); err != nil {
+		t.Fatalf("create schema_version: %v", err)
+	}
+	if _, err := DB.Exec(`INSERT INTO schema_version (version) VALUES ('1.0.0')`); err != nil {
+		t.Fatalf("insert schema version: %v", err)
+	}
+
+	original := upgrades
+	upgrades = []Upgrade{{Version: "1.0.1", SQL: []string{"invalid"}}}
+	t.Cleanup(func() { upgrades = original })
+
+	err := RunUpgrades()
+	if err == nil {
+		t.Fatal("RunUpgrades succeeded with invalid SQL")
+	}
+	if !strings.Contains(err.Error(), "SQL: invalid") {
+		t.Fatalf("error does not contain the short SQL statement: %v", err)
 	}
 }

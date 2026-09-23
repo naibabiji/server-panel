@@ -170,6 +170,13 @@ func ManagedFilePath(db *sql.DB, dataDir, rootPath, relativePath string, allowMi
 	return target, err
 }
 
+// ManagedFileEntryPath validates an existing managed entry and returns its
+// path without following the final symlink. Mutating operations must act on
+// the directory entry the user selected, never on the symlink target.
+func ManagedFileEntryPath(db *sql.DB, dataDir, rootPath, relativePath string) (string, error) {
+	return resolveManagedFileEntryPath(db, dataDir, rootPath, relativePath)
+}
+
 func CreateManagedDirectory(db *sql.DB, dataDir, rootPath, relativePath, name string) error {
 	if name != filepath.Base(name) || name == "." || name == ".." || strings.TrimSpace(name) == "" {
 		return errors.New("目录名称无效")
@@ -189,7 +196,7 @@ func RenameManagedFile(db *sql.DB, dataDir, rootPath, relativePath, newName stri
 	if newName != filepath.Base(newName) || newName == "." || newName == ".." || strings.TrimSpace(newName) == "" {
 		return errors.New("新名称无效")
 	}
-	source, _, err := resolveManagedFilePath(db, dataDir, rootPath, relativePath, false)
+	source, err := resolveManagedFileEntryPath(db, dataDir, rootPath, relativePath)
 	if err != nil {
 		return err
 	}
@@ -208,7 +215,7 @@ func RenameManagedFile(db *sql.DB, dataDir, rootPath, relativePath, newName stri
 }
 
 func DeleteManagedFile(db *sql.DB, dataDir, rootPath, relativePath string) error {
-	target, _, err := resolveManagedFilePath(db, dataDir, rootPath, relativePath, false)
+	target, err := resolveManagedFileEntryPath(db, dataDir, rootPath, relativePath)
 	if err != nil {
 		return err
 	}
@@ -268,7 +275,7 @@ func CompressManagedFile(db *sql.DB, dataDir, rootPath, relativePath string) (st
 	if isManagedRootRelativePath(relativePath) {
 		return "", errors.New("不能压缩整个管理根目录，请选择其中的文件或子目录")
 	}
-	source, _, err := resolveManagedFilePath(db, dataDir, rootPath, relativePath, false)
+	source, err := resolveManagedFileEntryPath(db, dataDir, rootPath, relativePath)
 	if err != nil {
 		return "", err
 	}
@@ -518,6 +525,26 @@ func resolveManagedFilePath(db *sql.DB, dataDir, rootPath, relativePath string, 
 		target = resolved
 	}
 	return target, resolvedRoot, nil
+}
+
+func resolveManagedFileEntryPath(db *sql.DB, dataDir, rootPath, relativePath string) (string, error) {
+	// First validate the existing entry and its resolved target with the same
+	// containment and protected-directory rules used by read operations.
+	if _, _, err := resolveManagedFilePath(db, dataDir, rootPath, relativePath, false); err != nil {
+		return "", err
+	}
+
+	rel := strings.TrimPrefix(filepath.Clean("/"+relativePath), "/")
+	parentRel := filepath.Dir(rel)
+	parent, _, err := resolveManagedFilePath(db, dataDir, rootPath, parentRel, false)
+	if err != nil {
+		return "", err
+	}
+	entry := filepath.Join(parent, filepath.Base(rel))
+	if _, err := os.Lstat(entry); err != nil {
+		return "", err
+	}
+	return entry, nil
 }
 
 func isManagedRootRelativePath(path string) bool {
