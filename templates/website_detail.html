@@ -8,7 +8,8 @@
         </div>
         <div class="flex gap-2">
             <a :href="w.id ? w.id + '/edit' : '#'" class="btn-secondary text-sm">{{t .Lang "common.edit"}}</a>
-            <a href=".." class="text-sm text-gray-400 hover:text-white">{{t .Lang "server_detail.back_to_list"}}</a>
+            <button @click="deleteWebsite()" class="btn-danger text-sm" :disabled="deleting || !w.id">{{t .Lang "common.delete"}}</button>
+            <a href="/{{.RandomSuffix}}/websites" class="text-sm text-gray-400 hover:text-white">{{t .Lang "server_detail.back_to_list"}}</a>
         </div>
     </div>
 
@@ -68,7 +69,7 @@
 <script>
 function websiteDetail() {
     return {
-        w: {}, loading: true, panelPassword: '',
+        w: {}, loading: true, deleting: false, panelPassword: '',
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
             try { const d = await api('/api/websites/' + id); this.w = d.data; }
@@ -85,6 +86,17 @@ function websiteDetail() {
         customerURL() {
             if (!this.w.customer_id) return '#';
             return (document.body.dataset.panelPrefix || '') + '/customers/' + this.w.customer_id;
+        },
+        async deleteWebsite() {
+            if (!this.w.id || !await confirmModal(t('website.delete_confirm'))) return;
+            this.deleting = true;
+            try {
+                await api('/api/websites/' + this.w.id, {method: 'DELETE'});
+                window.location.href = (document.body.dataset.panelPrefix || '') + '/websites';
+            } catch(e) {
+                showToast(e.message, 'error');
+                this.deleting = false;
+            }
         },
         async revealPanelPassword() {
             try {
