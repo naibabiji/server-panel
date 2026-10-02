@@ -14,6 +14,7 @@ import (
 	"github.com/naibabiji/server-panel/executor"
 	"github.com/naibabiji/server-panel/i18n"
 	"github.com/naibabiji/server-panel/models"
+	"github.com/naibabiji/server-panel/releasecheck"
 )
 
 type UpdateHandler struct {
@@ -60,7 +61,7 @@ func (h *UpdateHandler) CheckUpdate(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse(i18n.TE(c.Request, "errors.update.check_failed", i18n.P{"error": err.Error()})))
 		return
 	}
-	hasUpdate := executor.CompareVersions(release.TagName, current) > 0
+	hasUpdate := releasecheck.CompareVersions(release.TagName, current) > 0
 	notes := release.Body
 	if idx := strings.Index(notes, "**Full Changelog**"); idx >= 0 {
 		notes = strings.TrimSpace(notes[:idx])

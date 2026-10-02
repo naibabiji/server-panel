@@ -76,6 +76,11 @@ var upgrades = []Upgrade{
 		Description: "Track TCP-level server reachability so a lost Agent heartbeat can be told apart from a genuinely unreachable server",
 		Func:        addTCPReachabilityColumns,
 	},
+	{
+		Version:     "1.8.0",
+		Description: "Record alert resolve time for flap debounce and Agent self-update status",
+		Func:        addAlertResolvedAtAndAgentUpdateColumns,
+	},
 }
 
 // addTCPReachabilityColumns checks column existence via columnExists rather
@@ -85,12 +90,28 @@ var upgrades = []Upgrade{
 // enough to already have every earlier upgrade applied. This is simpler to
 // just check directly.
 func addTCPReachabilityColumns() error {
-	columns := []struct{ name, ddl string }{
-		{"tcp_reachable", `ALTER TABLE servers ADD COLUMN tcp_reachable INTEGER`},
-		{"tcp_reachable_checked_at", `ALTER TABLE servers ADD COLUMN tcp_reachable_checked_at DATETIME`},
-	}
+	return addMissingColumns([]missingColumn{
+		{"servers", "tcp_reachable", `ALTER TABLE servers ADD COLUMN tcp_reachable INTEGER`},
+		{"servers", "tcp_reachable_checked_at", `ALTER TABLE servers ADD COLUMN tcp_reachable_checked_at DATETIME`},
+	})
+}
+
+func addAlertResolvedAtAndAgentUpdateColumns() error {
+	return addMissingColumns([]missingColumn{
+		{"alert_log", "resolved_at", `ALTER TABLE alert_log ADD COLUMN resolved_at DATETIME`},
+		{"servers", "agent_auto_update", `ALTER TABLE servers ADD COLUMN agent_auto_update INTEGER NOT NULL DEFAULT 0`},
+		{"servers", "agent_update_error", `ALTER TABLE servers ADD COLUMN agent_update_error TEXT NOT NULL DEFAULT ''`},
+	})
+}
+
+type missingColumn struct{ table, name, ddl string }
+
+// addMissingColumns adds each column only when columnExists says it is
+// absent, so the upgrade is safe on fresh installs (baseline already has the
+// column) and on re-runs.
+func addMissingColumns(columns []missingColumn) error {
 	for _, col := range columns {
-		exists, err := columnExists("servers", col.name)
+		exists, err := columnExists(col.table, col.name)
 		if err != nil {
 			return err
 		}

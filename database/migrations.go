@@ -68,6 +68,8 @@ var migrations = []string{
 		agent_api_key_hash    TEXT NOT NULL DEFAULT '',
 		agent_api_key_enc     TEXT NOT NULL DEFAULT '',
 		agent_version         TEXT NOT NULL DEFAULT '',
+		agent_auto_update     INTEGER NOT NULL DEFAULT 0,
+		agent_update_error    TEXT NOT NULL DEFAULT '',
 		last_seen_at          DATETIME,
 		is_online             INTEGER NOT NULL DEFAULT 0,
 		http_probe_enabled    INTEGER NOT NULL DEFAULT 0,
@@ -166,6 +168,7 @@ var migrations = []string{
 		level      TEXT NOT NULL DEFAULT 'warning',
 		message    TEXT NOT NULL,
 		resolved   INTEGER NOT NULL DEFAULT 0,
+		resolved_at DATETIME,
 		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 	)`,
 	`CREATE INDEX IF NOT EXISTS idx_alert_log_type ON alert_log(alert_type, created_at)`,

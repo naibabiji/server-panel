@@ -41,7 +41,11 @@
                     <td class="table-cell text-gray-400" x-text="panelTypeLabel(s.panel_type)"></td>
                     <td class="table-cell text-gray-400" x-text="s.website_count || 0"></td>
                     <td class="table-cell"><span :class="s.status=='active'?'badge-success':'badge-danger'" x-text="s.status=='active'?t('common.status_active'):t('common.status_expired')"></span></td>
-                    <td class="table-cell"><span :class="serverStatus(s).cls" x-text="serverStatus(s).label"></span></td>
+                    <td class="table-cell">
+                        <span :class="serverStatus(s).cls" x-text="serverStatus(s).label"></span>
+                        <span x-show="agentUpdateState(s) === 'manual'" class="badge-warning ml-1">{{t .Lang "server.agent_needs_upgrade"}}</span>
+                        <span x-show="agentUpdateState(s) === 'failed'" class="badge-danger ml-1" :title="s.agent_update_error">{{t .Lang "server.agent_update_failed"}}</span>
+                    </td>
                     <td class="table-cell" :class="expiryClass(s.expiry_date)" x-text="s.expiry_date || '--'"></td>
                     <td class="table-cell">
                         <div class="flex gap-2">

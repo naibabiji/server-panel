@@ -96,6 +96,8 @@ type Server struct {
 	AgentAPIKeyEnc     string  `json:"-"`
 	AgentAPIKey        string  `json:"agent_api_key,omitempty"`
 	AgentVersion       string  `json:"agent_version"`
+	AgentAutoUpdate    bool    `json:"agent_auto_update"`
+	AgentUpdateError   string  `json:"agent_update_error"`
 	LastSeenAt         string  `json:"last_seen_at"`
 	IsOnline           bool    `json:"is_online"`
 	HTTPProbeEnabled   int     `json:"http_probe_enabled"`

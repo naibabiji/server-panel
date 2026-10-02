@@ -5,12 +5,21 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
 )
 
-func Report(centerURL, apiKey, version string, snapshot *MetricSnapshot, skipVerify bool) error {
+// UpdateStatus is the self-update state reported alongside metrics.
+type UpdateStatus struct {
+	AutoUpdate bool
+	Error      string
+}
+
+// Report sends one metrics snapshot and returns the version the panel wants
+// this Agent to update to ("" for none).
+func Report(centerURL, apiKey, version string, snapshot *MetricSnapshot, status UpdateStatus, skipVerify bool) (string, error) {
 	payload := map[string]interface{}{
 		"agent_version":      version,
 		"cpu_percent":        snapshot.CPUPercent,
@@ -26,11 +35,13 @@ func Report(centerURL, apiKey, version string, snapshot *MetricSnapshot, skipVer
 		"load_avg_5":         snapshot.LoadAvg5,
 		"load_avg_15":        snapshot.LoadAvg15,
 		"uptime_seconds":     snapshot.UptimeSeconds,
+		"auto_update":        status.AutoUpdate,
+		"update_error":       status.Error,
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("marshal failed: %w", err)
+		return "", fmt.Errorf("marshal failed: %w", err)
 	}
 
 	transport := &http.Transport{
@@ -52,7 +63,7 @@ func Report(centerURL, apiKey, version string, snapshot *MetricSnapshot, skipVer
 
 		req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
 		if err != nil {
-			return fmt.Errorf("build request failed: %w", err)
+			return "", fmt.Errorf("build request failed: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Agent-API-Key", apiKey)
@@ -63,8 +74,18 @@ func Report(centerURL, apiKey, version string, snapshot *MetricSnapshot, skipVer
 			continue
 		}
 		if resp.StatusCode == http.StatusOK {
+			var parsed struct {
+				Data struct {
+					AgentUpdate struct {
+						Version string `json:"version"`
+					} `json:"agent_update"`
+				} `json:"data"`
+			}
+			// A body that fails to decode (e.g. an older panel) just means
+			// no update target; the report itself succeeded.
+			_ = json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&parsed)
 			resp.Body.Close()
-			return nil
+			return parsed.Data.AgentUpdate.Version, nil
 		}
 		lastErr = fmt.Errorf("unexpected status: %d", resp.StatusCode)
 		resp.Body.Close()
@@ -77,5 +98,5 @@ func Report(centerURL, apiKey, version string, snapshot *MetricSnapshot, skipVer
 		}
 	}
 
-	return lastErr
+	return "", lastErr
 }

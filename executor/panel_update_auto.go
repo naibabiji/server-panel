@@ -10,6 +10,7 @@ import (
 
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/releasecheck"
 )
 
 const (
@@ -79,10 +80,10 @@ func runPanelAutoUpdateCheck(currentVersion, configPath string, cfg *config.Conf
 		log.Printf("自动更新检查失败: %v", err)
 		return
 	}
-	if CompareVersions(release.TagName, currentVersion) <= 0 {
+	if releasecheck.CompareVersions(release.TagName, currentVersion) <= 0 {
 		return
 	}
-	if !IsStableVersion(release.TagName) {
+	if !releasecheck.IsStableVersion(release.TagName) {
 		return // never auto-install a prerelease
 	}
 
@@ -90,7 +91,7 @@ func runPanelAutoUpdateCheck(currentVersion, configPath string, cfg *config.Conf
 	if mode == "" {
 		mode = "patch_only"
 	}
-	if mode == "patch_only" && !IsPatchBump(currentVersion, release.TagName) {
+	if mode == "patch_only" && !releasecheck.IsPatchBump(currentVersion, release.TagName) {
 		return // minor/major bumps always require a manual click
 	}
 

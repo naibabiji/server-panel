@@ -69,6 +69,10 @@ var i18nKeys = []string{
 	"server_detail.uninstall_cmd_note", "server_detail.uninstall_cmd_title", "server_detail.view_failed",
 	"server_detail.view_password", "server_detail.website_status_expired", "server_detail.website_status_running",
 	"server_detail.websites_load_failed",
+	"server_detail.modal_title_proxy", "server_detail.modal_title_upgrade",
+	"server_detail.generate_install_command", "server_detail.generate_upgrade_command",
+	"server_detail.upgrade_cmd_title", "server_detail.upgrade_cmd_note", "server_detail.upgrade_cmd_generated",
+	"server_detail.release_info_invalid",
 	"server_form.cycle_2year", "server_form.cycle_3year", "server_form.cycle_monthly",
 	"server_form.cycle_quarterly", "server_form.cycle_yearly", "server_form.probe_off",
 	"server_form.type_dedicated", "server_form.type_other", "server_form.type_shared",
@@ -235,7 +239,7 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 	ag.Use(middleware.AgentIPRateLimit())
 	ag.Use(middleware.AgentAuth(db))
 	{
-		ah := &handlers.AgentDataHandler{DB: db}
+		ah := &handlers.AgentDataHandler{DB: db, PanelVersion: cfg.Panel.Version}
 		ag.POST("/agent/ping", ah.Ping)
 		ag.POST("/agent/uninstall", ah.Uninstall)
 		ag.POST("/agent/metrics", ah.ReceiveMetrics)
@@ -296,6 +300,8 @@ func SetupRouter(cfg *config.Config, db *sql.DB, staticFS fs.FS, templatesFS fs.
 			protected.DELETE("/api/servers/:id", srvH.Delete)
 			protected.POST("/api/servers/:id/agent-key/regenerate", srvH.RegenerateAgentKey)
 			protected.POST("/api/servers/:id/agent/uninstall", srvH.PrepareAgentUninstall)
+			agentReleaseH := &handlers.AgentReleaseHandler{PanelVersion: cfg.Panel.Version}
+			protected.POST("/api/agent/install-info", agentReleaseH.InstallInfo)
 
 			customerH := &handlers.CustomerHandler{DB: db}
 			protected.GET("/api/customers", customerH.List)

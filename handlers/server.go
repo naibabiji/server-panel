@@ -75,7 +75,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 		s.location, s.ssh_port, s.ssh_username, s.panel_type,
 		(SELECT COUNT(*) FROM websites w WHERE w.server_id = s.id), s.panel_url, s.panel_username,
 		s.purchase_date, s.expiry_date, s.renewal_cycle, s.auto_renewal, s.purchase_price, s.currency,
-		` + effectiveServerStatusSQL + `, s.agent_version, s.last_seen_at, s.is_online,
+		` + effectiveServerStatusSQL + `, s.agent_version, s.agent_auto_update, s.agent_update_error, s.last_seen_at, s.is_online,
 		s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at, s.http_probe_last_error,
 		s.tcp_reachable, s.tcp_reachable_checked_at,
 		s.status_page_enabled, s.notes, s.created_at, s.updated_at
@@ -101,7 +101,7 @@ func (h *ServerHandler) List(c *gin.Context) {
 			&s.CPUCores, &s.RAMGB, &s.DiskGB, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
 			&s.Location, &s.SSHPort, &s.SSHUsername, &s.PanelType, &s.WebsiteCount, &s.PanelURL, &s.PanelUsername,
 			&s.PurchaseDate, &s.ExpiryDate, &s.RenewalCycle, &s.AutoRenewal, &s.PurchasePrice, &s.Currency,
-			&s.Status, &s.AgentVersion, &lastSeen, &s.IsOnline,
+			&s.Status, &s.AgentVersion, &s.AgentAutoUpdate, &s.AgentUpdateError, &lastSeen, &s.IsOnline,
 			&s.HTTPProbeEnabled, &probeHealthy, &probeLast, &s.HTTPProbeLastError,
 			&tcpReachable, &tcpReachableAt,
 			&s.StatusPageEnabled, &s.Notes, &s.CreatedAt, &s.UpdatedAt)
@@ -165,7 +165,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 		s.cpu_cores, s.ram_gb, s.disk_gb, s.bandwidth, s.provider_id, COALESCE(p.name,''),
 		s.location, s.ssh_port, s.ssh_username, s.ssh_password_enc, s.panel_type, s.panel_url, s.panel_username,
 		s.panel_password_enc, s.purchase_date, s.expiry_date, s.renewal_cycle, s.auto_renewal, s.purchase_price, s.currency,
-		`+effectiveServerStatusSQL+`, s.agent_api_key_enc, s.agent_version, s.last_seen_at, s.is_online,
+		`+effectiveServerStatusSQL+`, s.agent_api_key_enc, s.agent_version, s.agent_auto_update, s.agent_update_error, s.last_seen_at, s.is_online,
 		s.http_probe_enabled, s.http_probe_healthy, s.http_probe_last_at, s.http_probe_last_error,
 		s.tcp_reachable, s.tcp_reachable_checked_at,
 		s.status_page_enabled, s.status_page_token, s.notes, s.created_at, s.updated_at
@@ -177,7 +177,7 @@ func (h *ServerHandler) Get(c *gin.Context) {
 		&s.CPUCores, &s.RAMGB, &s.DiskGB, &s.Bandwidth, &s.ProviderID, &s.ProviderName,
 		&s.Location, &s.SSHPort, &s.SSHUsername, &s.SSHPasswordEnc, &s.PanelType, &s.PanelURL, &s.PanelUsername,
 		&s.PanelPasswordEnc, &s.PurchaseDate, &s.ExpiryDate, &s.RenewalCycle, &s.AutoRenewal, &s.PurchasePrice, &s.Currency,
-		&s.Status, &s.AgentAPIKeyEnc, &s.AgentVersion, &lastSeen, &s.IsOnline,
+		&s.Status, &s.AgentAPIKeyEnc, &s.AgentVersion, &s.AgentAutoUpdate, &s.AgentUpdateError, &lastSeen, &s.IsOnline,
 		&s.HTTPProbeEnabled, &probeHealthy, &probeLast, &s.HTTPProbeLastError,
 		&tcpReachable, &tcpReachableAt,
 		&s.StatusPageEnabled, &s.StatusPageToken, &s.Notes, &s.CreatedAt, &s.UpdatedAt)
@@ -265,7 +265,8 @@ func (h *ServerHandler) RegenerateAgentKey(c *gin.Context) {
 	result, err := h.DB.Exec(
 		`UPDATE servers
 		 SET agent_api_key_hash = ?, agent_api_key_enc = '',
-		     agent_version = '', last_seen_at = NULL, is_online = 0,
+		     agent_version = '', agent_auto_update = 0, agent_update_error = '',
+		     last_seen_at = NULL, is_online = 0,
 		     tcp_reachable = NULL, tcp_reachable_checked_at = NULL,
 		     updated_at = CURRENT_TIMESTAMP
 		 WHERE id = ?`,
@@ -290,7 +291,8 @@ func (h *ServerHandler) PrepareAgentUninstall(c *gin.Context) {
 	result, err := h.DB.Exec(
 		`UPDATE servers
 		 SET agent_api_key_hash = '', agent_api_key_enc = '',
-		     agent_version = '', last_seen_at = NULL, is_online = 0,
+		     agent_version = '', agent_auto_update = 0, agent_update_error = '',
+		     last_seen_at = NULL, is_online = 0,
 		     tcp_reachable = NULL, tcp_reachable_checked_at = NULL,
 		     updated_at = CURRENT_TIMESTAMP
 		 WHERE id = ?`,

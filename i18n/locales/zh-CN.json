@@ -115,7 +115,9 @@
     "col_actions": "操作",
     "empty": "暂无服务器，点击右上角添加",
     "renew_title": "续费 {{name}}",
-    "delete_confirm": "确认删除此服务器？"
+    "delete_confirm": "确认删除此服务器？",
+    "agent_needs_upgrade": "Agent 需手动升级",
+    "agent_update_failed": "Agent 更新失败"
   },
   "server_form": {
     "title_edit": "编辑服务器",
@@ -255,7 +257,17 @@
     "uninstall_cmd_note": "在目标服务器执行该命令会停止并删除 Agent 服务。执行完后，回到此处点“确认已卸载”以清除面板记录。",
     "uninstall_cmd_generated": "Agent 卸载命令已生成",
     "agent_uninstalled_cleared": "Agent 已卸载，面板记录已清除",
-    "command_copied": "命令已复制"
+    "command_copied": "命令已复制",
+    "upgrade_agent": "升级 Agent",
+    "agent_version_label": "Agent 版本：",
+    "agent_manual_upgrade_notice": "该 Agent 版本过旧，不支持自动更新。请点击“升级 Agent”生成命令，在该服务器上以 root 执行一次；之后的版本会跟随面板自动升级。",
+    "agent_update_failed_notice": "最近一次 Agent 自动更新失败，已自动回滚，稍后会再次尝试。原因：",
+    "modal_title_upgrade": "升级 Agent",
+    "generate_upgrade_command": "生成升级命令",
+    "upgrade_cmd_title": "复制到该服务器以 root 执行",
+    "upgrade_cmd_note": "升级命令沿用该服务器现有的 Agent 配置和 Key，面板无需任何改动。执行后会安装最新 Agent 及自动更新组件，之后的版本会跟随面板自动升级。",
+    "upgrade_cmd_generated": "Agent 升级命令已生成",
+    "release_info_invalid": "面板返回的 Agent 发布信息格式无效"
   },
   "website": {
     "search_placeholder": "搜索名称/域名...",
@@ -799,7 +811,9 @@
     "agent": {
       "invalid_metrics": "无效的指标数据",
       "write_metrics_failed": "写入指标失败",
-      "marked_uninstalled": "Agent 已标记为卸载"
+      "marked_uninstalled": "Agent 已标记为卸载",
+      "invalid_proxy": "GitHub 反代地址必须是 http:// 或 https:// 开头的有效地址",
+      "release_info_failed": "获取并校验 Agent 发布签名失败：{{error}}"
     },
     "alert": {
       "smtp_test_failed": "SMTP 测试失败: {{error}}",

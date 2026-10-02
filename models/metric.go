@@ -36,4 +36,9 @@ type AgentMetricPayload struct {
 	LoadAvg5       float64 `json:"load_avg_5"`
 	LoadAvg15      float64 `json:"load_avg_15"`
 	UptimeSeconds  int64   `json:"uptime_seconds"`
+	// AutoUpdate is true when the Agent's root self-update helper is
+	// installed; UpdateError is its last failed attempt ("" if none).
+	// Agents predating self-update omit both.
+	AutoUpdate  bool   `json:"auto_update"`
+	UpdateError string `json:"update_error"`
 }

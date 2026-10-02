@@ -167,7 +167,8 @@
             <div class="text-base font-semibold text-gray-100">{{t .Lang "server_detail.section_agent"}}</div>
             <div class="flex items-center gap-2">
                 <a :href="monitorURL()" class="btn-secondary text-sm" x-show="hasAgent()">{{t .Lang "server_detail.view_monitor"}}</a>
-                <button x-show="!hasAgent()" @click="openAgentProxyModal()" class="btn-secondary text-sm" :disabled="savingAgent">{{t .Lang "server_detail.install_via_proxy"}}</button>
+                <button x-show="!hasAgent()" @click="openAgentProxyModal('install')" class="btn-secondary text-sm" :disabled="savingAgent">{{t .Lang "server_detail.install_via_proxy"}}</button>
+                <button x-show="agentNeedsUpgradeCommand()" @click="openAgentProxyModal('upgrade')" class="btn-primary text-sm" :disabled="savingAgent">{{t .Lang "server_detail.upgrade_agent"}}</button>
                 <button @click="hasAgent() ? showUninstallCommand() : showInstallCommand()" class="btn-secondary text-sm" :disabled="savingAgent">
                     <span x-show="!savingAgent" x-text="hasAgent() ? t('server_detail.uninstall_agent') : t('server_detail.install_agent')"></span>
                     <span x-show="savingAgent">{{t .Lang "server_detail.generating"}}</span>
@@ -177,7 +178,10 @@
         </div>
         <div class="p-5">
         <div class="text-sm text-gray-400 mb-2"><span>{{t .Lang "server_detail.agent_status_label"}}</span><span x-text="hasAgent() ? t('server_detail.agent_installed') : t('server_detail.agent_not_installed')"></span></div>
+        <div class="text-sm text-gray-400 mb-2" x-show="s.agent_version"><span>{{t .Lang "server_detail.agent_version_label"}}</span><span x-text="s.agent_version"></span></div>
         <div class="text-sm text-gray-400 mb-3" x-show="s.last_seen_at"><span>{{t .Lang "server_detail.last_reported"}}</span><span x-text="s.last_seen_at"></span></div>
+        <div class="text-sm text-yellow-400 mb-3" x-show="agentUpdateState(s) === 'manual'">{{t .Lang "server_detail.agent_manual_upgrade_notice"}}</div>
+        <div class="text-sm text-red-400 mb-3 break-all" x-show="agentUpdateState(s) === 'failed'"><span>{{t .Lang "server_detail.agent_update_failed_notice"}}</span><span x-text="s.agent_update_error"></span></div>
         <div class="text-sm text-gray-400 mb-3" x-show="agentCommand">{{t .Lang "server_detail.paste_hint"}}</div>
         <template x-if="agentCommand">
             <div class="p-3 bg-[#11151a] border border-[#2a3038] rounded">
@@ -194,14 +198,14 @@
 
     <div class="modal-overlay" x-show="agentProxyModalOpen" x-cloak @click.self="agentProxyModalOpen=false">
         <div class="modal-content max-w-lg">
-            <div class="text-base font-semibold text-gray-100 mb-4">{{t .Lang "server_detail.modal_title_proxy"}}</div>
+            <div class="text-base font-semibold text-gray-100 mb-4" x-text="agentProxyModalMode === 'upgrade' ? t('server_detail.modal_title_upgrade') : t('server_detail.modal_title_proxy')"></div>
             <label class="label">{{t .Lang "server_detail.github_proxy_label"}}</label>
             <input type="text" x-model="agentGithubProxyDraft" class="input-field w-full" placeholder="{{t .Lang "server_detail.github_proxy_placeholder"}}">
             <div class="text-xs text-gray-500 mt-2">{{t .Lang "server_detail.github_proxy_hint"}}</div>
             <div class="flex justify-end gap-2 mt-5">
                 <button @click="agentProxyModalOpen=false" class="btn-secondary text-sm">{{t .Lang "common.cancel"}}</button>
-                <button @click="showInstallCommand(agentGithubProxyDraft)" class="btn-primary text-sm" :disabled="savingAgent">
-                    <span x-show="!savingAgent">{{t .Lang "server_detail.generate_install_command"}}</span>
+                <button @click="agentProxyModalMode === 'upgrade' ? showUpgradeCommand(agentGithubProxyDraft) : showInstallCommand(agentGithubProxyDraft)" class="btn-primary text-sm" :disabled="savingAgent">
+                    <span x-show="!savingAgent" x-text="agentProxyModalMode === 'upgrade' ? t('server_detail.generate_upgrade_command') : t('server_detail.generate_install_command')"></span>
                     <span x-show="savingAgent">{{t .Lang "server_detail.generating"}}</span>
                 </button>
             </div>
@@ -211,7 +215,7 @@
 <script>
 function serverDetail() {
     return {
-        s: {}, loading: true, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false, agentProxyModalOpen: false, agentGithubProxyDraft: '',
+        s: {}, loading: true, websites: [], websitesLoading: true, savingAgent: false, agentCommand: '', agentCommandTitle: '', agentCommandNote: '', agentUninstallMode: false, agentProxyModalOpen: false, agentProxyModalMode: 'install', agentGithubProxyDraft: '',
         secrets: {'ssh-password':'', 'panel-password':''},
         async init() {
             const id = window.location.pathname.split('/').filter(Boolean).pop();
@@ -236,6 +240,9 @@ function serverDetail() {
         },
         hasAgent() {
             return !!(this.s.agent_version || this.s.last_seen_at);
+        },
+        agentNeedsUpgradeCommand() {
+            return ['manual', 'failed'].includes(agentUpdateState(this.s));
         },
         monitorStatusText() {
             if (!this.hasAgent()) return t('server_detail.monitor_not_installed');
@@ -316,24 +323,52 @@ function serverDetail() {
         shellQuote(value) {
             return "'" + String(value || '').replace(/'/g, "'\\''") + "'";
         },
-        buildInstallCommand(agentKey, githubProxyURL = '') {
-            const centerURL = this.panelCenterURL();
+        buildInstallCommand(agentKey, githubProxyURL, release) {
             const tlsSkipVerify = '{{.TLSMode}}' === 'self_signed';
             return `#!/bin/sh
 set -e
-# 清理可能残留的旧 Agent，避免重复安装冲突
-systemctl disable --now server-panel-agent 2>/dev/null || true
-rm -f /usr/local/bin/server-panel-agent /etc/systemd/system/server-panel-agent.service /etc/server-panel/agent.json 2>/dev/null || true
-systemctl daemon-reload 2>/dev/null || true
-AGENT_VERSION="latest"
-CENTER_URL=${this.shellQuote(centerURL)}
+CENTER_URL=${this.shellQuote(this.panelCenterURL())}
 AGENT_API_KEY=${this.shellQuote(agentKey)}
+TLS_SKIP_VERIFY="${tlsSkipVerify}"
 GITHUB_PROXY_URL=${this.shellQuote(githubProxyURL)}
-INTERVAL_SECONDS="60"
+` + this.agentSetupScript(release);
+        },
+        // buildUpgradeCommand keeps this host's existing center URL and key, so
+        // upgrading an old Agent (one without the self-update helper) needs no
+        // key regeneration and no change in the panel.
+        buildUpgradeCommand(githubProxyURL, release) {
+            return `#!/bin/sh
+set -e
+CONF=/etc/server-panel/agent.json
+if [ ! -f "$CONF" ]; then
+  echo "未找到 $CONF，请在面板中改用安装命令" >&2
+  exit 1
+fi
+CENTER_URL="$(grep -o '"center_url":"[^"]*"' "$CONF" | sed 's/"center_url":"//;s/"//')"
+AGENT_API_KEY="$(grep -o '"api_key":"[^"]*"' "$CONF" | sed 's/"api_key":"//;s/"//')"
+TLS_SKIP_VERIFY="false"
+grep -Eq '"tls_skip_verify"[[:space:]]*:[[:space:]]*true' "$CONF" && TLS_SKIP_VERIFY="true"
+GITHUB_PROXY_URL=${this.shellQuote(githubProxyURL)}
+if [ -z "$CENTER_URL" ] || [ -z "$AGENT_API_KEY" ]; then
+  echo "无法从 $CONF 读取中心地址或密钥，请在面板中改用安装命令" >&2
+  exit 1
+fi
+` + this.agentSetupScript(release);
+        },
+        // agentSetupScript is the shared body of the install and upgrade
+        // commands. It expects CENTER_URL, AGENT_API_KEY, TLS_SKIP_VERIFY and
+        // GITHUB_PROXY_URL to be set, and installs release.version of the
+        // Agent plus its root self-update helper
+        // (server-panel-agent-update.path/.service). release.sha256 comes from
+        // POST /api/agent/install-info, which the panel verified against the
+        // release signing key: the binary that later backs the root updater
+        // must never be trusted on a hash served by the same proxy as itself.
+        agentSetupScript(release) {
+            return `AGENT_VERSION=${this.shellQuote(release.version)}
 ARCH="$(uname -m)"
 case "$ARCH" in
-  x86_64|amd64) ARCH="amd64" ;;
-  aarch64|arm64) ARCH="arm64" ;;
+  x86_64|amd64) ARCH="amd64"; EXPECTED_SUM=${this.shellQuote(release.sha256.amd64)} ;;
+  aarch64|arm64) ARCH="arm64"; EXPECTED_SUM=${this.shellQuote(release.sha256.arm64)} ;;
   *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
 esac
 github_url() {
@@ -343,37 +378,26 @@ github_url() {
     printf '%s' "$1"
   fi
 }
-AGENT_URL="$(github_url "https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/server-panel-agent-linux-\${ARCH}")"
-CHECKSUM_URL="$(github_url "https://github.com/naibabiji/server-panel/releases/\${AGENT_VERSION}/download/checksums-\${ARCH}.txt")"
+AGENT_URL="$(github_url "https://github.com/naibabiji/server-panel/releases/download/\${AGENT_VERSION}/server-panel-agent-linux-\${ARCH}")"
 
 id -u server-panel-agent >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin server-panel-agent
 
-install -d /etc/server-panel
 TMP_BIN="$(mktemp)"
-TMP_SUM="$(mktemp)"
 curl -fsSL "$AGENT_URL" -o "$TMP_BIN"
-curl -fsSL "$CHECKSUM_URL" -o "$TMP_SUM"
-EXPECTED_SUM="$(grep "server-panel-agent-linux-\${ARCH}\$" "$TMP_SUM" | awk '{print $1}')"
-if [ -z "$EXPECTED_SUM" ]; then
-  echo "未能在 checksums-\${ARCH}.txt 中找到 server-panel-agent-linux-\${ARCH} 的校验和" >&2
-  rm -f "$TMP_BIN" "$TMP_SUM"
-  exit 1
-fi
+# EXPECTED_SUM 由面板用内置发布公钥校验签名后写入本命令，下载源（含反代）无法替换
 ACTUAL_SUM="$(sha256sum "$TMP_BIN" | awk '{print $1}')"
 if [ "$EXPECTED_SUM" != "$ACTUAL_SUM" ]; then
-  echo "Agent 二进制校验和不匹配，可能下载不完整或被篡改，已中止安装" >&2
-  rm -f "$TMP_BIN" "$TMP_SUM"
+  echo "Agent 二进制与已签名的校验和不匹配，可能下载不完整或被篡改，已中止安装" >&2
+  rm -f "$TMP_BIN"
   exit 1
 fi
-rm -f "$TMP_SUM"
-mv "$TMP_BIN" /usr/local/bin/server-panel-agent
-chmod 755 /usr/local/bin/server-panel-agent
-cat >/etc/server-panel/agent.json <<EOF
-{"center_url":"${centerURL}","api_key":"${agentKey}","interval_seconds":60,"tls_skip_verify":${tlsSkipVerify}}
+# 先把新配置和服务文件全部准备好，再停止旧 Agent 并切换；切换中任一步失败都会自动恢复原有 Agent
+STAGE="$(mktemp -d)"
+BACKUP="$(mktemp -d)"
+cat >"$STAGE/agent.json" <<EOF
+{"center_url":"\${CENTER_URL}","api_key":"\${AGENT_API_KEY}","interval_seconds":60,"tls_skip_verify":\${TLS_SKIP_VERIFY},"github_proxy":"\${GITHUB_PROXY_URL}"}
 EOF
-chown server-panel-agent:server-panel-agent /etc/server-panel/agent.json
-chmod 600 /etc/server-panel/agent.json
-cat >/etc/systemd/system/server-panel-agent.service <<'EOF'
+cat >"$STAGE/server-panel-agent.service" <<'EOF'
 [Unit]
 Description=Server Panel Agent
 After=network-online.target
@@ -386,6 +410,7 @@ Group=server-panel-agent
 ExecStart=/usr/local/bin/server-panel-agent -config /etc/server-panel/agent.json
 Restart=always
 RestartSec=10
+StateDirectory=server-panel-agent
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
@@ -399,8 +424,59 @@ LockPersonality=true
 [Install]
 WantedBy=multi-user.target
 EOF
+# 自动更新组件：Agent 收到面板的新版本通知后写入请求文件，由 root 校验发布签名后升级，失败自动回滚
+cat >"$STAGE/server-panel-agent-update.path" <<'EOF'
+[Unit]
+Description=Server Panel Agent self-update trigger
+
+[Path]
+PathExists=/var/lib/server-panel-agent/update-request
+
+[Install]
+WantedBy=multi-user.target
+EOF
+cat >"$STAGE/server-panel-agent-update.service" <<'EOF'
+[Unit]
+Description=Server Panel Agent self-update
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/server-panel-agent -self-update -config /etc/server-panel/agent.json
+TimeoutStartSec=15min
+EOF
+AGENT_FILES="/usr/local/bin/server-panel-agent /etc/server-panel/agent.json /etc/systemd/system/server-panel-agent.service /etc/systemd/system/server-panel-agent-update.path /etc/systemd/system/server-panel-agent-update.service"
+for f in $AGENT_FILES; do
+  if [ -e "$f" ]; then cp -p "$f" "$BACKUP/$(basename "$f")"; fi
+done
+SWITCHING=0
+restore_old_agent() {
+  if [ "$SWITCHING" = 1 ]; then
+    echo "安装未完成，正在恢复原有 Agent" >&2
+    systemctl disable --now server-panel-agent server-panel-agent-update.path 2>/dev/null || true
+    for f in $AGENT_FILES; do
+      rm -f "$f"
+      if [ -e "$BACKUP/$(basename "$f")" ]; then cp -p "$BACKUP/$(basename "$f")" "$f"; fi
+    done
+    systemctl daemon-reload || true
+    if [ -e /usr/local/bin/server-panel-agent ]; then systemctl enable --now server-panel-agent || true; fi
+    if [ -e /etc/systemd/system/server-panel-agent-update.path ]; then systemctl enable --now server-panel-agent-update.path || true; fi
+  fi
+  rm -rf "$STAGE" "$BACKUP" "$TMP_BIN"
+}
+trap restore_old_agent EXIT
+SWITCHING=1
+systemctl disable --now server-panel-agent server-panel-agent-update.path 2>/dev/null || true
+install -d /etc/server-panel
+install -m 755 "$TMP_BIN" /usr/local/bin/server-panel-agent
+install -m 600 -o server-panel-agent -g server-panel-agent "$STAGE/agent.json" /etc/server-panel/agent.json
+install -m 644 "$STAGE/server-panel-agent.service" /etc/systemd/system/server-panel-agent.service
+install -m 644 "$STAGE/server-panel-agent-update.path" /etc/systemd/system/server-panel-agent-update.path
+install -m 644 "$STAGE/server-panel-agent-update.service" /etc/systemd/system/server-panel-agent-update.service
 systemctl daemon-reload
 systemctl enable --now server-panel-agent
+systemctl enable --now server-panel-agent-update.path
+systemctl is-active --quiet server-panel-agent
+SWITCHING=0
 systemctl status server-panel-agent --no-pager`;
         },
         // buildInstallCommand/buildUninstallCommand return shell scripts via JS
@@ -425,7 +501,9 @@ if [ -f /etc/server-panel/agent.json ]; then
   fi
 fi
 systemctl disable --now server-panel-agent || true
-rm -f /usr/local/bin/server-panel-agent /etc/systemd/system/server-panel-agent.service /etc/server-panel/agent.json
+systemctl disable --now server-panel-agent-update.path 2>/dev/null || true
+rm -f /usr/local/bin/server-panel-agent /usr/local/bin/server-panel-agent.bak /etc/systemd/system/server-panel-agent.service /etc/systemd/system/server-panel-agent-update.path /etc/systemd/system/server-panel-agent-update.service /etc/server-panel/agent.json
+rm -rf /var/lib/server-panel-agent /var/lib/server-panel-agent-update
 systemctl daemon-reload || true
 userdel server-panel-agent 2>/dev/null || true
 echo "Server Panel Agent 已卸载"`;
@@ -457,9 +535,39 @@ echo "Server Panel Agent 已卸载"`;
                 showToast(t('server_detail.copy_failed_content'),'error');
             }
         },
-        openAgentProxyModal() {
+        openAgentProxyModal(mode) {
+            this.agentProxyModalMode = mode;
             this.agentGithubProxyDraft = '';
             this.agentProxyModalOpen = true;
+        },
+        // fetchAgentRelease asks the panel for the Agent version to install and
+        // its signature-verified SHA-256 per architecture (see agentSetupScript).
+        async fetchAgentRelease(githubProxyURL) {
+            const d = await api('/api/agent/install-info', {method:'POST', body:{github_proxy: githubProxyURL}});
+            const r = d.data || {};
+            const hex = /^[0-9a-f]{64}$/;
+            if (!/^v\d+\.\d+\.\d+$/.test(r.version || '') || !r.sha256 || !hex.test(r.sha256.amd64 || '') || !hex.test(r.sha256.arm64 || '')) {
+                throw new Error(t('server_detail.release_info_invalid'));
+            }
+            return r;
+        },
+        async showUpgradeCommand(githubProxyURL = '') {
+            this.agentUninstallMode = false;
+            githubProxyURL = (githubProxyURL || '').trim();
+            if (githubProxyURL && !/^https?:\/\//i.test(githubProxyURL)) {
+                showToast(t('server_detail.proxy_url_invalid'), 'error');
+                return;
+            }
+            this.savingAgent = true;
+            try {
+                const release = await this.fetchAgentRelease(githubProxyURL);
+                this.agentCommandTitle = t('server_detail.upgrade_cmd_title');
+                this.agentCommand = this.buildUpgradeCommand(githubProxyURL, release);
+                this.agentCommandNote = t('server_detail.upgrade_cmd_note');
+                this.agentProxyModalOpen = false;
+                showToast(t('server_detail.upgrade_cmd_generated'),'success');
+            } catch(e) { showToast(e.message,'error'); }
+            this.savingAgent = false;
         },
         async showInstallCommand(githubProxyURL = '') {
             this.agentUninstallMode = false;
@@ -470,9 +578,10 @@ echo "Server Panel Agent 已卸载"`;
             }
             this.savingAgent = true;
             try {
+                const release = await this.fetchAgentRelease(githubProxyURL);
                 const d = await api('/api/servers/'+this.s.id+'/agent-key/regenerate', {method:'POST'});
                 this.agentCommandTitle = t('server_detail.install_cmd_title');
-                this.agentCommand = this.buildInstallCommand(d.data.agent_key, githubProxyURL);
+                this.agentCommand = this.buildInstallCommand(d.data.agent_key, githubProxyURL, release);
                 this.agentCommandNote = t('server_detail.install_cmd_note');
                 this.agentProxyModalOpen = false;
                 showToast(t('server_detail.install_cmd_generated'),'success');

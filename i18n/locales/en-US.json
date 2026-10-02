@@ -115,7 +115,9 @@
     "col_actions": "Actions",
     "empty": "No servers yet — click Add server in the top right",
     "renew_title": "Renew {{name}}",
-    "delete_confirm": "Delete this server?"
+    "delete_confirm": "Delete this server?",
+    "agent_needs_upgrade": "Agent needs manual upgrade",
+    "agent_update_failed": "Agent update failed"
   },
   "server_form": {
     "title_edit": "Edit Server",
@@ -255,7 +257,17 @@
     "uninstall_cmd_note": "Running this on the target server stops and removes the Agent service. Afterwards, come back here and click \"Confirm uninstalled\" to clear the panel record.",
     "uninstall_cmd_generated": "Agent uninstall command generated",
     "agent_uninstalled_cleared": "Agent uninstalled, panel record cleared",
-    "command_copied": "Command copied"
+    "command_copied": "Command copied",
+    "upgrade_agent": "Upgrade Agent",
+    "agent_version_label": "Agent version: ",
+    "agent_manual_upgrade_notice": "This Agent is too old to update itself. Click \"Upgrade Agent\" to generate a command and run it once as root on this server; later versions will follow the panel automatically.",
+    "agent_update_failed_notice": "The last automatic Agent update failed and was rolled back; it will be retried later. Reason: ",
+    "modal_title_upgrade": "Upgrade Agent",
+    "generate_upgrade_command": "Generate upgrade command",
+    "upgrade_cmd_title": "Run this as root on this server",
+    "upgrade_cmd_note": "The upgrade command keeps this server's existing Agent config and key; nothing changes in the panel. It installs the latest Agent plus the self-update helper, after which the Agent follows the panel version automatically.",
+    "upgrade_cmd_generated": "Agent upgrade command generated",
+    "release_info_invalid": "The panel returned invalid Agent release information"
   },
   "website": {
     "search_placeholder": "Search name/domain...",
@@ -799,7 +811,9 @@
     "agent": {
       "invalid_metrics": "Invalid metrics data",
       "write_metrics_failed": "Failed to write metrics",
-      "marked_uninstalled": "Agent marked as uninstalled"
+      "marked_uninstalled": "Agent marked as uninstalled",
+      "invalid_proxy": "The GitHub proxy must be a valid http:// or https:// URL",
+      "release_info_failed": "Failed to fetch and verify the Agent release signature: {{error}}"
     },
     "alert": {
       "smtp_test_failed": "SMTP test failed: {{error}}",

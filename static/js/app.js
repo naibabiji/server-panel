@@ -493,6 +493,18 @@ function serverStatus(s) {
     return { label: t('common.status_unknown'), cls: 'badge-warning' };
 }
 
+// agentUpdateState() tells server_list/server_detail which Agents need the
+// admin: 'manual' = the Agent predates self-update (no root updater
+// installed) and needs the one-time upgrade command; 'failed' = its last
+// automatic update failed and was rolled back (it retries after a cooldown).
+// '' = nothing to do; update-capable Agents follow the panel version alone.
+function agentUpdateState(s) {
+    if (!s || !s.agent_version) return '';
+    if (!s.agent_auto_update) return 'manual';
+    if (s.agent_update_error) return 'failed';
+    return '';
+}
+
 function showToast(message, type = 'info') {
     const colors = {
         success: 'background:#065f46;border-color:#059669;color:#a7f3d0;',

@@ -477,6 +477,7 @@ func newAlertTestDB(t *testing.T) *sql.DB {
 			level TEXT NOT NULL DEFAULT 'warning',
 			message TEXT NOT NULL,
 			resolved INTEGER NOT NULL DEFAULT 0,
+			resolved_at DATETIME,
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
 	}
@@ -490,5 +491,51 @@ func execAlertSQL(t *testing.T, db *sql.DB, stmt string, args ...interface{}) {
 	t.Helper()
 	if _, err := db.Exec(stmt, args...); err != nil {
 		t.Fatalf("exec %q: %v", stmt, err)
+	}
+}
+
+// Regression test for the 2026-10-02 incident: an Agent whose DNS kept
+// failing dropped its heartbeat, recovered, and dropped again many times a
+// day, and each flap created a fresh alert (and email). A condition that
+// returns within alertReopenWindow must reopen the same alert instead.
+func TestFlappingAlertReopensInsteadOfCreatingNew(t *testing.T) {
+	db := newAlertTestDB(t)
+	execAlertSQL(t, db, `INSERT INTO alert_rules (alert_type, threshold_value, enabled) VALUES ('server_offline', 5, 1)`)
+	execAlertSQL(t, db, `INSERT INTO servers (id, name, status, is_online, last_seen_at)
+		VALUES (10, 'flapping', 'active', 0, datetime('now', '-10 minutes'))`)
+
+	countAlerts := func() (total, open int) {
+		t.Helper()
+		if err := db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(resolved = 0), 0) FROM alert_log WHERE server_id = 10`).Scan(&total, &open); err != nil {
+			t.Fatalf("count alerts: %v", err)
+		}
+		return
+	}
+
+	checkOfflineAlerts(db)
+	if total, open := countAlerts(); total != 1 || open != 1 {
+		t.Fatalf("after first outage: total=%d open=%d, want 1/1", total, open)
+	}
+
+	// Agent recovers: alert resolves and records when.
+	execAlertSQL(t, db, `UPDATE servers SET is_online = 1, last_seen_at = datetime('now') WHERE id = 10`)
+	checkOfflineAlerts(db)
+	var resolvedAt sql.NullString
+	if err := db.QueryRow(`SELECT resolved_at FROM alert_log WHERE server_id = 10`).Scan(&resolvedAt); err != nil || !resolvedAt.Valid {
+		t.Fatalf("resolved_at = %v (err %v), want set", resolvedAt, err)
+	}
+
+	// Agent drops again shortly after: same row reopens, no new alert.
+	execAlertSQL(t, db, `UPDATE servers SET is_online = 0, last_seen_at = datetime('now', '-10 minutes') WHERE id = 10`)
+	checkOfflineAlerts(db)
+	if total, open := countAlerts(); total != 1 || open != 1 {
+		t.Fatalf("after flap: total=%d open=%d, want the original alert reopened (1/1)", total, open)
+	}
+
+	// A recurrence long after the incident was resolved is a new incident.
+	execAlertSQL(t, db, `UPDATE alert_log SET resolved = 1, resolved_at = datetime('now', '-2 hours') WHERE server_id = 10`)
+	checkOfflineAlerts(db)
+	if total, open := countAlerts(); total != 2 || open != 1 {
+		t.Fatalf("after old resolve: total=%d open=%d, want a new alert (2/1)", total, open)
 	}
 }

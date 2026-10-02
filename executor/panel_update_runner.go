@@ -5,9 +5,9 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"database/sql"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -26,6 +26,7 @@ import (
 
 	"github.com/naibabiji/server-panel/config"
 	"github.com/naibabiji/server-panel/database"
+	"github.com/naibabiji/server-panel/releasecheck"
 )
 
 const (
@@ -138,7 +139,7 @@ func ExecutePanelUpdate(opts PanelUpdateOptions) error {
 		panelUpdateMu.Unlock()
 		return err
 	}
-	if CompareVersions(release.TagName, opts.CurrentVersion) <= 0 {
+	if releasecheck.CompareVersions(release.TagName, opts.CurrentVersion) <= 0 {
 		panelUpdateMu.Unlock()
 		return fmt.Errorf("已经是最新版本")
 	}
@@ -236,18 +237,17 @@ func runPanelUpdate(opts PanelUpdateOptions, release *GithubRelease) {
 		fail("verify_signature", err)
 		return
 	}
-	sigBytes, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(sigRaw)))
-	if err != nil {
-		fail("verify_signature", fmt.Errorf("签名文件格式无效: %w", err))
-		return
-	}
-	if !VerifyReleaseSignature(checksumsBytes, sigBytes) {
-		fail("verify_signature", fmt.Errorf("签名校验失败，发布内容可能已被篡改"))
+	if err := releasecheck.VerifySignatureFile(checksumsBytes, sigRaw); err != nil {
+		if errors.Is(err, releasecheck.ErrSignatureFormat) {
+			fail("verify_signature", fmt.Errorf("签名文件格式无效: %w", err))
+		} else {
+			fail("verify_signature", fmt.Errorf("签名校验失败，发布内容可能已被篡改"))
+		}
 		return
 	}
 
 	setPanelUpdateStep("verify_checksum", "校验文件完整性", 78)
-	expectedHash, err := findChecksumForFile(string(checksumsBytes), binaryName)
+	expectedHash, err := releasecheck.ChecksumFor(string(checksumsBytes), binaryName)
 	if err != nil {
 		fail("verify_checksum", err)
 		return
@@ -425,27 +425,6 @@ func downloadFileRetry(url, dest string) error {
 		}
 	}
 	return lastErr
-}
-
-// findChecksumForFile parses `sha256sum`-style output ("<hash>  <filename>"
-// per line) and returns the hash for filename. The checksums file covers
-// multiple binaries (panel + agent), so matching by filename is required.
-func findChecksumForFile(checksumsContent, filename string) (string, error) {
-	for _, line := range strings.Split(checksumsContent, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			continue
-		}
-		name := strings.TrimPrefix(fields[len(fields)-1], "*")
-		if name == filename {
-			return fields[0], nil
-		}
-	}
-	return "", fmt.Errorf("校验文件中未找到 %s 的哈希", filename)
 }
 
 func sha256File(path string) (string, error) {

@@ -169,3 +169,41 @@ func TestRunUpgradesReportsShortInvalidSQLWithoutPanicking(t *testing.T) {
 		t.Fatalf("error does not contain the short SQL statement: %v", err)
 	}
 }
+
+// Legacy install: alert_log/servers predate the 1.8.0 columns; the upgrade
+// adds them, keeps existing rows, and is safe to re-run.
+func TestAddAlertResolvedAtAndAgentUpdateColumns(t *testing.T) {
+	withTestDB(t)
+	for _, stmt := range []string{
+		`CREATE TABLE servers (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
+		`CREATE TABLE alert_log (id INTEGER PRIMARY KEY, resolved INTEGER NOT NULL DEFAULT 0)`,
+		`INSERT INTO servers (id, name) VALUES (1, 'old')`,
+		`INSERT INTO alert_log (id, resolved) VALUES (1, 1)`,
+	} {
+		if _, err := DB.Exec(stmt); err != nil {
+			t.Fatalf("exec %q: %v", stmt, err)
+		}
+	}
+
+	for run := 0; run < 2; run++ {
+		if err := addAlertResolvedAtAndAgentUpdateColumns(); err != nil {
+			t.Fatalf("run %d: %v", run, err)
+		}
+	}
+
+	var autoUpdate int
+	var updateError string
+	if err := DB.QueryRow(`SELECT agent_auto_update, agent_update_error FROM servers WHERE id = 1`).Scan(&autoUpdate, &updateError); err != nil {
+		t.Fatalf("query servers: %v", err)
+	}
+	if autoUpdate != 0 || updateError != "" {
+		t.Fatalf("defaults = (%d, %q), want (0, \"\")", autoUpdate, updateError)
+	}
+	var resolvedAt sql.NullString
+	if err := DB.QueryRow(`SELECT resolved_at FROM alert_log WHERE id = 1`).Scan(&resolvedAt); err != nil {
+		t.Fatalf("query alert_log: %v", err)
+	}
+	if resolvedAt.Valid {
+		t.Fatalf("legacy resolved alert got resolved_at %q, want NULL", resolvedAt.String)
+	}
+}

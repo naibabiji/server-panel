@@ -489,6 +489,9 @@ func createAlertUsingRule(db *sql.DB, alertType, ruleType string, serverID *int6
 	if count > 0 {
 		return
 	}
+	if reopenRecentAlert(db, where, args, level, message) {
+		return
+	}
 
 	if _, err := db.Exec(
 		`INSERT INTO alert_log (alert_type, server_id, website_id, level, message) VALUES (?,?,?,?,?)`,
@@ -498,6 +501,38 @@ func createAlertUsingRule(db *sql.DB, alertType, ruleType string, serverID *int6
 	}
 
 	notifyAlertUsingRule(db, alertType, ruleType, serverID, websiteID, message)
+}
+
+// alertReopenWindow is how long after an alert resolves that the same
+// condition coming back on the same target still counts as the same incident.
+// A flapping condition (e.g. an Agent whose DNS keeps failing, so its
+// heartbeat drops for 10 minutes, recovers for 20, drops again) would
+// otherwise resolve and re-create its alert - and send another email - on
+// every flap.
+const alertReopenWindow = "-60 minutes"
+
+// reopenRecentAlert reopens the most recent alert matching where/args that
+// was resolved within alertReopenWindow, refreshing its level/message, and
+// reports whether it did. A reopened alert sends no notification: whoever
+// was notified about this incident has already been told.
+func reopenRecentAlert(db *sql.DB, where string, args []interface{}, level, message string) bool {
+	var id int64
+	err := db.QueryRow(`SELECT id FROM alert_log WHERE `+where+`
+		AND resolved = 1 AND resolved_at >= datetime('now', ?)
+		ORDER BY resolved_at DESC, id DESC LIMIT 1`,
+		append(append([]interface{}{}, args...), alertReopenWindow)...).Scan(&id)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			log.Printf("check recently resolved alert failed: %v", err)
+		}
+		return false
+	}
+	if _, err := db.Exec(`UPDATE alert_log SET resolved = 0, resolved_at = NULL, level = ?, message = ? WHERE id = ?`,
+		level, message, id); err != nil {
+		log.Printf("reopen alert failed: id=%d: %v", id, err)
+		return false
+	}
+	return true
 }
 
 // upsertAlert is like createAlert but, when an unresolved alert for the same
@@ -612,7 +647,7 @@ func resolveInactiveAlerts(db *sql.DB, alertType string, active map[alertTarget]
 	rows.Close()
 
 	for _, id := range resolveIDs {
-		_, _ = db.Exec("UPDATE alert_log SET resolved = 1 WHERE id = ?", id)
+		_, _ = db.Exec("UPDATE alert_log SET resolved = 1, resolved_at = CURRENT_TIMESTAMP WHERE id = ?", id)
 	}
 }
 
