@@ -18,13 +18,14 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" x-show="loading" x-cloak>
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6" x-show="loading" x-cloak>
+        <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
         <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
         <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
         <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
         <div class="card"><div class="skeleton-block h-3 w-10 mb-2"></div><div class="skeleton-block h-6 w-16"></div></div>
     </div>
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" x-show="!loading">
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6" x-show="!loading">
         <div class="card">
             <div class="text-xs text-gray-400">{{t .Lang "dashboard.cpu"}}</div>
             <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'cpu_percent', server.cpu_cores)" x-text="monitorMetricText(latest, 'cpu_percent')"></div>
@@ -40,6 +41,10 @@
         <div class="card">
             <div class="text-xs text-gray-400">{{t .Lang "dashboard.load_1m"}}</div>
             <div class="text-xl font-bold mt-1" :class="monitorMetricClass(latest, 'load_avg_1', server.cpu_cores)" x-text="monitorMetricText(latest, 'load_avg_1')"></div>
+        </div>
+        <div class="card">
+            <div class="text-xs text-gray-400">{{t .Lang "monitor.col_uptime"}}</div>
+            <div class="text-xl font-bold mt-1 text-gray-200" x-text="latest.recorded_at ? formatUptime(latest.uptime_seconds || 0) : '--'"></div>
         </div>
     </div>
 
